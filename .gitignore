@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+*.DS_Store
+.vscode/settings.json
+.idea/
+coverage/
+.pytest_cache/
+__pycache__/
+.env.example.local

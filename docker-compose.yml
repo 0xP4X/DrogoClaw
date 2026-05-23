@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  drogonclaw:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: drogonclaw
+    ports:
+      - "18789:18789"
+    environment:
+      - AI_PROVIDER=claude
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GATEWAY_PORT=18789
+      - GATEWAY_HOST=0.0.0.0
+      - LOG_LEVEL=info
+      - DATABASE_PATH=/app/data/drogonclaw.db
+    volumes:
+      - ./data:/app/data
+      - ./skills:/app/skills
+    networks:
+      - drogonclaw-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:18789/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Optional: Ollama for local LLM
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - drogonclaw-network
+    restart: unless-stopped
+    profiles:
+      - local-llm
+
+networks:
+  drogonclaw-network:
+    driver: bridge
+
+volumes:
+  ollama_data:

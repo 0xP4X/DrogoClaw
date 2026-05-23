@@ -1,0 +1,76 @@
+{
+  "name": "drogonclaw",
+  "version": "0.1.0",
+  "description": "🐉🔥 DrogonClaw — Autonomous AI Penetration Testing Framework",
+  "main": "dist/cli/index.js",
+  "bin": {
+    "drogonclaw": "dist/cli/index.js"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx --watch src/cli/index.ts",
+    "cli": "tsx src/cli/index.ts",
+    "start": "tsx src/cli/index.ts start",
+    "gateway": "tsx src/gateway/server.ts",
+    "api": "tsx src/gateway/web-socket.ts",
+    "web": "npm run dev --prefix ui",
+    "test": "jest",
+    "lint": "eslint src --ext .ts --fix",
+    "format": "prettier --write src skills docs"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^8.4.3",
+    "@langchain/anthropic": "^0.3.0",
+    "@langchain/core": "^0.3.0",
+    "@langchain/google-genai": "^0.1.0",
+    "@langchain/langgraph": "^0.2.0",
+    "@langchain/openai": "^0.3.0",
+    "@types/dockerode": "^4.0.1",
+    "@types/ws": "^8.18.1",
+    "axios": "^1.5.0",
+    "chalk": "^5.3.0",
+    "cli-spinners": "^3.4.0",
+    "commander": "^11.0.0",
+    "dockerode": "^5.0.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "figlet": "^1.11.0",
+    "langchain": "^0.3.0",
+    "neo4j-driver": "^6.0.1",
+    "ora": "^9.4.0",
+    "pino": "^8.16.1",
+    "sqlite3": "^5.1.6",
+    "telegraf": "^4.16.3",
+    "ws": "^8.21.0",
+    "yaml": "^2.3.3",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.20",
+    "@types/figlet": "^1.7.0",
+    "@types/jest": "^29.5.5",
+    "@types/node": "^20.5.9",
+    "@typescript-eslint/eslint-plugin": "^6.7.2",
+    "@typescript-eslint/parser": "^6.7.2",
+    "eslint": "^8.49.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.0.3",
+    "tsx": "^3.14.0",
+    "typescript": "^5.2.2"
+  },
+  "keywords": [
+    "pentesting",
+    "security",
+    "ai",
+    "automation",
+    "ctf",
+    "hacking",
+    "penetration-testing",
+    "autonomous-agent"
+  ],
+  "license": "MIT"
+}

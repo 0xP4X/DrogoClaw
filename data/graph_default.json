@@ -1,0 +1,19 @@
+{
+  "nodes": [
+    {
+      "id": "/heath",
+      "label": "Asset",
+      "properties": {
+        "description": "Nmap scan results"
+      }
+    },
+    {
+      "id": "nc 154.57.164.82 31274",
+      "label": "Target",
+      "properties": {
+        "description": "Initial service interaction"
+      }
+    }
+  ],
+  "edges": []
+}
