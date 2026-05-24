@@ -1,6 +1,8 @@
 import { Telegraf } from "telegraf";
 import chalk from "chalk";
 import { AgentOrchestrator } from "../agent/orchestrator";
+import { HitL } from "../core/hitl";
+import { ConfigManager } from "../core/config-manager";
 
 /**
  * DrogonClaw Telegram Gateway
@@ -14,8 +16,8 @@ export class GatewayServer {
   private allowedChatId: string;
 
   constructor() {
-    const token = process.env.TELEGRAM_TOKEN;
-    this.allowedChatId = process.env.TELEGRAM_CHAT_ID || "";
+    const token = ConfigManager.get("TELEGRAM_TOKEN");
+    this.allowedChatId = ConfigManager.get("TELEGRAM_CHAT_ID") || "";
 
     if (!token) {
       console.log(chalk.red("❌ TELEGRAM_TOKEN is not set in .env"));
@@ -62,6 +64,15 @@ export class GatewayServer {
       );
     });
 
+    // Human-in-the-Loop Event Listener
+    HitL.on("approval_requested", async ({ question, requestId }) => {
+      try {
+        await this.bot.telegram.sendMessage(this.allowedChatId, `⚠️ *AGENT REQUIRES APPROVAL*\n\n_${question}_\n\nPlease reply directly to this message with your decision.`, { parse_mode: "Markdown" });
+      } catch (e) {
+        console.error(chalk.red(`[Gateway Error] Failed to send HitL request: ${e}`));
+      }
+    });
+
     // Handle all natural language text messages
     this.bot.on("text", async (ctx) => {
       const instruction = ctx.message.text;
@@ -73,10 +84,41 @@ export class GatewayServer {
           await ctx.reply("🔄 Agent memory wiped. Ready for a new mission.");
           return;
         }
-        if (instruction !== "/start") {
-          await ctx.reply("I operate on natural language. Just tell me what to do directly. (Type /new to wipe memory)");
+        if (instruction === "/report") {
+          const statusMessage = await ctx.reply("📝 Compiling raw intelligence into compliance report. Please wait...");
+          try {
+            const { ReportGenerator } = await import("../core/report-generator");
+            const generator = new ReportGenerator(this.orchestrator.getMemoryGraph());
+            const { docPath } = await generator.generateReport();
+            
+            await ctx.telegram.deleteMessage(ctx.chat.id, statusMessage.message_id);
+            await ctx.replyWithDocument({ source: docPath }, { caption: "📋 Mission Intelligence Report Generated." });
+          } catch (e: any) {
+            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined, `❌ Report generation failed: ${e.message}`);
+          }
           return;
         }
+        if (instruction === "/autopilot on") {
+          this.orchestrator.autopilotEnabled = true;
+          await ctx.reply("🔥 *AUTOPILOT MODE ACTIVATED*\nI will now run autonomously, compile my own tools, and only stop when the objective is completely destroyed. Send your mission.", { parse_mode: "Markdown" });
+          return;
+        }
+        if (instruction === "/autopilot off") {
+          this.orchestrator.autopilotEnabled = false;
+          await ctx.reply("🛑 Autopilot deactivated. I will return to standard step-by-step execution.");
+          return;
+        }
+        if (instruction !== "/start") {
+          await ctx.reply("I operate on natural language. Just tell me what to do directly. (Type /new to wipe memory, /autopilot on to enable infinite autonomy, or /report to get a final document)");
+          return;
+        }
+      }
+
+      // If HitL is waiting for a reply, resolve it instead of launching a new execution!
+      if (HitL.hasPendingRequest()) {
+        HitL.resolveRequest(instruction);
+        await ctx.reply("✅ Answer received. Agent execution resuming...");
+        return;
       }
 
       console.log(chalk.cyan(`\n[Telegram Gateway] Received mission: "${instruction}"`));
@@ -116,6 +158,12 @@ export class GatewayServer {
         console.log(chalk.green(`[Telegram Gateway] Mission complete. Report delivered.`));
 
       } catch (error: any) {
+        if (error.name === "HitLPauseError") {
+          console.log(chalk.yellow(`\n[HitL] Agent execution suspended. Awaiting human input...`));
+          // Do not send a failure message, the user is already pinged.
+          return;
+        }
+
         console.error(chalk.red(`[Telegram Gateway Error] ${error.message}`));
         await ctx.reply(`❌ *Mission Failed:*\n\n${error.message}`, { parse_mode: "Markdown" });
       }
@@ -142,3 +190,9 @@ export class GatewayServer {
     return chunks;
   }
 }
+
+// Start the gateway if called directly
+const gateway = new GatewayServer();
+gateway.start().catch((err) => {
+  console.error(chalk.red("❌ Failed to start Telegram Gateway:"), err);
+});

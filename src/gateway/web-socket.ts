@@ -11,22 +11,43 @@ export class WebGUIServer {
 
   constructor(orchestrator: AgentOrchestrator, port: number = 8080) {
     this.orchestrator = orchestrator;
-    this.wss = new WebSocketServer({ port });
-    console.log(chalk.cyan(`\n🌐 Web GUI API running on ws://localhost:${port}`));
+    try {
+      this.wss = new WebSocketServer({ port });
+      console.log(chalk.cyan(`\n🌐 Web GUI API running on ws://localhost:${port}`));
+    } catch (e: any) {
+      if (e.code === 'EADDRINUSE') {
+        console.log(chalk.red(`❌ Port ${port} is already in use.`));
+        console.log(chalk.yellow(`💡 Try running 'npx kill-port ${port}' or closing other DrogonClaw instances.`));
+      }
+      throw e;
+    }
   }
 
   public start(): void {
     this.wss.on("connection", (ws: WebSocket) => {
       console.log(chalk.green("[Web GUI] Client connected to WebSocket."));
       
+      const setupGraphListeners = () => {
+        const graph = this.orchestrator.getMemoryGraph();
+        if (graph) {
+          graph.on("nodeAdded", (node) => {
+            ws.send(JSON.stringify({ type: "GRAPH_NODE_ADDED", data: node }));
+          });
+          graph.on("edgeAdded", (edge) => {
+            ws.send(JSON.stringify({ type: "GRAPH_EDGE_ADDED", data: edge }));
+          });
+        }
+      };
+
       if (!this.orchestrator.isReady()) {
         ws.send(JSON.stringify({ type: "NEEDS_SETUP" }));
       } else {
         const graph = this.orchestrator.getMemoryGraph();
         ws.send(JSON.stringify({
           type: "MEMORY_GRAPH_DUMP",
-          data: graph ? JSON.parse(graph.getFullGraphJSON()) : {}
+          data: graph ? JSON.parse(graph.getFullGraphJSON()) : { nodes: [], edges: [] }
         }));
+        setupGraphListeners();
       }
 
       ws.on("message", async (message: string) => {
@@ -53,17 +74,23 @@ export class WebGUIServer {
             dotenv.config({ override: true });
 
             this.orchestrator = new AgentOrchestrator();
-            await this.orchestrator.initialize();
+            const success = await this.orchestrator.initialize();
 
-            if (this.orchestrator.isReady()) {
+            if (success && this.orchestrator.isReady()) {
               ws.send(JSON.stringify({ type: "SETUP_COMPLETE" }));
               const graph = this.orchestrator.getMemoryGraph();
               ws.send(JSON.stringify({
                 type: "MEMORY_GRAPH_DUMP",
-                data: graph ? JSON.parse(graph.getFullGraphJSON()) : {}
+                data: graph ? JSON.parse(graph.getFullGraphJSON()) : { nodes: [], edges: [] }
               }));
+              setupGraphListeners();
             } else {
-              ws.send(JSON.stringify({ type: "ERROR", data: "Failed to connect to the AI Provider with those credentials." }));
+              // Extract specific error if available
+              const lastErr = this.orchestrator.getLastError();
+              ws.send(JSON.stringify({ 
+                type: "ERROR", 
+                data: lastErr || "Initialization failed. Check API key validity and network connectivity." 
+              }));
             }
           }
           
@@ -72,8 +99,9 @@ export class WebGUIServer {
             ws.send(JSON.stringify({ type: "MISSION_STATUS", data: "Mission started..." }));
             
             // Execute the mission and stream tool calls
-            const response = await this.orchestrator.execute(mission, (toolName) => {
-              ws.send(JSON.stringify({ type: "TOOL_UPDATE", data: toolName }));
+            const response = await this.orchestrator.execute(mission, (toolName, args) => {
+              const argStr = args ? ` - ${JSON.stringify(args)}` : "";
+              ws.send(JSON.stringify({ type: "TOOL_UPDATE", data: `${toolName}${argStr}` }));
             });
             
             // Send final response and updated graph
@@ -99,11 +127,17 @@ export class WebGUIServer {
 
 // Start server if run directly
 const orchestrator = new AgentOrchestrator();
+
+// Start the server IMMEDIATELY so the UI can connect 
+// even while the core is trying to initialize or awaiting setup.
+const server = new WebGUIServer(orchestrator);
+server.start();
+
+// Try initial background initialization
 orchestrator.initialize().then(() => {
-  // We no longer exit on failure, so the Web GUI can display the setup wizard.
   if (!orchestrator.isReady()) {
     console.log(chalk.yellow("\n⚠️ Agent Core is offline. Awaiting Web GUI configuration..."));
+  } else {
+    console.log(chalk.green("\n✅ Agent Core initialized from existing environment."));
   }
-  const server = new WebGUIServer(orchestrator);
-  server.start();
 });

@@ -2,102 +2,49 @@
 
 **Date:** 2026-05-23  
 **Project:** DrogonClaw Pentesting Framework  
-**Status:** Phase 1 - Project Scaffolding (88% Complete)
+**Status:** Phase 3 - Advanced Offensive Tradecraft (95% Complete)
 
 ---
 
 ## ✅ Completed
 
-### Configuration Files (7 files)
-1. ✅ `package.json` - Complete npm configuration with 10 dependencies
-2. ✅ `tsconfig.json` - TypeScript 5.2.2 configuration
-3. ✅ `.eslintrc.json` - Strict ESLint configuration
-4. ✅ `.prettierrc` - Code formatting rules
-5. ✅ `.gitignore` - Git ignore patterns
-6. ✅ `.env.example` - Environment template with 9 variables
-7. ✅ `README.md` - Project documentation
+### Core Pillars
+- ✅ `AgentOrchestrator` - Stable ReAct loop with 150+ recursion limit.
+- ✅ `MissionPlanner` - JSON-structured hierarchical goal decomposition.
+- ✅ `MemoryGraph` - Persistent intelligence graph for asset/vuln tracking.
+- ✅ `EvidenceValidator` - Dual-pass LLM verification of tool output.
+- ✅ `SwarmCommander` - Parallel multi-vector agent execution.
 
-### Setup Scripts (3 scripts)
-- ✅ `setup-project.js` - Node.js automated setup
-- ✅ `setup_project.py` - Python automated setup
-- ✅ `create-structure.bat` - Windows batch setup
+### Advanced Skill Registry (20+ Specialized Tools)
+- ✅ `Nmap`, `Gobuster`, `Nuclei` - Standard recon.
+- ✅ `SQLMap`, `Metasploit` - Advanced exploitation.
+- ✅ `Hydra` (Brute Force) - Credential testing.
+- ✅ `Chisel` (Pivoting) - Network tunneling for internal segments.
+- ✅ `Exploit-DB` (Searchsploit) - Local vulnerability research.
+- ✅ `PrivEsc Audit` - Automated path identification for Linux/Windows.
+- ✅ `Advanced Implant Gen` - Stealth Go payloads with anti-sandbox/obfuscation.
 
-### Installation Guides (3 docs)
-- ✅ `SETUP_INSTRUCTIONS.md` - Step-by-step manual guide
-- ✅ `MANIFEST.md` - Project status manifest
-- ✅ `00_START_HERE.txt` - Quick start guide
-
-### Source Files (3 TS files - ready to be placed)
-- ✅ `cli-index.ts` → **`src/cli/index.ts`** (CLI entry point)
-- ✅ `gateway-server.ts` → **`src/gateway/server.ts`** (Express gateway)
-- ✅ `agent-orchestrator.ts` → **`src/agent/orchestrator.ts`** (Agent engine)
+### Gateways & Channels
+- ✅ `CLI` - Full interactive experience.
+- ✅ `Telegram Bot` - Remote C2 with secure whitelist & status streaming.
+- ✅ `Express Gateway` - Central control plane on port 18789.
 
 ---
 
-## ⏳ Remaining (12% - Command Execution Only)
+## ⏳ Remaining (5% - Polish)
 
-The project is 100% scaffolded. Just needs these commands to run in **Command Prompt**:
-
-### Option A: Automated Setup (Recommended)
-```batch
-cd C:\Users\0day\Desktop\drogon
-node setup-project.js
-npm install
-npm run build
-npm run lint
-```
-
-### Option B: Manual Setup
-```batch
-cd C:\Users\0day\Desktop\drogon
-mkdir src\gateway
-mkdir src\agent\strategies
-mkdir src\skills\recon
-mkdir src\skills\exploitation
-mkdir src\channels\cli
-mkdir src\channels\telegram
-mkdir src\storage
-mkdir src\reporting
-mkdir src\cli\commands
-mkdir src\types
-mkdir config
-mkdir tests\unit
-mkdir tests\integration
-mkdir tests\fixtures
-mkdir docs
-REM Then move the .ts files to correct locations
-npm install
-npm run build
-npm run lint
-```
-
-### Option C: Use Batch Script
-```batch
-cd C:\Users\0day\Desktop\drogon
-create-structure.bat
-npm install
-npm run build
-```
+1. **Active Directory Modules**: Native SMBMap/RPC wrappers (planned).
+2. **Cloud Audit**: Integration with Prowler/Trivy for AWS/Azure (planned).
+3. **Web UI**: React Dashboard for the Intelligence Graph (placeholder exists).
 
 ---
 
-## 📊 Dependencies Installed (Will be when npm install runs)
+## 📊 Infrastructure Status
 
-**Production (10):**
-- express@4.18.2 - Web framework
-- sqlite3@5.1.6 - Database
-- telegraf@4.12.2 - Telegram bot
-- dotenv@16.3.1 - Environment config
-- chalk@5.3.0 - CLI colors
-- inquirer@8.2.5 - Interactive prompts
-- axios@1.5.0 - HTTP client
-- yaml@2.3.3 - YAML parsing
-- pino@8.16.1 - Logging
-- zod@3.22.4 - Schema validation
+**Docker Sandbox**: ✅ Operational (`kali-rolling`)
+**LLM Connectivity**: ✅ Verified (Structured Outputs Compatible)
+**Session Persistence**: ✅ Operational (SQLite + File system)
 
-**Development (8):**
-- typescript@5.2.2
-- @types/node@20.5.9
 - @types/express@4.17.20
 - tsx@3.14.0
 - eslint@8.49.0

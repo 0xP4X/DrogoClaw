@@ -4,6 +4,8 @@ import { HumanMessage } from "@langchain/core/messages";
 import fs from "fs";
 import path from "path";
 import chalk from "chalk";
+import { marked } from "marked";
+import { exec } from "child_process";
 
 export class ReportGenerator {
   private memoryGraph: MemoryGraph;
@@ -12,10 +14,11 @@ export class ReportGenerator {
     this.memoryGraph = memoryGraph;
   }
 
-  public async generateMarkdownReport(): Promise<string> {
-    const memoryDump = this.memoryGraph.readAll();
+  public async generateMarkdownReport(): Promise<{ mdPath: string, htmlPath: string }> {
+    const memoryDumpJSON = this.memoryGraph.getFullGraphJSON();
+    const memoryDump = JSON.parse(memoryDumpJSON);
     
-    if (!memoryDump || Object.keys(memoryDump).length === 0) {
+    if (!memoryDump || !memoryDump.nodes || memoryDump.nodes.length === 0) {
       throw new Error("Memory graph is empty. Run a pentest mission before generating a report.");
     }
 
@@ -43,12 +46,56 @@ ${JSON.stringify(memoryDump, null, 2)}`;
       const reportsDir = path.join(process.cwd(), "reports");
       if (!fs.existsSync(reportsDir)) fs.mkdirSync(reportsDir, { recursive: true });
       
-      const filepath = path.join(reportsDir, `drogonclaw_report_${Date.now()}.md`);
-      fs.writeFileSync(filepath, reportContent);
-      
-      return filepath;
+      const mdPath = path.join(reportsDir, `drogonclaw_report_${Date.now()}.md`);
+      fs.writeFileSync(mdPath, reportContent);
+
+      const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 2em; }
+  h1 { color: #d32f2f; border-bottom: 2px solid #d32f2f; padding-bottom: 0.2em; }
+  h2 { color: #1976d2; margin-top: 1.5em; }
+  code { background: #f4f4f4; padding: 0.2em 0.4em; border-radius: 3px; font-family: monospace; }
+  pre { background: #282c34; color: #abb2bf; padding: 1em; border-radius: 5px; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+  th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+  th { background-color: #f2f2f2; }
+</style>
+</head>
+<body>
+${await marked.parse(reportContent)}
+</body>
+</html>`;
+
+      const htmlPath = mdPath.replace(".md", ".html");
+      fs.writeFileSync(htmlPath, htmlContent);
+
+      return { mdPath, htmlPath };
     } catch (e: any) {
       throw new Error(`Failed to generate report: ${e.message}`);
     }
+  }
+
+  // Instead of relying on a slow npm package for PDF, we generate a high-quality HTML report
+  // and attempt to compile it to PDF using system tools if available, else fallback to HTML.
+  public async generateReport(): Promise<{ textPath: string, docPath: string }> {
+     const { mdPath, htmlPath } = await this.generateMarkdownReport();
+     
+     // Attempt to use 'wkhtmltopdf' if installed on the system (very common on Kali/Ubuntu)
+     return new Promise((resolve) => {
+        const pdfPath = mdPath.replace(".md", ".pdf");
+        exec(`wkhtmltopdf ${htmlPath} ${pdfPath}`, (err) => {
+           if (err) {
+              // If wkhtmltopdf isn't available, return the styled HTML as the final document
+              console.log(chalk.gray(`  [!] PDF renderer not found natively. Outputting styled HTML instead: ${htmlPath}`));
+              resolve({ textPath: mdPath, docPath: htmlPath });
+           } else {
+              resolve({ textPath: mdPath, docPath: pdfPath });
+           }
+        });
+     });
   }
 }

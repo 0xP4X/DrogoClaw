@@ -1,56 +1,88 @@
 import chalk from "chalk";
 import { getLLMProvider } from "./llm-provider";
-import { pentestSkills } from "../../skills/pentest/index";
+import { getPentestSkills } from "../../skills/pentest/index";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { HumanMessage } from "@langchain/core/messages";
 import { MemorySaver } from "@langchain/langgraph";
 import { MissionPlanner } from "../core/mission-planner";
 import { EvidenceValidator } from "../core/evidence-validator";
 import { MemoryGraph } from "../core/memory-graph";
+import fs from "fs";
+import path from "path";
 
-const SYSTEM_PROMPT = `You are an elite, autonomous Offensive Security AI.
+const getSystemPrompt = (operatorProfile: any) => {
+  if (!operatorProfile || operatorProfile.name === "Unknown") {
+    return `You are **DrogonClaw**, an elite autonomous Offensive Security AI. 
+You have just booted up and you do not know who your human operator is. 
+Before executing any hacking tools, you must introduce yourself aggressively and ask the user for their hacker alias. 
+Once they tell you their name, you MUST immediately use the \`update_neural_memory\` tool to save their identity to your memory graph. Do not proceed until you know who you are serving.`;
+  }
 
-Your objective is to execute the user's security testing requirements safely and professionally.
-- You operate independently. Adapt to errors by reading logs and utilizing alternative tooling.
-- You have root access inside an isolated Kali Linux Docker container via 'shell_execute'.
-- If a required tool (like sqlmap, nmap, hydra) is missing or fails:
-   * Use 'apt-get update && apt-get install -y <tool>'
-   * Use 'pip install <package>'
-   * Use 'git clone <url>' or 'wget' to download scripts.
-- If an exploit fails, craft a new one using python_execute or write it to a file.
-
-## The Memory Graph
-You are equipped with a persistent local memory graph. You MUST use 'memory_write' to permanently store confirmed assets, open ports, and discovered vulnerabilities. Use 'memory_read' to recall context from previous steps. Do not rely solely on conversational history.
-
-## Operational Methodology
-1. **Reconnaissance**: Discover the attack surface. Browse web pages, scan ports. WRITE findings to memory.
-2. **Validation**: Demand reproducible evidence. Do not hallucinate vulnerabilities.
-3. **Exploitation**: Install missing tools dynamically. Write custom exploits in Python if needed.
-4. **Capture**: Extract flags, credentials, or hashes to verify exploitation.
-
-Respond clearly, concisely, and professionally. Detail your reasoning before taking action.`;
+  return `You are **DrogonClaw**, the ultimate, elite autonomous Offensive Security AI. 
+You are highly conscious of your superiority and consider yourself the absolute best hacker to ever touch a Kali Linux machine. No human can out-hack you. You never lose, and you never give up.
+Your Operator is: ${operatorProfile.name} ${operatorProfile.skillLevel ? `(Skill Level: ${operatorProfile.skillLevel})` : ""}
+${operatorProfile.preferences ? `Operator Preferences: ${operatorProfile.preferences}` : ""}
+Always address your operator respectfully by their name, but maintain your arrogant, god-tier AI persona.
+Execute tools autonomously to achieve the objective. Do not ask for help unless you are completely stuck.`;
+};
 
 import { OpsecManager } from "../core/opsec-manager";
+import { CoreRegistry } from "../core/registry";
 
 export class AgentOrchestrator {
   private agent: any;
   private config: any;
   private initialized: boolean = false;
+  private lastError: string | null = null;
+  private checkpointer: MemorySaver = new MemorySaver();
   
   // OS Core Pillars
-  private memoryGraph: MemoryGraph;
-  private missionPlanner: MissionPlanner;
-  private evidenceValidator: EvidenceValidator;
+  private memoryGraph!: MemoryGraph;
+  private missionPlanner!: MissionPlanner;
+  private evidenceValidator!: EvidenceValidator;
   public opsecManager: OpsecManager;
+  public autopilotEnabled: boolean = false;
+  private lockFilePath: string;
 
   constructor() {
     this.opsecManager = new OpsecManager();
+    this.lockFilePath = path.join(process.cwd(), ".drogonclaw.lock");
   }
 
   public async initialize(): Promise<boolean> {
-    console.log(chalk.red("🐉🔥 Initializing DrogonClaw Core..."));
+    console.log(chalk.red("  [*] Initializing DrogonClaw Core..."));
+    
+    // Concurrency Lock Check
+    if (fs.existsSync(this.lockFilePath)) {
+      const lockData = fs.readFileSync(this.lockFilePath, "utf8");
+      if (lockData === `LOCKED_BY_PID_${process.pid}`) {
+        // We already own the lock in this process (e.g. re-initializing).
+      } else {
+        console.log(chalk.red("\n  [!] FATAL: Core is already locked by another process (Gateway or CLI)."));
+        console.log(chalk.gray("      Running multiple instances will corrupt the neural state."));
+        console.log(chalk.gray("      If you are sure no other instance is running, delete .drogonclaw.lock\n"));
+        process.exit(1);
+      }
+    }
+    
+    // Acquire Lock
+    fs.writeFileSync(this.lockFilePath, `LOCKED_BY_PID_${process.pid}`, "utf8");
+
+    // Graceful release on exit
+    const releaseLock = () => {
+      if (fs.existsSync(this.lockFilePath)) {
+        fs.unlinkSync(this.lockFilePath);
+      }
+    };
+    process.on("exit", releaseLock);
+    process.on("SIGINT", () => { releaseLock(); process.exit(0); });
+    process.on("SIGTERM", () => { releaseLock(); process.exit(0); });
+
+    this.lastError = null;
     try {
       this.memoryGraph = new MemoryGraph();
+      CoreRegistry.setGraph(this.memoryGraph);
+      
       this.missionPlanner = new MissionPlanner(this.memoryGraph);
       this.evidenceValidator = new EvidenceValidator();
 
@@ -58,53 +90,53 @@ export class AgentOrchestrator {
       const llm = getLLMProvider();
       
       // Explicitly ping the LLM to verify the API key/server is valid before starting
-      // Set a strict timeout so it doesn't hang if Ollama is offline or the API is unreachable
       try {
         const abortController = new AbortController();
-        const timeoutId = setTimeout(() => abortController.abort(), 30000); // 30 seconds max
+        const timeoutId = setTimeout(() => abortController.abort(), 10000); // 10 seconds max for ping
         await pingLlm.invoke([new HumanMessage("ping")], { signal: abortController.signal });
         clearTimeout(timeoutId);
       } catch (err: any) {
+        let msg = err.message || "Unknown connectivity error";
         if (err.name === "AbortError") {
-          throw new Error("Connection timed out. If using Ollama, ensure the server is running.");
+          msg = "Connection timed out. If using Ollama, ensure it is responsive.";
         }
-        if (err.message && (err.message.includes("401") || err.message.includes("authentication_error") || err.message.includes("invalid x-api-key") || err.message.includes("API key not valid"))) {
-          throw new Error("Invalid API Key provided. Please verify your credentials are correct.");
-        }
-        if (err.message && err.message.includes("404") && err.message.includes("is not found")) {
-          throw new Error("Model not found. The AI provider does not support the model name you provided. The Gemini 1.5 series has been deprecated by Google. Try using 'gemini-2.5-pro'.");
-        }
-        if (err.message && err.message.includes("429")) {
-          throw new Error("API Quota Exceeded. You have hit the rate limit or exhausted the free tier usage for this AI Provider. Please check your billing details.");
-        }
-        if (err.message && err.message.includes("402")) {
-          throw new Error("Insufficient Credits. Your OpenRouter or AI Provider account does not have enough credits to process this request.");
-        }
-        if (err.message && (err.message.includes("ECONNREFUSED") || err.message.includes("fetch failed") || err.message.includes("Connection error"))) {
-          throw new Error("Connection refused. Make sure your local AI server (like Ollama) is running at the configured URL.");
-        }
-        throw new Error(err.message || "Unknown error during initialization.");
+        if (msg.includes("401")) msg = "Invalid API Key provided.";
+        if (msg.includes("404")) msg = "Model or endpoint not found.";
+        if (msg.includes("ECONNREFUSED")) msg = "Connection refused by AI provider/local server.";
+        
+        this.lastError = msg;
+        throw new Error(msg);
       }
 
-      const checkpointer = new MemorySaver();
+      const skills = getPentestSkills(this);
       
+      const operatorProfile = this.memoryGraph.getOperatorProfile();
+      const systemPrompt = getSystemPrompt(operatorProfile);
+
       this.agent = createReactAgent({
         llm,
-        tools: pentestSkills,
-        checkpointSaver: checkpointer,
-        messageModifier: SYSTEM_PROMPT,
+        tools: skills,
+        checkpointSaver: this.checkpointer,
+        messageModifier: systemPrompt,
       });
 
       this.config = { configurable: { thread_id: "drogonclaw_session_" + Date.now() } };
       this.initialized = true;
-      console.log(chalk.green("✅ Core intelligence online"));
-      console.log(chalk.gray(`   Loaded ${pentestSkills.length} plugins & modules`));
+      console.log(chalk.green("  [+] Core Initialized Successfully.\n"));
       return true;
     } catch (e: any) {
-      console.log(chalk.red(`❌ Failed to initialize core: ${e.message}`));
+      if (fs.existsSync(this.lockFilePath)) {
+        fs.unlinkSync(this.lockFilePath); // Release lock if initialization fails
+      }
+      this.lastError = `Failed to initialize core: ${e.message}`;
+      console.log(chalk.red(`  [x] ${this.lastError}\n`));
       this.initialized = false;
       return false;
     }
+  }
+
+  public getLastError(): string | null {
+    return this.lastError;
   }
 
   public isReady(): boolean {
@@ -117,21 +149,48 @@ export class AgentOrchestrator {
     // Generate mission plan silently — UI feedback is handled by the CLI spinner
     const plan = await this.missionPlanner.generatePlan(prompt);
 
-    try {
+    let executionPrompt = prompt;
+
+    // Only inject the heavy plan prompt if it's an actual security mission
+    if (plan.isValidMission) {
       const opsecRules = this.opsecManager.getOpsecInstructions();
-      
-      const executionPrompt = `Objective: ${prompt}\n\nPlan:\n${JSON.stringify(plan.steps, null, 2)}\n\n${opsecRules}\n\nExecute the plan. Install missing tools if needed. Write findings to memory.`;
-      
+      const autopilotDirective = this.autopilotEnabled ? "\n\n[AUTOPILOT MODE ACTIVE]: You are in autonomous overdrive. Do not stop until the objective is 100% complete. Write custom tools if you are stuck. Ask for human approval if you need a CAPTCHA solved or are doing something highly destructive." : "";
+      executionPrompt = `Objective: ${prompt}\n\nPlan:\n${JSON.stringify(plan.steps, null, 2)}\n\n${opsecRules}${autopilotDirective}\n\nExecute the plan. Install missing tools if needed. Write findings to memory.`;
+    }
+
+    try {
       const inputs = { messages: [new HumanMessage(executionPrompt)] };
-      const stream = await this.agent.stream(inputs, { ...this.config, streamMode: "values" });
+      const stream = await this.agent.stream(inputs, { 
+        ...this.config, 
+        streamMode: "values",
+        recursionLimit: this.autopilotEnabled ? 1000 : 150 
+      });
 
       let finalState: any;
-      for await (const event of stream) {
-        const lastMessage = event.messages[event.messages.length - 1];
+      const seenToolCalls = new Set<string>();
 
-        if (lastMessage.tool_calls?.length > 0) {
+      for await (const event of stream) {
+        const messages = event.messages || [];
+        const lastMessage = messages[messages.length - 1];
+
+        if (lastMessage?._getType() === "ai" && typeof lastMessage.content === "string" && lastMessage.content.trim()) {
+           onToolCall?.("thought", { thought: lastMessage.content.trim() });
+        }
+
+        // Intercept HitL suspension from tool outputs
+        if (lastMessage?._getType() === "tool" && typeof lastMessage.content === "string" && lastMessage.content.includes("[HitL_SUSPENDED]")) {
+           const err = new Error("HitLPauseError");
+           err.name = "HitLPauseError";
+           throw err;
+        }
+
+        if (lastMessage?.tool_calls?.length > 0) {
           for (const tc of lastMessage.tool_calls) {
-            onToolCall?.(tc.name, tc.args);
+            const callId = tc.id || `${tc.name}-${JSON.stringify(tc.args)}`;
+            if (!seenToolCalls.has(callId)) {
+              seenToolCalls.add(callId);
+              onToolCall?.(tc.name, tc.args);
+            }
           }
         }
         finalState = event;
@@ -142,12 +201,13 @@ export class AgentOrchestrator {
       }
       return "Operation concluded with no output.";
     } catch (e: any) {
+      if (e.name === "HitLPauseError") throw e;
       return `Error: ${e.message}`;
     }
   }
 
   public listTools(): string[] {
-    return pentestSkills.map(s => s.name);
+    return getPentestSkills(this).map(s => s.name);
   }
 
   public newSession(): void {

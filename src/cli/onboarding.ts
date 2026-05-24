@@ -2,18 +2,23 @@ import { select, input, password, confirm } from "@inquirer/prompts";
 import chalk from "chalk";
 import fs from "fs";
 import path from "path";
-
-const ENV_PATH = path.join(process.cwd(), ".env");
+import { ConfigManager, DrogonConfig } from "../core/config-manager";
 
 export async function runOnboarding(): Promise<void> {
-  console.log(chalk.red("\n🔥 Welcome to DrogonClaw Initialization 🔥"));
-  console.log(chalk.gray("Let's get your autonomous agent configured.\n"));
+  console.log(chalk.red("\n  [*] Welcome to DrogonClaw Initialization [*]"));
+  console.log(chalk.gray("      Let's configure your neural backend.\n"));
+
+  console.log(chalk.cyan("  [OPTIMIZATION GUIDE]"));
+  console.log(chalk.gray("  For precision offensive security, we highly recommend:"));
+  console.log(chalk.gray("   - OpenAI: ") + chalk.white("gpt-4-turbo") + chalk.gray(" (Best overall logic and tool use)"));
+  console.log(chalk.gray("   - Anthropic: ") + chalk.white("claude-3-opus-20240229") + chalk.gray(" (Best coding and exploit writing)"));
+  console.log(chalk.gray("  Local models (Ollama) may lack the precision needed for complex autonomy.\n"));
 
   const setupMethod = await select({
     message: "Choose your setup method:",
     choices: [
-      { name: "⚡ Quick Setup (Default: OpenAI + gpt-4o)", value: "quick" },
-      { name: "🛠️  Custom Setup (Choose Provider, Model, Telegram)", value: "custom" },
+      { name: "[+] Quick Setup (Default: OpenAI + gpt-4o)", value: "quick" },
+      { name: "[*] Custom Setup (Choose Provider, Model, Telegram)", value: "custom" },
     ],
   });
 
@@ -38,7 +43,7 @@ export async function runOnboarding(): Promise<void> {
       ],
     });
 
-    envConfig = `AI_PROVIDER=${provider}\n\n`;
+    envConfig += `AI_PROVIDER=${provider}\n\n`;
 
     if (provider === "openai") {
       const apiKey = await input({ 
@@ -135,35 +140,35 @@ export async function runOnboarding(): Promise<void> {
   const save = await confirm({ message: "Save configuration?", default: true });
 
   if (save) {
-    fs.writeFileSync(ENV_PATH, envConfig, "utf-8");
-    console.log(chalk.green("\n✅ Configuration saved!"));
+    // Parse the constructed env string into the DrogonConfig object
+    const newConfig: DrogonConfig = {};
+    const lines = envConfig.split("\n");
+    for (const line of lines) {
+      if (line.includes("=")) {
+        const [key, value] = line.split("=");
+        (newConfig as any)[key.trim()] = value.trim();
+      }
+    }
+    
+    ConfigManager.save(newConfig);
+    console.log(chalk.green("\n  [+] Profile saved successfully!"));
+    console.log(chalk.cyan("\n  ╭─ System Ready ────────────────────────────────────────"));
+    console.log(chalk.gray("  │  Neural pathways are configured."));
+    console.log(chalk.gray("  │  DrogonClaw will now initialize and seize control."));
+    console.log(chalk.gray("  │  Follow its instructions carefully."));
+    console.log(chalk.cyan("  ╰───────────────────────────────────────────────────────\n"));
   } else {
-    console.log(chalk.yellow("\n⚠️ Configuration aborted. You will need to manually configure the agent to run DrogonClaw."));
+    console.log(chalk.yellow("\n  [-] Configuration aborted. You will need to manually configure the agent to run DrogonClaw."));
     process.exit(1);
   }
 }
 
 export function isEnvConfigured(): boolean {
-  if (!fs.existsSync(ENV_PATH)) return false;
-  
-  const content = fs.readFileSync(ENV_PATH, "utf-8");
-  
-  // Basic check: Ensure AI_PROVIDER exists
-  if (!content.includes("AI_PROVIDER=")) return false;
-
-  // Function to extract a specific key's value and check if it's non-empty
-  const hasValidValue = (key: string): boolean => {
-    const regex = new RegExp(`^${key}=(.*)$`, "m");
-    const match = content.match(regex);
-    return match ? match[1].trim().length > 0 : false;
-  };
-
-  // Ensure at least one required provider key has a non-empty value
   return (
-    hasValidValue("OPENAI_API_KEY") ||
-    hasValidValue("ANTHROPIC_API_KEY") ||
-    hasValidValue("GOOGLE_API_KEY") ||
-    hasValidValue("OPENROUTER_API_KEY") ||
-    hasValidValue("OLLAMA_BASE_URL")
+    !!ConfigManager.get("OPENAI_API_KEY") ||
+    !!ConfigManager.get("ANTHROPIC_API_KEY") ||
+    !!ConfigManager.get("GOOGLE_API_KEY") ||
+    !!ConfigManager.get("OPENROUTER_API_KEY") ||
+    !!ConfigManager.get("OLLAMA_BASE_URL")
   );
 }

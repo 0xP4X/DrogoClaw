@@ -14,7 +14,6 @@ process.emit = function (event: string, ...args: any[]) {
 import { program } from "commander";
 import chalk from "chalk";
 import figlet from "figlet";
-import dotenv from "dotenv";
 import { runOnboarding, isEnvConfigured } from "./onboarding";
 import { startChatSession } from "./chat";
 import { AgentOrchestrator } from "../agent/orchestrator";
@@ -24,15 +23,21 @@ const VERSION = "0.2.0";
 async function printBanner(): Promise<void> {
   console.clear();
   return new Promise((resolve) => {
-    figlet.text("DrogonClaw", { font: "Standard", horizontalLayout: "default" }, (err, data) => {
+    figlet.text("DROGONCLAW", { font: "ANSI Shadow", horizontalLayout: "fitted" }, (err, data) => {
+      console.log("");
       if (!err && data) {
-        console.log(chalk.red(data));
+        // Apply a subtle red-to-dark gradient effect
+        const lines = data.split('\n');
+        lines.forEach((line, i) => {
+          const intensity = Math.max(50, 255 - (i * 20));
+          console.log(chalk.rgb(intensity, 0, 0).bold(line));
+        });
       } else {
-        console.log(chalk.red("🐉🔥 DrogonClaw"));
+        console.log(chalk.red.bold("  [*] DROGONCLAW"));
       }
-      console.log(chalk.red("══════════════════════════════════════════════════════════════════════════"));
-      console.log(chalk.gray(`Autonomous AI Penetration Testing Framework v${VERSION}`));
-      console.log(chalk.red("══════════════════════════════════════════════════════════════════════════\n"));
+      console.log(chalk.red.bold("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
+      console.log(chalk.gray(`  Autonomous Offensive Security Framework`) + chalk.red(` v${VERSION}`) + chalk.gray(` | Root: `) + chalk.green(`Active`));
+      console.log(chalk.red.bold("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"));
       resolve();
     });
   });
@@ -46,14 +51,11 @@ async function startInteractiveMode(): Promise<void> {
       await runOnboarding();
     }
 
-    // Load environment variables after onboarding
-    dotenv.config();
-
     let orchestrator = new AgentOrchestrator();
     await orchestrator.initialize();
     
     while (!orchestrator.isReady()) {
-      console.log(chalk.yellow("\n⚠️ Agent Core is offline. Please resolve configuration errors to continue."));
+      console.log(chalk.yellow("\n  [-] Agent Core is offline. Please resolve configuration errors to continue."));
       const { confirm } = await import("@inquirer/prompts");
       const fs = await import("fs");
       const path = await import("path");
@@ -61,26 +63,13 @@ async function startInteractiveMode(): Promise<void> {
       const retry = await confirm({ message: "Would you like to run the setup wizard again?", default: true });
       
       if (retry) {
-        const envPath = path.join(process.cwd(), ".env");
-        if (fs.existsSync(envPath)) {
-          fs.unlinkSync(envPath); // Clear the bad config
-        }
         await runOnboarding();
         
-        // Force manual override of process.env because dotenv.config({override: true}) sometimes fails to mutate cached Node vars
-        const newEnvPath = path.join(process.cwd(), ".env");
-        if (fs.existsSync(newEnvPath)) {
-          const parsed = dotenv.parse(fs.readFileSync(newEnvPath));
-          for (const key in parsed) {
-            process.env[key] = parsed[key];
-          }
-        }
-        
-        console.log(chalk.cyan("\n🔄 Retrying initialization..."));
+        console.log(chalk.cyan("\n  [*] Retrying initialization..."));
         orchestrator = new AgentOrchestrator();
         await orchestrator.initialize();
       } else {
-        console.log(chalk.red("\n❌ Setup aborted. Please check your credentials manually."));
+        console.log(chalk.red("\n  [x] Setup aborted. Please check your credentials manually."));
         process.exit(1);
       }
     }
@@ -88,10 +77,10 @@ async function startInteractiveMode(): Promise<void> {
     await startChatSession(orchestrator);
   } catch (error: any) {
     if (error.name === "ExitPromptError") {
-      console.log(chalk.red("\n🐉 Setup cancelled. Stay dangerous. 🔥\n"));
+      console.log(chalk.red("\n  [!] Setup cancelled. Stay dangerous.\n"));
       process.exit(0);
     }
-    console.error(chalk.red("\n❌ Fatal Error:"), error);
+    console.error(chalk.red("\n  [x] Fatal Error:"), error);
     process.exit(1);
   }
 }
@@ -117,7 +106,6 @@ program
   .description("Execute a single pentesting instruction")
   .argument("<instruction...>", "Natural language instruction for the agent")
   .action(async (instruction: string[]) => {
-    dotenv.config();
     const orchestrator = new AgentOrchestrator();
     if (!orchestrator.isReady()) {
       console.log(chalk.red("Agent failed to initialize. Please run 'drogonclaw start' to configure it first."));
@@ -134,8 +122,7 @@ program
   .command("gateway")
   .description("Start the DrogonClaw gateway server (HTTP + Telegram)")
   .action(async () => {
-    dotenv.config();
-    console.log(chalk.cyan("🐉 Starting DrogonClaw Gateway..."));
+    console.log(chalk.cyan("  [*] Starting DrogonClaw Gateway..."));
     const { GatewayServer } = await import("../gateway/server");
     const server = new GatewayServer();
     await server.start();

@@ -13,7 +13,33 @@
       "properties": {
         "description": "Initial service interaction"
       }
+    },
+    {
+      "id": "greeting",
+      "label": "Target",
+      "properties": {
+        "message": "Hello, zero!"
+      }
+    },
+    {
+      "id": "zero",
+      "label": "Credential",
+      "properties": {
+        "username": "zero"
+      }
+    },
+    {
+      "id": "https://jeboo-admin-627.fly.dev",
+      "label": "Target",
+      "properties": {
+        "description": "Jeboo Admin"
+      }
     }
   ],
-  "edges": []
+  "edges": [],
+  "operatorProfile": {
+    "name": "de4lt",
+    "skillLevel": "",
+    "preferences": ""
+  }
 }
