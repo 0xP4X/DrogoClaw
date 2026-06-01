@@ -34,9 +34,9 @@ function App() {
         <Navbar />
         <Hero />
         <TerminalPreview />
+        <QuickStart />
         <Pillars />
         <Architecture />
-        <QuickStart />
       </div>
 
       <Footer />
