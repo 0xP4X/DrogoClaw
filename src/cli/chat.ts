@@ -341,8 +341,11 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
 
   while (true) {
     // Dynamically fetch the operator name in case it was updated by the neural memory tool during the session
-    const currentProfile = activeOrchestrator.getMemoryGraph().getOperatorProfile();
-    const currentOperatorName = currentProfile ? currentProfile.name : "Unknown Operator";
+    const currentOperatorProfile = activeOrchestrator.getMemoryGraph().getOperatorProfile();
+    const currentOperatorName = currentOperatorProfile ? currentOperatorProfile.name : "Unknown";
+
+    const currentAgentProfile = activeOrchestrator.getMemoryGraph().getAgentProfile();
+    const currentAgentName = currentAgentProfile ? currentAgentProfile.name : "DrogonClaw";
 
     // Dynamic Tactical Status Bar
     const stealthStatus = activeOrchestrator.opsecManager.isStealthModeActive() ? chalk.green("STEALTH:ON") : chalk.red("STEALTH:OFF");
@@ -354,7 +357,7 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
       chalk.gray(`  ${stealthStatus} | ${autopilotStatus} | ${telemetryStatus} | GRAPH:${nodeCount} | IDENTITY:${currentOperatorName}\n`)
     );
 
-    const promptText = chalk.cyan(`┏━ `) + chalk.bold.white(currentOperatorName) + chalk.cyan(`@drogonclaw `) + chalk.gray(`[${activeOrchestrator.getSessionId().substring(0,8)}]`) + chalk.cyan(`\n┗━❯ `);
+    const promptText = chalk.cyan(`┏━ `) + chalk.bold.white(currentOperatorName) + chalk.cyan(`@`) + chalk.bold.cyan(currentAgentName.toLowerCase()) + chalk.cyan(` `) + chalk.gray(`[${activeOrchestrator.getSessionId().substring(0,8)}]`) + chalk.cyan(`\n┗━❯ `);
     const prompt = await ask(promptText + chalk.white(""));
 
     let command = prompt.trim();
@@ -616,12 +619,20 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
         console.log(chalk.cyan(`  ┃  └─ `) + chalk.green(`[✓] Execution Complete`));
       }
 
-      console.log(chalk.cyan(" ┏━ DrogonClaw ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"));
+      const currentAgentProfile = activeOrchestrator.getMemoryGraph().getAgentProfile();
+      const currentAgentName = currentAgentProfile ? currentAgentProfile.name : "DrogonClaw";
+      
+      // Calculate border padding dynamically based on agent name length
+      const borderLen = Math.max(50 - currentAgentName.length, 10);
+      const topBorder = ` ┏━ ${currentAgentName} ` + "━".repeat(borderLen) + "┓";
+      const bottomBorder = ` ┗` + "━".repeat(borderLen + currentAgentName.length + 3) + "┛";
+
+      console.log(chalk.cyan(topBorder));
       const rendered = await marked.parse(result);
       // Custom border style for typewriter
       const styledResult = rendered.trimEnd();
       await streamText(styledResult);
-      console.log(chalk.cyan(" ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n"));
+      console.log(chalk.cyan(`${bottomBorder}\n`));
     } catch (error: any) {
       spinner.stop();
       if (error.name === "HitLPauseError") {

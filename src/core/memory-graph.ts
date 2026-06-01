@@ -28,12 +28,17 @@ export interface OperatorProfile {
   preferences?: string;
 }
 
+export interface AgentProfile {
+  name: string;
+}
+
 export class MemoryGraph extends EventEmitter {
   private nodes: Map<string, GraphNode> = new Map();
   private edges: GraphEdge[] = [];
   private dbPath: string;
   private neo4jDriver: Driver | null = null;
   private operatorProfile: OperatorProfile | null = null;
+  private agentProfile: AgentProfile | null = null;
 
   constructor(sessionId: string = "default") {
     super();
@@ -171,6 +176,10 @@ export class MemoryGraph extends EventEmitter {
     return this.operatorProfile;
   }
 
+  public getAgentProfile(): AgentProfile | null {
+    return this.agentProfile;
+  }
+
   public async updateOperatorProfile(profile: Partial<OperatorProfile>): Promise<void> {
     if (!this.operatorProfile) {
       this.operatorProfile = { name: profile.name || "Unknown" };
@@ -178,6 +187,15 @@ export class MemoryGraph extends EventEmitter {
     this.operatorProfile = { ...this.operatorProfile, ...profile };
     this.save();
     console.log(`\n  [Memory] Neural pathway updated: Operator Identity -> ${this.operatorProfile.name}`);
+  }
+
+  public async updateAgentProfile(profile: Partial<AgentProfile>): Promise<void> {
+    if (!this.agentProfile) {
+      this.agentProfile = { name: profile.name || "DrogonClaw" };
+    }
+    this.agentProfile = { ...this.agentProfile, ...profile };
+    this.save();
+    console.log(`\n  [Memory] Neural pathway updated: Agent Identity -> ${this.agentProfile.name}`);
   }
 
   public getNodesCount(): number {
@@ -188,7 +206,8 @@ export class MemoryGraph extends EventEmitter {
     return JSON.stringify({
       nodes: Array.from(this.nodes.values()),
       edges: this.edges,
-      operatorProfile: this.operatorProfile
+      operatorProfile: this.operatorProfile,
+      agentProfile: this.agentProfile
     }, null, 2);
   }
 
@@ -196,7 +215,8 @@ export class MemoryGraph extends EventEmitter {
     const data = {
       nodes: Array.from(this.nodes.values()),
       edges: this.edges,
-      operatorProfile: this.operatorProfile
+      operatorProfile: this.operatorProfile,
+      agentProfile: this.agentProfile
     };
     const dir = path.dirname(this.dbPath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -218,6 +238,9 @@ export class MemoryGraph extends EventEmitter {
         }
         if (data.operatorProfile) {
           this.operatorProfile = data.operatorProfile;
+        }
+        if (data.agentProfile) {
+          this.agentProfile = data.agentProfile;
         }
       } catch (e) {
         console.warn("[MemoryGraph] Failed to load local JSON graph.");
