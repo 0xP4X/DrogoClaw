@@ -12,6 +12,9 @@
   --border-hover: rgba(255, 255, 255, 0.15);
   --nav-bg: rgba(10, 10, 15, 0.4);
   --terminal-bg: rgba(5, 5, 8, 0.8);
+  --terminal-header-bg: rgba(255, 255, 255, 0.03);
+  --terminal-text: #a0a0a0;
+  --terminal-prompt: #5c6370;
   --code-bg: rgba(0, 0, 0, 0.4);
   --footer-bg: rgba(5, 5, 8, 0.4);
   --hero-gradient: linear-gradient(135deg, #fff 0%, #a5a5a5 100%);
@@ -33,7 +36,10 @@
   --border-color: rgba(0, 0, 0, 0.08);
   --border-hover: rgba(0, 0, 0, 0.15);
   --nav-bg: rgba(245, 245, 247, 0.75);
-  --terminal-bg: rgba(20, 20, 24, 0.95);
+  --terminal-bg: rgba(248, 248, 250, 0.95);
+  --terminal-header-bg: rgba(235, 235, 238, 0.9);
+  --terminal-text: #4a4a55;
+  --terminal-prompt: #9ba1ad;
   --code-bg: rgba(230, 230, 235, 0.8);
   --footer-bg: rgba(235, 235, 238, 0.8);
   --hero-gradient: linear-gradient(135deg, #111 0%, #444 100%);
@@ -339,12 +345,13 @@ nav {
 }
 
 .terminal-header {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--terminal-header-bg);
   padding: 0.85rem 1.25rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
   border-bottom: 1px solid var(--border-color);
+  transition: background 0.4s ease;
 }
 
 .terminal-dot {
@@ -358,13 +365,14 @@ nav {
 
 .terminal-body {
   padding: 2rem;
-  color: #a0a0a0;
+  color: var(--terminal-text);
   font-size: 0.95rem;
   line-height: 1.6;
   text-align: left;
+  transition: color 0.4s ease;
 }
 
-.cmd-prompt { color: #5c6370; }
+.cmd-prompt { color: var(--terminal-prompt); }
 .cmd-text { color: #e5c07b; }
 .cmd-success { color: #98c379; }
 .cmd-info { color: #61afef; }
