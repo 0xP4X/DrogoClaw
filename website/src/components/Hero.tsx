@@ -11,7 +11,7 @@ export default function Hero() {
         initial={{ opacity: 0, scale: 0.5, rotate: -10 }}
         animate={{ opacity: 1, scale: 1, rotate: 0 }}
         transition={{ duration: 0.7, type: "spring", bounce: 0.4 }}
-        style={{ width: '120px', height: '120px', marginBottom: '1.5rem', filter: 'drop-shadow(0 0 20px rgba(255, 42, 75, 0.4))' }}
+        style={{ width: '180px', height: '180px', marginBottom: '1.5rem', filter: 'drop-shadow(0 0 20px rgba(255, 42, 75, 0.4))' }}
       />
       
       <motion.h1
