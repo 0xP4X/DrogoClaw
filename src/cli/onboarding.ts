@@ -145,10 +145,23 @@ export async function runOnboarding(): Promise<void> {
           message: "Enter your OpenRouter API Key:", 
           validate: (input) => input.trim().length > 0 ? true : "API Key cannot be empty!"
         });
-        const model = await input({ 
-          message: "Enter the OpenRouter Model string (e.g. anthropic/claude-3.5-sonnet):",
-          default: "anthropic/claude-3.5-sonnet",
+        const model = await select({
+          message: "Select the OpenRouter model:",
+          choices: [
+            { name: "Anthropic: Claude 3.5 Sonnet", value: "anthropic/claude-3.5-sonnet" },
+            { name: "Anthropic: Claude 3 Opus", value: "anthropic/claude-3-opus" },
+            { name: "OpenAI: GPT-4o", value: "openai/gpt-4o" },
+            { name: "OpenAI: o1-preview", value: "openai/o1-preview" },
+            { name: "Google: Gemini Pro 1.5", value: "google/gemini-pro-1.5" },
+            { name: "Google: Gemini Flash 1.5", value: "google/gemini-flash-1.5" },
+            { name: "Meta: Llama 3.1 405B Instruct", value: "meta-llama/llama-3.1-405b-instruct" },
+            { name: "Meta: Llama 3.1 70B Instruct", value: "meta-llama/llama-3.1-70b-instruct" },
+            { name: "Mistral: Mixtral 8x22B Instruct", value: "mistralai/mixtral-8x22b-instruct" },
+            { name: "Mistral: Mistral Large", value: "mistralai/mistral-large" },
+            { name: "Cancel & Re-select Provider", value: "back" }
+          ]
         });
+        if (model === "back") continue;
 
         envConfigMap.set("OPENROUTER_API_KEY", apiKey);
         envConfigMap.set("OPENROUTER_MODEL_NAME", model);
@@ -165,7 +178,6 @@ export async function runOnboarding(): Promise<void> {
         if (availableModels && availableModels.length > 0) {
           console.log(chalk.green(`  [+] Found ${availableModels.length} local models.`));
           const choices = availableModels.map(m => ({ name: m, value: m }));
-          choices.push({ name: "Manual Entry (Type a model name manually)", value: "manual" });
           choices.push({ name: "Cancel & Re-select Provider", value: "back" });
 
           const selectedModel = await select({
@@ -174,23 +186,24 @@ export async function runOnboarding(): Promise<void> {
           });
 
           if (selectedModel === "back") continue;
-          
-          if (selectedModel === "manual") {
-            finalModel = await input({ message: "Enter the exact model name (e.g., llama3.1:8b):" });
-          } else {
-            finalModel = selectedModel;
-          }
+          finalModel = selectedModel;
         } else {
           console.log(chalk.yellow("  [!] Could not connect to Ollama or no models found. Ensure Ollama is running."));
-          const manualAction = await select({
-             message: "How would you like to proceed?",
+          const fallbackModel = await select({
+             message: "Select a standard Ollama model (ensure you pull it later):",
              choices: [
-               { name: "Enter Model Name Manually", value: "manual" },
+               { name: "llama3.1", value: "llama3.1" },
+               { name: "llama3", value: "llama3" },
+               { name: "mistral", value: "mistral" },
+               { name: "mixtral", value: "mixtral" },
+               { name: "qwen2.5", value: "qwen2.5" },
+               { name: "phi3", value: "phi3" },
+               { name: "gemma2", value: "gemma2" },
                { name: "Cancel & Re-select Provider", value: "back" }
              ]
           });
-          if (manualAction === "back") continue;
-          finalModel = await input({ message: "Enter the exact model name (e.g., llama3.1:8b):" });
+          if (fallbackModel === "back") continue;
+          finalModel = fallbackModel;
         }
 
         envConfigMap.set("OLLAMA_BASE_URL", baseUrl);
