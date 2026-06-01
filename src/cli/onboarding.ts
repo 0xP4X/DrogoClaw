@@ -69,6 +69,7 @@ export async function runOnboarding(): Promise<void> {
       console.log(chalk.gray("  For Experts: Local models (Ollama) can be used, but require tool-support (e.g. llama3.1)"));
       
       const provider = await select({
+          loop: false,
         message: "Select your AI Backend:",
         choices: [
           { name: "OpenAI (Recommended for Novices)", value: "openai" },
@@ -92,11 +93,12 @@ export async function runOnboarding(): Promise<void> {
           validate: (input) => input.trim().length > 0 ? true : "API Key cannot be empty!"
         });
         const model = await select({
+          loop: false,
           message: "Select the OpenAI model:",
           choices: [
             { name: "gpt-4o (Best overall)", value: "gpt-4o" },
             { name: "gpt-4o-mini (Faster & cheaper)", value: "gpt-4o-mini" },
-            { name: "o1-preview (Advanced reasoning)", value: "o1-preview" },
+            { name: "o1-pro (Advanced reasoning)", value: "o1-pro" },
             { name: "Cancel & Re-select Provider", value: "back" }
           ]
         });
@@ -112,6 +114,7 @@ export async function runOnboarding(): Promise<void> {
           validate: (input) => input.trim().length > 0 ? true : "API Key cannot be empty!"
         });
         const model = await select({
+          loop: false,
           message: "Select the Anthropic model:",
           choices: [
             { name: "Claude 4.6 Sonnet (Best overall)", value: "claude-sonnet-4-6-20260218" },
@@ -131,6 +134,7 @@ export async function runOnboarding(): Promise<void> {
           validate: (input) => input.trim().length > 0 ? true : "API Key cannot be empty!"
         });
         const model = await select({
+          loop: false,
           message: "Select the Gemini model:",
           choices: [
             { name: "Gemini 2.5 Pro (Best performance)", value: "gemini-2.5-pro" },
@@ -150,15 +154,16 @@ export async function runOnboarding(): Promise<void> {
           validate: (input) => input.trim().length > 0 ? true : "API Key cannot be empty!"
         });
         const model = await select({
+          loop: false,
           message: "Select the OpenRouter model:",
           choices: [
             { name: "Anthropic: Claude 4.6 Sonnet", value: "anthropic/claude-sonnet-4.6" },
             { name: "Anthropic: Claude 4.8 Opus", value: "anthropic/claude-opus-4.8" },
             { name: "OpenAI: GPT-4o", value: "openai/gpt-4o" },
-            { name: "OpenAI: o1-preview", value: "openai/o1-preview" },
+            { name: "OpenAI: o1-pro", value: "openai/o1-pro" },
             { name: "Google: Gemini 2.5 Pro", value: "google/gemini-2.5-pro" },
             { name: "Google: Gemini 2.5 Flash", value: "google/gemini-2.5-flash" },
-            { name: "Meta: Llama 3.1 405B Instruct", value: "meta-llama/llama-3.1-405b-instruct" },
+            { name: "Meta: Hermes 3 Llama 405B", value: "nousresearch/hermes-3-llama-3.1-405b" },
             { name: "Meta: Llama 3.1 70B Instruct", value: "meta-llama/llama-3.1-70b-instruct" },
             { name: "Mistral: Mixtral 8x22B Instruct", value: "mistralai/mixtral-8x22b-instruct" },
             { name: "Mistral: Mistral Large", value: "mistralai/mistral-large" },
@@ -185,6 +190,7 @@ export async function runOnboarding(): Promise<void> {
           choices.push({ name: "Cancel & Re-select Provider", value: "back" });
 
           const selectedModel = await select({
+          loop: false,
             message: "Select an active local model:",
             choices: choices
           });
@@ -194,6 +200,7 @@ export async function runOnboarding(): Promise<void> {
         } else {
           console.log(chalk.yellow("  [!] Could not connect to Ollama or no models found. Ensure Ollama is running."));
           const fallbackModel = await select({
+          loop: false,
              message: "Select a standard Ollama model (ensure you pull it later):",
              choices: [
                { name: "llama3.1", value: "llama3.1" },
@@ -224,6 +231,7 @@ export async function runOnboarding(): Promise<void> {
   async function configureTelegram() {
     console.log(chalk.cyan("\n  [Step 2: C2 Interface Setup]"));
     const tgAction = await select({
+          loop: false,
        message: "Would you like to setup remote Command & Control via Telegram?",
        choices: [
          { name: "Yes, configure Telegram Bot", value: "yes" },
@@ -277,6 +285,7 @@ export async function runOnboarding(): Promise<void> {
     console.log(chalk.cyan("╰─────────────────────────────────────────────────────────"));
 
     const finalAction = await select({
+          loop: false,
       message: "Review your setup:",
       choices: [
         { name: "[+] Finish & Boot DrogonClaw", value: "boot" },
