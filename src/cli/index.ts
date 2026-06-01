@@ -14,10 +14,10 @@ process.emit = function (event: string, ...args: any[]) {
 import { program } from "commander";
 import chalk from "chalk";
 import figlet from "figlet";
-import { runOnboarding, isEnvConfigured } from "./onboarding";
+import { runOnboarding, isEnvConfigured } from "./onboarding.js";
 import ora from "ora";
-import { startChatSession } from "./chat";
-import { AgentOrchestrator } from "../agent/orchestrator";
+import { startChatSession } from "./chat.js";
+import { AgentOrchestrator } from "../agent/orchestrator.js";
 
 const VERSION = "0.2.0";
 
@@ -171,7 +171,7 @@ program
   .description("Start the DrogonClaw Telegram gateway")
   .action(async () => {
     console.log(chalk.cyan("  [*] Starting DrogonClaw Gateway..."));
-    const { GatewayServer } = await import("../gateway/telegram");
+    const { GatewayServer } = await import("../gateway/telegram.js");
     const server = new GatewayServer();
     await server.start();
   });

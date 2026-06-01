@@ -1,6 +1,6 @@
-import { getLLMProvider } from "../agent/llm-provider";
+import { getLLMProvider } from "../agent/llm-provider.js";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { MemoryGraph, GraphNode } from "./memory-graph";
+import { MemoryGraph, GraphNode } from "./memory-graph.js";
 
 export interface MissionStep {
   id: string;

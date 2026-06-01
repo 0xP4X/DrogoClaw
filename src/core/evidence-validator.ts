@@ -1,4 +1,4 @@
-import { getLLMProvider } from "../agent/llm-provider";
+import { getLLMProvider } from "../agent/llm-provider.js";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 export interface ValidationResult {

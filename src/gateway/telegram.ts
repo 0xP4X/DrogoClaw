@@ -1,8 +1,8 @@
 import { Telegraf } from "telegraf";
 import chalk from "chalk";
-import { AgentOrchestrator } from "../agent/orchestrator";
-import { HitL } from "../core/hitl";
-import { ConfigManager } from "../core/config-manager";
+import { AgentOrchestrator } from "../agent/orchestrator.js";
+import { HitL } from "../core/hitl.js";
+import { ConfigManager } from "../core/config-manager.js";
 
 /**
  * DrogonClaw Telegram Gateway
@@ -97,7 +97,7 @@ export class GatewayServer {
         if (instruction === "/report") {
           const statusMessage = await ctx.reply("📝 Compiling raw intelligence into compliance report. Please wait...");
           try {
-            const { ReportGenerator } = await import("../core/report-generator");
+            const { ReportGenerator } = await import("../core/report-generator.js");
             const generator = new ReportGenerator(this.orchestrator.getMemoryGraph());
             const { docPath } = await generator.generateReport();
             

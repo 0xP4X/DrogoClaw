@@ -1,4 +1,4 @@
-import { MemoryGraph } from "./memory-graph";
+import { MemoryGraph } from "./memory-graph.js";
 
 export class CoreRegistry {
   private static graph: MemoryGraph | null = null;

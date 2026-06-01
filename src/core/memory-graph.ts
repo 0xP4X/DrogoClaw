@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { EventEmitter } from "events";
 import neo4j, { Driver } from "neo4j-driver";
-import { ConfigManager } from "./config-manager";
+import { ConfigManager } from "./config-manager.js";
 import "dotenv/config";
 
 export interface GraphNode {

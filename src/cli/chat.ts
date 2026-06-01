@@ -1,12 +1,12 @@
 import chalk from "chalk";
 import * as readline from "readline";
-import { AgentOrchestrator } from "../agent/orchestrator";
+import { AgentOrchestrator } from "../agent/orchestrator.js";
 import ora from "ora";
 import { marked } from "marked";
 import TerminalRenderer from "marked-terminal";
 import { select, Separator } from "@inquirer/prompts";
-import { ConfigManager } from "../core/config-manager";
-import { runOnboarding } from "./onboarding";
+import { ConfigManager } from "../core/config-manager.js";
+import { runOnboarding } from "./onboarding.js";
 
 marked.setOptions({
   // @ts-ignore
@@ -479,7 +479,7 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
         continue;
       }
       
-      const { SwarmCommander } = await import("../agent/swarm-commander");
+      const { SwarmCommander } = await import("../agent/swarm-commander.js");
       const commander = new SwarmCommander();
       
       const swarmSpinner = ora({ text: chalk.gray("Dispatching parallel agents..."), color: "cyan", spinner: "bouncingBar" }).start();
@@ -499,7 +499,7 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
     if (command.toLowerCase() === "/report") {
       const reportSpinner = ora({ text: chalk.gray("Generating report..."), color: "cyan", spinner: "bouncingBar" }).start();
       try {
-        const { ReportGenerator } = await import("../core/report-generator");
+        const { ReportGenerator } = await import("../core/report-generator.js");
         const generator = new ReportGenerator(activeOrchestrator.getMemoryGraph());
         const { textPath, docPath } = await generator.generateReport();
         reportSpinner.stop();
@@ -513,7 +513,7 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
     }
 
     if (command.toLowerCase() === "/health") {
-      const { HealthChecker } = await import("../core/health-checker");
+      const { HealthChecker } = await import("../core/health-checker.js");
       const checker = new HealthChecker();
       await checker.runDiagnostics();
       continue;

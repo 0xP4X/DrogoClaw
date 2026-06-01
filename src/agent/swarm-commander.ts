@@ -1,6 +1,6 @@
 import chalk from "chalk";
-import { AgentOrchestrator } from "./orchestrator";
-import { getLLMProvider } from "./llm-provider";
+import { AgentOrchestrator } from "./orchestrator.js";
+import { getLLMProvider } from "./llm-provider.js";
 import { HumanMessage } from "@langchain/core/messages";
 import ora from "ora";
 

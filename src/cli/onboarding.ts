@@ -1,6 +1,6 @@
 import { select, input, password, confirm } from "@inquirer/prompts";
 import chalk from "chalk";
-import { ConfigManager, DrogonConfig } from "../core/config-manager";
+import { ConfigManager, DrogonConfig } from "../core/config-manager.js";
 
 async function fetchOllamaModels(baseUrl: string): Promise<string[] | null> {
   try {

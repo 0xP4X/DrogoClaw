@@ -12,6 +12,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "prepublishOnly": "npm run build",
     "dev": "tsx --watch --no-warnings src/cli/index.ts",
     "cli": "tsx --no-warnings src/cli/index.ts",
     "start": "tsx --no-warnings src/cli/index.ts start",

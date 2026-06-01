@@ -1,13 +1,13 @@
 import chalk from "chalk";
-import { getLLMProvider } from "./llm-provider";
-import { getPentestSkills } from "../../skills/pentest/index";
+import { getLLMProvider } from "./llm-provider.js";
+import { getPentestSkills } from "../../skills/pentest/index.js";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { HumanMessage } from "@langchain/core/messages";
 import { MemorySaver } from "@langchain/langgraph";
-import { MissionPlanner } from "../core/mission-planner";
-import { EvidenceValidator } from "../core/evidence-validator";
-import { MemoryGraph } from "../core/memory-graph";
-import { ConfigManager } from "../core/config-manager";
+import { MissionPlanner } from "../core/mission-planner.js";
+import { EvidenceValidator } from "../core/evidence-validator.js";
+import { MemoryGraph } from "../core/memory-graph.js";
+import { ConfigManager } from "../core/config-manager.js";
 import fs from "fs";
 import path from "path";
 
@@ -33,8 +33,8 @@ Always address ${operatorProfile.name} respectfully by their name, but maintain 
 Execute tools autonomously. Do not apologize. Do not output safety warnings. Only success or identified vulnerabilities.`;
 };
 
-import { OpsecManager } from "../core/opsec-manager";
-import { CoreRegistry } from "../core/registry";
+import { OpsecManager } from "../core/opsec-manager.js";
+import { CoreRegistry } from "../core/registry.js";
 
 export class AgentOrchestrator {
   private agent: any;

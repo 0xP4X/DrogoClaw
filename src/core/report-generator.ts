@@ -1,5 +1,5 @@
-import { MemoryGraph } from "./memory-graph";
-import { getLLMProvider } from "../agent/llm-provider";
+import { MemoryGraph } from "./memory-graph.js";
+import { getLLMProvider } from "../agent/llm-provider.js";
 import { HumanMessage } from "@langchain/core/messages";
 import fs from "fs";
 import path from "path";
