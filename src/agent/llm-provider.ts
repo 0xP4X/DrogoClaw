@@ -35,7 +35,7 @@ export function getLLMProvider(options?: LLMProviderOptions): BaseChatModel {
         const apiKey = ConfigManager.get("ANTHROPIC_API_KEY") || process.env.ANTHROPIC_API_KEY;
         if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set in config.");
         return new ChatAnthropic({
-          modelName: ConfigManager.get("ANTHROPIC_MODEL_NAME") || process.env.ANTHROPIC_MODEL_NAME || "claude-sonnet-4-20250514",
+          modelName: ConfigManager.get("ANTHROPIC_MODEL_NAME") || process.env.ANTHROPIC_MODEL_NAME || "claude-sonnet-4-6-20260218",
           temperature: 0,
           anthropicApiKey: apiKey,
           maxTokens: 4000,

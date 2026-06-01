@@ -114,8 +114,8 @@ export async function runOnboarding(): Promise<void> {
         const model = await select({
           message: "Select the Anthropic model:",
           choices: [
-            { name: "Claude 3.5 Sonnet (Best overall)", value: "claude-3-5-sonnet-20240620" },
-            { name: "Claude 3 Opus (Most powerful)", value: "claude-3-opus-20240229" },
+            { name: "Claude 4.6 Sonnet (Best overall)", value: "claude-sonnet-4-6-20260218" },
+            { name: "Claude 4.8 Opus (Most powerful)", value: "claude-opus-4-8-20260515" },
             { name: "Cancel & Re-select Provider", value: "back" }
           ]
         });
@@ -152,12 +152,12 @@ export async function runOnboarding(): Promise<void> {
         const model = await select({
           message: "Select the OpenRouter model:",
           choices: [
-            { name: "Anthropic: Claude 3.5 Sonnet", value: "anthropic/claude-3.5-sonnet" },
-            { name: "Anthropic: Claude 3 Opus", value: "anthropic/claude-3-opus" },
+            { name: "Anthropic: Claude 4.6 Sonnet", value: "anthropic/claude-sonnet-4.6" },
+            { name: "Anthropic: Claude 4.8 Opus", value: "anthropic/claude-opus-4.8" },
             { name: "OpenAI: GPT-4o", value: "openai/gpt-4o" },
             { name: "OpenAI: o1-preview", value: "openai/o1-preview" },
-            { name: "Google: Gemini Pro 1.5", value: "google/gemini-pro-1.5" },
-            { name: "Google: Gemini Flash 1.5", value: "google/gemini-flash-1.5" },
+            { name: "Google: Gemini 2.5 Pro", value: "google/gemini-2.5-pro" },
+            { name: "Google: Gemini 2.5 Flash", value: "google/gemini-2.5-flash" },
             { name: "Meta: Llama 3.1 405B Instruct", value: "meta-llama/llama-3.1-405b-instruct" },
             { name: "Meta: Llama 3.1 70B Instruct", value: "meta-llama/llama-3.1-70b-instruct" },
             { name: "Mistral: Mixtral 8x22B Instruct", value: "mistralai/mixtral-8x22b-instruct" },
