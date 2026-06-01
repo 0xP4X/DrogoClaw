@@ -49,7 +49,7 @@ export class DockerSandbox {
     
     // Quick test to see if docker is actually available
     try {
-      await this.docker.ping();
+      await this.docker.ping().catch((e) => { throw new Error('Docker ping failed'); });
     } catch (e) {
       console.log("\n  [!] DOCKER DAEMON UNAVAILABLE: Automatically falling back to Native Mode.");
       process.env.USE_NATIVE_KALI = "true";
