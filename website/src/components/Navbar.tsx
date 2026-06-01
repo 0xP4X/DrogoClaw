@@ -13,10 +13,9 @@ export default function Navbar() {
         <span>DrogonClaw</span>
       </div>
       <div className="nav-links">
-        <a href="#pillars">Pillars</a>
-        <a href="#features">Features</a>
-        <a href="#cli">CLI</a>
+        <a href="#cli">Demo</a>
         <a href="#quickstart">Quick Start</a>
+        <a href="#features">Architecture</a>
         <a href="https://github.com/0xP4X/DrogoClaw" target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main)' }}>
           <GitBranch size={18} /> GitHub
         </a>
