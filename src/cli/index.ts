@@ -21,46 +21,28 @@ import { AgentOrchestrator } from "../agent/orchestrator";
 
 const VERSION = "0.2.0";
 
-const DROGONCLAW_BANNER = \`
-      /\\      /\\      /\\
-     /  \\    /  \\    /  \\
-    |    |  |    |  |    |
-    |    |  |    |  |    |
-    |  /\\|  |/\\  |  |/\\  |
-     \\ \\  \\  /  /   / / /
-      \\ \\  \\/  /   / / /
-       \\ \\    /   / / /
-        \\      \\ / / /
-         \\      / / /
-          |    | | |
-
-    ____                               ________              
-   / __ \\_________  ____ _____  ____  / ____/ /___ __      __
-  / / / / ___/ __ \\/ __ \`/ __ \\/ __ \\/ /   / / __ \`/ | /| / /
- / /_/ / /  / /_/ / /_/ / /_/ / / / / /___/ / /_/ /| |/ |/ / 
-/_____/_/   \\____/\\__, /\\____/_/ /_/\\____/_/\\__,_/ |__/|__/  
-                 /____/                                      
-\`;
-
 async function printBanner(): Promise<void> {
   console.clear();
   return new Promise((resolve) => {
-    console.log("");
-    const lines = DROGONCLAW_BANNER.split('\\n');
-    lines.forEach((line, i) => {
-      // Glow effect: red to dark red
-      const intensity = Math.max(80, 255 - (i * 8));
-      const r = intensity;
-      const g = Math.max(0, intensity - 180); // Slight orange tint at the top
-      console.log(chalk.rgb(r, g, 0).bold(line));
+    figlet.text("DROGONCLAW", { font: "ANSI Shadow", horizontalLayout: "fitted" }, (err, data) => {
+      console.log("");
+      if (!err && data) {
+        // Apply a subtle red-to-dark gradient effect
+        const lines = data.split('\n');
+        lines.forEach((line, i) => {
+          const intensity = Math.max(50, 255 - (i * 20));
+          console.log(chalk.rgb(intensity, 0, 0).bold(line));
+        });
+      } else {
+        console.log(chalk.red.bold("  [*] DROGONCLAW"));
+      }
+      console.log(chalk.red.bold("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
+      console.log(chalk.gray(`  Autonomous Offensive Security Framework`) + chalk.red(` v${VERSION}`) + chalk.gray(` | Root: `) + chalk.green(`Active`));
+      console.log(chalk.red.bold("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"));
+      console.log(chalk.green("  Tip: Run `drogonclaw setup` to reconfigure models, or use /setup inside the CLI."));
+      console.log("");
+      resolve();
     });
-
-    console.log(chalk.red.bold("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
-    console.log(chalk.gray(\`  Autonomous Offensive Security Framework\`) + chalk.red(\` v\${VERSION}\`) + chalk.gray(\` | Root: \`) + chalk.green(\`Active\`));
-    console.log(chalk.red.bold("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\n"));
-    console.log(chalk.green("  Tip: Run \`drogonclaw setup\` to reconfigure models, or use /setup inside the CLI."));
-    console.log("");
-    resolve();
   });
 }
 
