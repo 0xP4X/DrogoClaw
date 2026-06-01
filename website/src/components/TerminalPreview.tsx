@@ -24,10 +24,10 @@ export default function TerminalPreview() {
   }, [isInView]);
 
   return (
-    <section id="terminal" className="terminal-section" ref={ref}>
+    <section id="cli" className="terminal-section" ref={ref}>
       <motion.div 
         className="terminal-window"
-        initial={{ opacity: 0, rotateX: 20, y: 50 }}
+        initial={{ opacity: 0, rotateX: 10, y: 30 }}
         animate={isInView ? { opacity: 1, rotateX: 0, y: 0 } : {}}
         transition={{ duration: 0.8, ease: "easeOut" }}
       >
@@ -37,7 +37,7 @@ export default function TerminalPreview() {
           <div className="terminal-dot dot-green"></div>
         </div>
         <div className="terminal-body">
-          <div><span className="cmd-prompt">astra@kali:~$</span> <span className="cmd-text">{typedText}</span><span className="animate-pulse" style={{ animation: 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite' }}>_</span></div>
+          <div><span className="cmd-prompt">operator@c2:~$</span> <span className="cmd-text">{typedText}</span><span className="animate-pulse">_</span></div>
           <br/>
           {typedText.length === fullText.length && (
             <motion.div 
@@ -45,17 +45,18 @@ export default function TerminalPreview() {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.5, delay: 0.3 }}
             >
-              <div style={{ color: '#27c93f' }}>+ drogonclaw@0.2.0</div>
-              <div style={{ color: '#888' }}>added 1 package, and audited 283 packages in 3s</div>
+              <div className="cmd-success">+ drogonclaw@0.2.0</div>
+              <div style={{ color: '#5c6370' }}>added 1 package, and audited 283 packages in 3s</div>
               <br/>
-              <div><span className="cmd-prompt">astra@kali:~$</span> <span className="cmd-text">drogonclaw</span></div>
-              <div style={{ color: '#dc143c', fontWeight: 'bold', marginTop: '1rem' }}>  [*] DROGONCLAW</div>
-              <div style={{ color: '#dc143c' }}>  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
-              <div style={{ color: '#888' }}>  Autonomous Offensive Security Framework <span style={{ color: '#dc143c'}}>v0.2.0</span></div>
+              <div><span className="cmd-prompt">operator@c2:~$</span> <span className="cmd-text">drogonclaw</span></div>
+              <div style={{ color: '#ff2a4b', fontWeight: '700', marginTop: '1rem', letterSpacing: '1px' }}>  [*] DROGONCLAW</div>
+              <div style={{ color: '#ff2a4b' }}>  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+              <div style={{ color: '#8a8f98' }}>  Autonomous Offensive Security Framework <span style={{ color: '#ff2a4b'}}>v0.2.0</span></div>
               <br/>
-              <div style={{ color: '#00ffff' }}>drogon&gt; Scan 10.10.10.5 for vulnerabilities and pivot.</div>
-              <div style={{ color: '#888' }}>  ┃  ┌─ <span style={{ color: '#ffbd2e'}}>[🧠] Neural Processing</span></div>
-              <div style={{ color: '#888' }}>  ┃  ├─ <span style={{ color: '#00ffff'}}>Executing nmap_scan...</span></div>
+              <div className="cmd-info">drogon&gt; Scan 10.10.10.5 for vulnerabilities and pivot.</div>
+              <div style={{ color: '#5c6370' }}>  ┃  ┌─ <span style={{ color: '#e5c07b'}}>[🧠] Neural Processing: Breaking down objective...</span></div>
+              <div style={{ color: '#5c6370' }}>  ┃  ├─ <span className="cmd-info">Executing nmap_scan inside Docker sandbox...</span></div>
+              <div style={{ color: '#5c6370' }}>  ┃  └─ <span className="cmd-success">Discovered Open Ports: 22/tcp, 80/tcp</span></div>
             </motion.div>
           )}
         </div>

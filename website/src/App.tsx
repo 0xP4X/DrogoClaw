@@ -1,10 +1,30 @@
+import { useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
+import Pillars from './components/Pillars';
 import Architecture from './components/Architecture';
 import TerminalPreview from './components/TerminalPreview';
+import QuickStart from './components/QuickStart';
 import Footer from './components/Footer';
 
 function App() {
+  useEffect(() => {
+    const banner = `
+  _____                                 _____ _               
+ |  __ \\                               / ____| |              
+ | |  | |_ __ ___  __ _  ___  _ __    | |    | | __ ___      __
+ | |  | | '__/ _ \\/ _\` |/ _ \\| '_ \\   | |    | |/ _\` \\ \\ /\\ / /
+ | |__| | | | (_) | (_| | (_) | | | |  | |____| | (_| |\\ V  V / 
+ |_____/|_|  \\___/ \\__, |\\___/|_| |_|   \\_____|_|\\__,_| \\_/\\_/  
+                    __/ |                                     
+                   |___/                                      
+
+[*] DrogonClaw Autonomous C2 Framework
+[*] Warning: Authorized access only.
+`;
+    console.log('%c' + banner, 'color: #ff2a4b; font-weight: bold; font-family: monospace;');
+  }, []);
+
   return (
     <>
       <div className="bg-gradient"></div>
@@ -14,24 +34,12 @@ function App() {
         <Navbar />
         <Hero />
         <TerminalPreview />
+        <Pillars />
         <Architecture />
+        <QuickStart />
       </div>
 
       <Footer />
-
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        .animate-pulse {
-          animation: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0; }
-        }
-      `}} />
     </>
   );
 }
