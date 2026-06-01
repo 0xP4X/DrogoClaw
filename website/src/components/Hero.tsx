@@ -1,34 +1,40 @@
-import { Terminal, Lock, GitBranch } from 'lucide-react';
+import { Terminal, GitBranch } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export default function Hero() {
   return (
     <section className="hero">
-      <div className="hero-badge">
-        <Lock size={14} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} />
-        Authorized Offensive Security Only
-      </div>
-      
-      <img 
-        src="/logo.png" 
-        alt="DrogonClaw Logo" 
-        style={{ width: '180px', height: '180px', marginBottom: '2rem', filter: 'drop-shadow(0 0 20px rgba(220, 20, 60, 0.4))' }} 
-      />
+      <motion.h1
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        Autonomous Offensive Security
+      </motion.h1>
 
-      <h1>Autonomous C2 Brain <br/> for Penetration Testing.</h1>
-      <p>
-        DrogonClaw is an AI-driven cyber operations framework. It plans attacks, orchestrates autonomous agent swarms, and executes native exploits inside sandboxed environments. No toys. No mock data. 100% genuine execution.
-      </p>
+      <motion.p
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.1 }}
+      >
+        DrogonClaw is an advanced C2 operations framework. It dynamically plans attack vectors, orchestrates concurrent agent swarms, and executes genuine exploits inside strictly isolated sandboxes. 
+      </motion.p>
       
-      <div className="hero-cta">
+      <motion.div 
+        className="hero-cta"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.2 }}
+      >
         <a href="#terminal" className="btn btn-primary">
-          <Terminal size={20} />
+          <Terminal size={16} />
           Install CLI
         </a>
         <a href="https://github.com/0xP4X/DrogoClaw" target="_blank" rel="noreferrer" className="btn btn-secondary">
-          <GitBranch size={20} />
-          View Source
+          <GitBranch size={16} />
+          GitHub
         </a>
-      </div>
+      </motion.div>
     </section>
   );
 }

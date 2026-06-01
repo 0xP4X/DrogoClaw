@@ -1,8 +1,13 @@
 import { GitBranch } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export default function Navbar() {
   return (
-    <nav>
+    <motion.nav 
+      initial={{ y: -100 }}
+      animate={{ y: 0 }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
+    >
       <div className="nav-brand">
         <img src="/logo.png" alt="DrogonClaw" className="nav-logo" />
         <span>DROGONCLAW</span>
@@ -14,6 +19,6 @@ export default function Navbar() {
           <GitBranch size={18} /> GitHub
         </a>
       </div>
-    </nav>
+    </motion.nav>
   );
 }
