@@ -1,5 +1,5 @@
 import { motion, type Variants } from 'framer-motion';
-import { Database, Box, CheckCircle, Smartphone, FileText } from 'lucide-react';
+import { Database, Box, CheckCircle, Smartphone, FileText, Code2 } from 'lucide-react';
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -28,6 +28,7 @@ export default function Architecture() {
         whileInView="visible"
         viewport={{ once: true, margin: "-50px" }}
         className="features-grid"
+        style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}
       >
         <motion.div variants={itemVariants} className="glass-card feature-item">
           <div className="feature-icon">
@@ -67,6 +68,14 @@ export default function Architecture() {
           </div>
           <h3>Automated Reporting</h3>
           <p>Generates comprehensive, boardroom-ready PDF reports with detailed reproduction steps for every verified vulnerability, ensuring clear communication of operational findings.</p>
+        </motion.div>
+
+        <motion.div variants={itemVariants} className="glass-card feature-item">
+          <div className="feature-icon">
+            <Code2 size={24} />
+          </div>
+          <h3>Extensible Architecture</h3>
+          <p>Write custom modules in TypeScript. DrogonClaw dynamically loads new attack vectors, reconnaissance scripts, and API integrations into its autonomous decision matrix.</p>
         </motion.div>
       </motion.div>
     </section>
