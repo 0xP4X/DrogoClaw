@@ -9,9 +9,25 @@ export default function Hero() {
         alt="DrogonClaw Logo"
         className="hero-logo"
         initial={{ opacity: 0, scale: 0.5, rotate: -10 }}
-        animate={{ opacity: 1, scale: 1, rotate: 0 }}
-        transition={{ duration: 0.7, type: "spring", bounce: 0.4 }}
-        style={{ width: '180px', height: '180px', marginBottom: '1.5rem', filter: 'drop-shadow(0 0 20px rgba(255, 42, 75, 0.4))' }}
+        animate={{ 
+          opacity: 1, 
+          scale: 1, 
+          rotate: 0,
+          y: [0, -14, 0],
+          filter: [
+            'drop-shadow(0 0 18px rgba(255, 42, 75, 0.35))',
+            'drop-shadow(0 0 38px rgba(255, 42, 75, 0.75))',
+            'drop-shadow(0 0 18px rgba(255, 42, 75, 0.35))',
+          ]
+        }}
+        transition={{ 
+          opacity: { duration: 0.7, type: "spring", bounce: 0.4 },
+          scale:   { duration: 0.7, type: "spring", bounce: 0.4 },
+          rotate:  { duration: 0.7, type: "spring", bounce: 0.4 },
+          y:       { duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.7 },
+          filter:  { duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.7 },
+        }}
+        style={{ width: '180px', height: '180px', marginBottom: '1.5rem' }}
       />
       
       <motion.h1
