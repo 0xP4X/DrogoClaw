@@ -5,6 +5,8 @@ import Pillars from './components/Pillars';
 import Architecture from './components/Architecture';
 import TerminalPreview from './components/TerminalPreview';
 import QuickStart from './components/QuickStart';
+import Arsenal from './components/Arsenal';
+import FAQ from './components/FAQ';
 import Footer from './components/Footer';
 
 function App() {
@@ -36,7 +38,9 @@ function App() {
         <TerminalPreview />
         <QuickStart />
         <Pillars />
+        <Arsenal />
         <Architecture />
+        <FAQ />
       </div>
 
       <Footer />
