@@ -1,12 +1,50 @@
+# Dependencies
 node_modules/
+ui/node_modules/
+
+# Build output
 dist/
+ui/.next/
+ui/out/
+
+# Environment & Secrets
 .env
 .env.local
-*.log
-*.DS_Store
-.vscode/settings.json
+.env.production
+.env.*.local
+
+# DrogonClaw Runtime
+.drogonclaw.lock
+data/
+*.db
+*.sqlite
+
+# Neural Memory Persistence
+memory_graph_*.json
+
+# Generated Reports & Payloads
+reports/
+data/hardware_payloads/
+data/sandbox/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
 .idea/
-coverage/
-.pytest_cache/
-__pycache__/
-.env.example.local
+*.code-workspace
+
+# Logs
+*.log
+npm-debug.log*
+
+# TypeScript cache
+*.tsbuildinfo
+
+.drogonclaw/
+.drogonclaw.lock

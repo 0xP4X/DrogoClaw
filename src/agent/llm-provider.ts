@@ -58,12 +58,24 @@ export function getLLMProvider(options?: LLMProviderOptions): BaseChatModel {
 
       case "ollama":
       case "local": {
-        const baseUrl = ConfigManager.get("OLLAMA_BASE_URL") || process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+        const baseUrl =
+          ConfigManager.get("OLLAMA_BASE_URL") ||
+          ConfigManager.get("OLLAMA_URL") ||
+          process.env.OLLAMA_BASE_URL ||
+          process.env.OLLAMA_URL ||
+          "http://localhost:11434";
+        const modelName =
+          ConfigManager.get("OLLAMA_MODEL_NAME") ||
+          ConfigManager.get("OLLAMA_MODEL") ||
+          process.env.OLLAMA_MODEL_NAME ||
+          process.env.OLLAMA_MODEL ||
+          "llama3.1:latest";
+        const normalizedBaseUrl = baseUrl.replace(/\/$/, "");
         return new ChatOpenAI({
-          modelName: ConfigManager.get("OLLAMA_MODEL_NAME") || process.env.OLLAMA_MODEL_NAME || "llama3",
+          modelName,
           temperature: 0,
           configuration: {
-            baseURL: `${baseUrl}/v1`,
+            baseURL: `${normalizedBaseUrl}/v1`,
           },
           openAIApiKey: "ollama",
           maxRetries,

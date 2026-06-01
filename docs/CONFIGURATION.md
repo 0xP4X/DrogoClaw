@@ -30,8 +30,8 @@ OPENAI_API_KEY=sk-proj-xxx-xxx
 
 ```env
 AI_PROVIDER=ollama
-OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=mistral
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL_NAME=llama3.1:latest
 ```
 
 Install Ollama: https://ollama.ai
@@ -89,8 +89,8 @@ MAX_TOOL_TIMEOUT=300000        # Tool execution timeout (5 min)
 
 ```env
 AI_PROVIDER=ollama
-OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=mistral
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL_NAME=mistral
 LOG_LEVEL=debug
 GATEWAY_PORT=18789
 ENABLE_WEBSOCKET=true

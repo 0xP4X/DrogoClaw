@@ -71,17 +71,6 @@ npm run gateway
 ```
 *Security Note: You must provide your `TELEGRAM_CHAT_ID` during initialization to whitelist your account, otherwise the agent will reject all commands.*
 
-#### 🌐 C2 Web Dashboard
-A premium Cyberpunk UI to visualize the attack tree and memory graph:
-```bash
-# Terminal 1: Start the backend WebSocket API
-npm run api
-
-# Terminal 2: Start the Next.js Frontend
-npm run web
-```
-Then navigate to `http://localhost:3000` in your browser.
-
 ## 🛠️ Modularity & Swarm Intelligence
 
 DrogonClaw is designed to scale into collaborative agent swarms. You can inject new specialized agents (e.g., a "Web Fuzzer Agent" or an "Active Directory Hound") without modifying the core orchestrator.

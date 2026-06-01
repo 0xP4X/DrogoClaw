@@ -3,11 +3,11 @@
  * DrogonClaw CLI — Interactive Pentesting Terminal
  */
 
-// Suppress noisy SDK deprecation warnings (Zod `.optional()` without `.nullable()`)
+// Suppress noisy SDK deprecation warnings (Zod `.optional()` without `.nullable()`) and ExperimentalWarnings
 const originalEmit = process.emit;
 // @ts-ignore
 process.emit = function (event: string, ...args: any[]) {
-  if (event === 'warning' && args[0]?.name === 'DeprecationWarning') return false;
+  if (event === 'warning' && (args[0]?.name === 'DeprecationWarning' || args[0]?.name === 'ExperimentalWarning')) return false;
   // @ts-ignore
   return originalEmit.apply(process, [event, ...args]);
 };
@@ -15,6 +15,7 @@ import { program } from "commander";
 import chalk from "chalk";
 import figlet from "figlet";
 import { runOnboarding, isEnvConfigured } from "./onboarding";
+import ora from "ora";
 import { startChatSession } from "./chat";
 import { AgentOrchestrator } from "../agent/orchestrator";
 
@@ -38,6 +39,8 @@ async function printBanner(): Promise<void> {
       console.log(chalk.red.bold("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
       console.log(chalk.gray(`  Autonomous Offensive Security Framework`) + chalk.red(` v${VERSION}`) + chalk.gray(` | Root: `) + chalk.green(`Active`));
       console.log(chalk.red.bold("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"));
+      console.log(chalk.green("  Tip: Run `drogonclaw setup` to reconfigure models, or use /setup inside the CLI."));
+      console.log("");
       resolve();
     });
   });
@@ -52,25 +55,63 @@ async function startInteractiveMode(): Promise<void> {
     }
 
     let orchestrator = new AgentOrchestrator();
-    await orchestrator.initialize();
-    
-    while (!orchestrator.isReady()) {
-      console.log(chalk.yellow("\n  [-] Agent Core is offline. Please resolve configuration errors to continue."));
-      const { confirm } = await import("@inquirer/prompts");
-      const fs = await import("fs");
-      const path = await import("path");
-      
-      const retry = await confirm({ message: "Would you like to run the setup wizard again?", default: true });
-      
-      if (retry) {
+
+    const initializeWithTimeout = async (orch: AgentOrchestrator, timeoutMs: number = 10000) => {
+      const spinner = ora({ text: chalk.gray("Initializing DrogonClaw core (this may take a while)..."), color: "cyan", spinner: "dots" }).start();
+      try {
+        const initPromise = orch.initialize();
+        const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), timeoutMs));
+        const result = await Promise.race([initPromise, timeoutPromise]);
+        if (result === false) {
+          spinner.stop();
+          return { completed: false };
+        }
+        spinner.stop();
+        return { completed: true };
+      } catch (e) {
+        spinner.stop();
+        return { completed: false };
+      }
+    };
+
+    while (true) {
+      const initResult = await initializeWithTimeout(orchestrator, Number(process.env.DROGON_INIT_TIMEOUT_MS || 10000));
+      if (initResult.completed && orchestrator.isReady()) break;
+
+      console.log(chalk.yellow("\n  [-] Agent Core is taking longer than expected or failed to initialize."));
+      const { select } = await import("@inquirer/prompts");
+
+      const action = await select({
+        message: "What would you like to do next?",
+        choices: [
+          { name: "Wait longer (continue initialization)", value: "wait" },
+          { name: "Retry initialization now", value: "retry" },
+          { name: "Reconfigure setup", value: "setup" },
+          { name: "Exit", value: "exit" },
+        ],
+      });
+
+      if (action === "exit") {
+        console.log(chalk.red("\n  [x] Setup aborted. Please check your configuration manually."));
+        process.exit(1);
+      }
+
+      if (action === "setup") {
         await runOnboarding();
-        
+      }
+
+      if (action === "retry") {
         console.log(chalk.cyan("\n  [*] Retrying initialization..."));
         orchestrator = new AgentOrchestrator();
+        continue;
+      }
+
+      if (action === "wait") {
+        console.log(chalk.cyan("\n  [*] Waiting for initialization to complete..."));
+        // wait without timeout
         await orchestrator.initialize();
-      } else {
-        console.log(chalk.red("\n  [x] Setup aborted. Please check your credentials manually."));
-        process.exit(1);
+        if (orchestrator.isReady()) break;
+        // otherwise loop again
       }
     }
 
@@ -102,6 +143,13 @@ program
   });
 
 program
+  .command("setup")
+  .description("Run the setup wizard to reconfigure the agent")
+  .action(async () => {
+    await runOnboarding();
+  });
+
+program
   .command("run")
   .description("Execute a single pentesting instruction")
   .argument("<instruction...>", "Natural language instruction for the agent")
@@ -120,10 +168,10 @@ program
 
 program
   .command("gateway")
-  .description("Start the DrogonClaw gateway server (HTTP + Telegram)")
+  .description("Start the DrogonClaw Telegram gateway")
   .action(async () => {
     console.log(chalk.cyan("  [*] Starting DrogonClaw Gateway..."));
-    const { GatewayServer } = await import("../gateway/server");
+    const { GatewayServer } = await import("../gateway/telegram");
     const server = new GatewayServer();
     await server.start();
   });

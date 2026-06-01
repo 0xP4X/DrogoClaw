@@ -14,6 +14,7 @@ export class GatewayServer {
   private bot: Telegraf;
   private orchestrator: AgentOrchestrator;
   private allowedChatId: string;
+  private noisyMode: boolean = false;
 
   constructor() {
     const token = ConfigManager.get("TELEGRAM_TOKEN");
@@ -26,6 +27,15 @@ export class GatewayServer {
 
     this.bot = new Telegraf(token);
     this.orchestrator = new AgentOrchestrator();
+
+    // Global Error Handler for the Bot
+    this.bot.catch((err: any) => {
+      if (String(err.message).includes("409")) {
+        console.error(chalk.red("\n[FATAL] Telegram Bot Conflict detected."));
+        console.error(chalk.yellow("You have another instance of this bot running. Terminal C2 and Telegram can coexist, but you cannot run TWO Telegram gateways at once."));
+        process.exit(1);
+      }
+    });
   }
 
   public async start(): Promise<void> {
@@ -75,7 +85,7 @@ export class GatewayServer {
 
     // Handle all natural language text messages
     this.bot.on("text", async (ctx) => {
-      const instruction = ctx.message.text;
+      let instruction = ctx.message.text;
 
       // Ignore standard commands if user types them by habit
       if (instruction.startsWith("/")) {
@@ -108,7 +118,20 @@ export class GatewayServer {
           await ctx.reply("🛑 Autopilot deactivated. I will return to standard step-by-step execution.");
           return;
         }
-        if (instruction !== "/start") {
+        if (instruction === "/noisy") {
+          this.noisyMode = !this.noisyMode;
+          const status = this.noisyMode ? "ENABLED" : "DISABLED";
+          await ctx.reply(`⚡ *Noisy Mode ${status}*\nLive neural telemetry stream is now active.`, { parse_mode: "Markdown" });
+          return;
+        }
+
+        // Handle mission shortcuts from documentation
+        const cmdParts = instruction.split(" ");
+        const baseCmd = cmdParts[0].toLowerCase();
+        if (["/scan", "/enum", "/recon", "/exploit", "/attack", "/whois", "/nmap"].includes(baseCmd)) {
+             // Let these through to the natural language processor by stripping the slash
+             instruction = instruction.substring(1); 
+        } else if (instruction !== "/start") {
           await ctx.reply("I operate on natural language. Just tell me what to do directly. (Type /new to wipe memory, /autopilot on to enable infinite autonomy, or /report to get a final document)");
           return;
         }
@@ -124,20 +147,34 @@ export class GatewayServer {
       console.log(chalk.cyan(`\n[Telegram Gateway] Received mission: "${instruction}"`));
       
       // Send initial acknowledgment
-      const statusMessage = await ctx.reply("🔥 Mission acknowledged. Engaging Orchestration Core...");
+      const statusMessage = await ctx.reply("🔥 *Mission Acknowledged.*\nInitializing Orchestration Core...", { parse_mode: "Markdown" });
 
       try {
         // Execute the agent, passing a callback to stream tool updates back to Telegram
         const finalResponse = await this.orchestrator.execute(instruction, async (toolName, args) => {
           // Send intermediate status updates as the agent works
           try {
-            await ctx.telegram.editMessageText(
-              ctx.chat.id,
-              statusMessage.message_id,
-              undefined,
-              `⚙️ *Executing Tool:* \`${toolName}\`\n_Analyzing findings..._`,
-              { parse_mode: "Markdown" }
-            );
+            if (toolName === "thought") {
+              if (this.noisyMode) {
+                await ctx.reply(`🧠 *Neural Thought:*\n_${args.thought.substring(0, 1000)}_`, { parse_mode: "Markdown" });
+              }
+            } else if (toolName === "status") {
+              await ctx.telegram.editMessageText(
+                ctx.chat.id,
+                statusMessage.message_id,
+                undefined,
+                `📡 *Tactical Status:* ${args.message}`,
+                { parse_mode: "Markdown" }
+              );
+            } else {
+              await ctx.telegram.editMessageText(
+                ctx.chat.id,
+                statusMessage.message_id,
+                undefined,
+                `⚙️ *Executing Tool:* \`${toolName}\`\n\`\`\`json\n${JSON.stringify(args, null, 2).substring(0, 500)}\`\`\``,
+                { parse_mode: "Markdown" }
+              );
+            }
           } catch (e) {
             // Ignore Telegram rate limit / same-text edit errors
           }
@@ -170,8 +207,20 @@ export class GatewayServer {
     });
 
     // Launch the bot polling loop
-    this.bot.launch();
-    console.log(chalk.green("✅ DrogonClaw Telegram Gateway is listening for instructions..."));
+    try {
+      this.bot.launch();
+      console.log(chalk.green("✅ DrogonClaw Telegram Gateway is listening for instructions..."));
+    } catch (e: any) {
+      if (e.message.includes("409")) {
+        console.error(chalk.red("\n[FATAL ERROR] Telegram Bot Conflict (409)"));
+        console.error(chalk.yellow("Another instance of this bot is already running elsewhere."));
+        console.error(chalk.gray("This usually happens if you have another terminal open or didn't kill the previous process correctly.\n"));
+        console.error(chalk.white("Try running: ") + chalk.cyan("killall node") + chalk.white(" or find the process in Task Manager.\n"));
+      } else {
+        console.error(chalk.red(`[Fatal Gateway Error] ${e.message}`));
+      }
+      process.exit(1);
+    }
 
     // Enable graceful stop
     process.once("SIGINT", () => this.bot.stop("SIGINT"));

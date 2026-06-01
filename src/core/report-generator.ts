@@ -84,18 +84,31 @@ ${await marked.parse(reportContent)}
   public async generateReport(): Promise<{ textPath: string, docPath: string }> {
      const { mdPath, htmlPath } = await this.generateMarkdownReport();
      
-     // Attempt to use 'wkhtmltopdf' if installed on the system (very common on Kali/Ubuntu)
-     return new Promise((resolve) => {
-        const pdfPath = mdPath.replace(".md", ".pdf");
-        exec(`wkhtmltopdf ${htmlPath} ${pdfPath}`, (err) => {
-           if (err) {
-              // If wkhtmltopdf isn't available, return the styled HTML as the final document
-              console.log(chalk.gray(`  [!] PDF renderer not found natively. Outputting styled HTML instead: ${htmlPath}`));
-              resolve({ textPath: mdPath, docPath: htmlPath });
-           } else {
-              resolve({ textPath: mdPath, docPath: pdfPath });
-           }
-        });
-     });
+     try {
+       // Utilize Playwright for native cross-platform PDF generation
+       const { chromium } = await import("playwright");
+       const browser = await chromium.launch({ headless: true });
+       const page = await browser.newPage();
+       
+       // Load the local HTML file
+       await page.goto(`file://${htmlPath}`, { waitUntil: 'networkidle' });
+       
+       const pdfPath = mdPath.replace(".md", ".pdf");
+       
+       // Generate PDF with professional styling
+       await page.pdf({
+         path: pdfPath,
+         format: 'A4',
+         printBackground: true,
+         margin: { top: '20mm', bottom: '20mm', left: '20mm', right: '20mm' }
+       });
+       
+       await browser.close();
+       console.log(chalk.green(`  [+] PDF generated successfully: ${pdfPath}`));
+       return { textPath: mdPath, docPath: pdfPath };
+     } catch (e: any) {
+       console.log(chalk.yellow(`  [!] PDF rendering failed (${e.message}). Falling back to styled HTML.`));
+       return { textPath: mdPath, docPath: htmlPath };
+     }
   }
 }

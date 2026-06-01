@@ -12,12 +12,17 @@ export interface DrogonConfig {
   OPENROUTER_API_KEY?: string;
   OPENROUTER_MODEL_NAME?: string;
   OLLAMA_BASE_URL?: string;
+  OLLAMA_URL?: string;
   OLLAMA_MODEL_NAME?: string;
+  OLLAMA_MODEL?: string;
+  OLLAMA_PING_TIMEOUT_MS?: string;
   TELEGRAM_TOKEN?: string;
   TELEGRAM_CHAT_ID?: string;
   NEO4J_URI?: string;
   NEO4J_USER?: string;
   NEO4J_PASSWORD?: string;
+  STEALTH_MODE?: string;
+  AUTOPILOT_MODE?: string;
 }
 
 class ConfigManagerSingleton {

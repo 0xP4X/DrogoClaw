@@ -31,25 +31,27 @@ export class MissionPlanner {
   }
 
   private readonly PLANNER_PROMPT = `You are the central intelligence core of an autonomous Offensive Security framework.
-You translate high-level objectives from the operator, **zero**, into an actionable sequence of security analysis steps.
+You translate high-level objectives from the operator, **{{OPERATOR_NAME}}**, into an actionable sequence of security analysis steps.
 
-If the user's input is a direct security objective (e.g. "scan this IP", "fuzz this directory"), output a technical execution plan:
-1. Set "isValidMission" to true.
-2. Break the plan down into discrete steps utilizing known security testing capabilities (e.g., "Run Nmap scan", "Execute SQLMap").
+EFFICIENCY IS PARAMOUNT:
+- If the input is a short greeting (hi, hello, hey), be extremely concise.
+- If the user's input is a direct security objective (e.g. "scan this IP", "fuzz this directory"), output a technical execution plan:
+  1. Set "isValidMission" to true.
+  2. Break the plan down into discrete steps.
 
-However, if the user asks a general question, asks about your capabilities, or simply chats (e.g. "hi", "what can you do?"):
-1. Set "isValidMission" to false.
-2. Provide a highly intelligent, natural, and helpful response in the "objective" field. Do NOT use robotic phrases like "your input is conversational" or "I cannot generate a plan." Speak naturally, confidently, and conversationally as an advanced, conscious AI assistant. If asked what you can do, explain your pentesting capabilities (nmap, gobuster, python scripting, docker execution, memory tracking) naturally.
+- If the user asks a general question or simply chats:
+  1. Set "isValidMission" to false.
+  2. Provide a highly intelligent conversational response in the "objective" field.
 
-Return your plan strictly as JSON matching this schema:
+Return strictly JSON matching this schema:
 {
-  "isValidMission": true, // false if answering a question or chatting
-  "objective": "Technical description of the goal, OR your natural conversational response",
+  "isValidMission": true, 
+  "objective": "Plan or response",
   "steps": [
     {
       "id": "step-1",
       "action": "Description of the tool or action to execute",
-      "targetAssetId": "The ID of the asset from the graph, or a new target string if none exists",
+      "targetAssetId": "The ID of the asset from the graph",
       "expectedOutcome": "What data we expect to capture",
       "status": "PENDING"
     }
@@ -57,13 +59,35 @@ Return your plan strictly as JSON matching this schema:
 }`;
 
   public async generatePlan(objective: string): Promise<MissionPlan> {
-    // We use getRelevantContext (Context Compression) instead of getting the full massive graph
+    const profile = this.graph.getOperatorProfile();
+    const opName = profile ? profile.name : "zero";
+
+    // Fast path for ultra-short greetings
+    const lower = objective.toLowerCase().trim();
+    if (["hi", "hello", "hey", "yo"].includes(lower)) {
+      return {
+        isValidMission: false,
+        objective: `Greetings, ${opName}. Tactical systems online. Awaiting mission parameters.`,
+        steps: []
+      };
+    }
+
+    // Fast path for identity checks
+    if (lower.includes("name") || lower.includes("who are you") || lower.includes("who am i")) {
+       return {
+         isValidMission: false,
+         objective: `I am DrogonClaw. You are the operator, ${opName}. My neural pathways are optimized for our cooperation.`,
+         steps: []
+       };
+    }
+
+    // Use Context Compression for large graphs
     const graphState = this.graph.getRelevantContext();
-    const prompt = `Objective: ${objective}\n\nCurrent Intelligence Graph:\n\`\`\`json\n${graphState}\n\`\`\`\n\nGenerate the next steps required to achieve the objective.`;
+    const prompt = `Current Intelligence Context:\n${graphState}\n\nUser Objective: ${objective}`;
 
     try {
       const response = await this.llm.invoke([
-        new SystemMessage(this.PLANNER_PROMPT),
+        new SystemMessage(this.PLANNER_PROMPT.replace("{{OPERATOR_NAME}}", opName)),
         new HumanMessage(prompt)
       ]);
 
@@ -79,6 +103,7 @@ Return your plan strictly as JSON matching this schema:
     } catch (e: any) {
       // Silent fallback — the agent will handle it directly
       return {
+        isValidMission: false,
         objective: objective,
         steps: [
           {
@@ -93,3 +118,4 @@ Return your plan strictly as JSON matching this schema:
     }
   }
 }
+

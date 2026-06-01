@@ -180,6 +180,10 @@ export class MemoryGraph extends EventEmitter {
     console.log(`\n  [Memory] Neural pathway updated: Operator Identity -> ${this.operatorProfile.name}`);
   }
 
+  public getNodesCount(): number {
+    return this.nodes.size;
+  }
+
   public getFullGraphJSON(): string {
     return JSON.stringify({
       nodes: Array.from(this.nodes.values()),
