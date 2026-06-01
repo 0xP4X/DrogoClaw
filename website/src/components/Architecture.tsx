@@ -1,5 +1,5 @@
 import { motion, type Variants } from 'framer-motion';
-import { Database, Box, CheckCircle, Smartphone, FileText, Code2 } from 'lucide-react';
+import { Database, Box, CheckCircle, Smartphone, FileText, Code2, Users, Ghost } from 'lucide-react';
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -28,7 +28,7 @@ export default function Architecture() {
         whileInView="visible"
         viewport={{ once: true, margin: "-50px" }}
         className="features-grid"
-        style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}
+        style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '2rem' }}
       >
         <motion.div variants={itemVariants} className="glass-card feature-item">
           <div className="feature-icon">
@@ -48,6 +48,14 @@ export default function Architecture() {
 
         <motion.div variants={itemVariants} className="glass-card feature-item">
           <div className="feature-icon">
+            <Users size={24} />
+          </div>
+          <h3>Multi-Agent Swarm</h3>
+          <p>Deploy specialized sub-agents simultaneously. While one agent runs a stealthy Nmap scan, another can be brute-forcing discovered login portals, slashing operational time in half.</p>
+        </motion.div>
+
+        <motion.div variants={itemVariants} className="glass-card feature-item">
+          <div className="feature-icon">
             <CheckCircle size={24} />
           </div>
           <h3>Zero Hallucinations</h3>
@@ -60,6 +68,14 @@ export default function Architecture() {
           </div>
           <h3>Telegram C2 Gateway</h3>
           <p>Control your agent swarm from anywhere. Pass your Telegram Chat ID during initialization to securely text instructions to DrogonClaw from your mobile device and receive real-time updates.</p>
+        </motion.div>
+
+        <motion.div variants={itemVariants} className="glass-card feature-item">
+          <div className="feature-icon">
+            <Ghost size={24} />
+          </div>
+          <h3>Stealth & Evasion</h3>
+          <p>Built-in OPSEC monitors analyze proposed commands before execution. Destructive or overly noisy commands are automatically flagged and require operator override.</p>
         </motion.div>
 
         <motion.div variants={itemVariants} className="glass-card feature-item">
