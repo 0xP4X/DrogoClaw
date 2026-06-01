@@ -2,6 +2,9 @@
 node_modules/
 ui/node_modules/
 
+# Website (maintained in a separate private repo)
+website/
+
 # Build output
 dist/
 ui/.next/
