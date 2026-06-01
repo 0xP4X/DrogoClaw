@@ -1,5 +1,9 @@
 # DrogonClaw 🐉🔥
 
+<div align="center">
+  <img src="assets/logo.png" alt="DrogonClaw Logo" width="300" />
+</div>
+
 > **AI-Driven Offensive Security Framework**
 > *Developed by 0day (0xP4X)*
 
