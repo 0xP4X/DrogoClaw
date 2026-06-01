@@ -88,6 +88,7 @@ export async function runOnboarding(): Promise<void> {
       if (provider === "openai") {
         const apiKey = await password({ 
           message: "Enter your OpenAI API Key (sk-...):", 
+          mask: "*",
           validate: (input) => input.trim().length > 0 ? true : "API Key cannot be empty!"
         });
         const model = await select({
@@ -107,6 +108,7 @@ export async function runOnboarding(): Promise<void> {
       } else if (provider === "anthropic") {
         const apiKey = await password({ 
           message: "Enter your Anthropic API Key (sk-ant-...):", 
+          mask: "*",
           validate: (input) => input.trim().length > 0 ? true : "API Key cannot be empty!"
         });
         const model = await select({
@@ -125,6 +127,7 @@ export async function runOnboarding(): Promise<void> {
       } else if (provider === "gemini") {
         const apiKey = await password({ 
           message: "Enter your Google Gemini API Key:", 
+          mask: "*",
           validate: (input) => input.trim().length > 0 ? true : "API Key cannot be empty!"
         });
         const model = await select({
@@ -143,6 +146,7 @@ export async function runOnboarding(): Promise<void> {
       } else if (provider === "openrouter") {
         const apiKey = await password({ 
           message: "Enter your OpenRouter API Key:", 
+          mask: "*",
           validate: (input) => input.trim().length > 0 ? true : "API Key cannot be empty!"
         });
         const model = await select({
@@ -235,6 +239,7 @@ export async function runOnboarding(): Promise<void> {
 
     const telegramToken = await password({ 
       message: "Enter your Telegram Bot Token:", 
+      mask: "*",
       validate: (input) => input.trim().length > 0 ? true : "Telegram Token cannot be empty!"
     });
     console.log(chalk.gray("\nTo secure your bot, we need your Telegram Chat ID so no one else can control it."));
