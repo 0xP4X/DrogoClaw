@@ -1,6 +1,7 @@
 # DrogonClaw 🐉🔥
 
 > **AI-Driven Offensive Security Framework**
+> *Developed by 0day (0xP4X)*
 
 DrogonClaw is a next-generation cyber operations platform. Rather than acting as a simple wrapper for Kali tools, DrogonClaw operates as a **Command-and-Control (C2) Brain**. It understands objectives, plans attack workflows, adapts to new discoveries, and orchestrates a swarm of specialized autonomous agents through a unified intelligence core.
 
@@ -29,40 +30,45 @@ DrogonClaw isolates operational risk through:
 
 ## 🚀 Quick Start & Setup Guide
 
-DrogonClaw operates through multiple interconnected modules. You can run it entirely from the CLI, or spin up the Web Dashboard and Telegram Gateway for a full Command & Control (C2) experience.
+DrogonClaw operates through multiple interconnected modules. You can run it locally from source, or install it globally as a standalone CLI tool.
 
-### 1. Installation
+### 1. Global Installation (Recommended)
+
+DrogonClaw is published on NPM and can be installed globally:
 
 ```bash
-git clone https://github.com/your-org/drogonclaw.git
+npm install -g drogonclaw
+```
+
+Once installed, simply run `drogonclaw` from anywhere on your system to launch the setup wizard and enter the AI.
+
+### 2. Local Installation (For Developers)
+
+```bash
+git clone https://github.com/0xP4X/DrogoClaw.git
 cd drogonclaw
 npm install
-```
-
-### 2. Initialization & Diagnostics
-
-Before running any web servers, you must configure the core intelligence engine:
-
-```bash
+npm run build
 npm run cli
 ```
 
-This will launch the **DrogonClaw Initialization Wizard**.
-- You will be prompted to enter your AI Provider API Keys (OpenAI, Anthropic, Gemini, or Ollama).
-- You will optionally be asked for a **Telegram Bot Token** and your **Telegram Chat ID**.
+### 3. Initialization Wizard
 
-Once inside the terminal, type `/health`. The agent will perform a system diagnostic and optionally install any missing pentesting tools (Nmap, Gobuster, Go, Metasploit) on your machine.
+Upon the first launch of `drogonclaw`, the **DrogonClaw Configuration Wizard** will guide you through setting up your neural pathways:
+- You will be prompted to select an AI Provider (OpenAI, Anthropic, OpenRouter, or local Ollama).
+- You will securely enter your API keys.
+- You can optionally configure a **Telegram Gateway** for remote mobile C2 operations.
 
-### 3. Launching the OS Components
+If you ever need to reconfigure your setup, run `drogonclaw setup` or type `/setup` inside the interactive terminal.
 
-DrogonClaw can be run in several modes depending on your operational needs. In separate terminal windows, run the following:
+### 4. Interactive Terminal & Dynamic Execution
 
-#### 💻 Interactive CLI
-The core interactive terminal session:
-```bash
-npm run cli
-```
-*Useful commands: `/swarm <task>`, `/stealth on`, `/report`, `/skills`*
+Inside the `drogon>` prompt, you can converse with the AI naturally or use specific slash commands:
+* `/skills` - List all loaded penetration testing modules
+* `/setup` - Relaunch the configuration wizard
+* `/clear` - Wipe the terminal screen
+
+**Graceful Action Abortion:** If DrogonClaw is running a long scan or executing an exploit and you want to steer it in a different direction, simply press `Ctrl+C`. This will instantly sever the active thread, halt all sandboxed executions, and drop you back to the prompt, preserving the session memory so you can inject new instructions.
 
 #### 📱 Telegram Gateway
 Allows you to text instructions to your agent from your phone:
@@ -74,6 +80,11 @@ npm run gateway
 ## 🛠️ Modularity & Swarm Intelligence
 
 DrogonClaw is designed to scale into collaborative agent swarms. You can inject new specialized agents (e.g., a "Web Fuzzer Agent" or an "Active Directory Hound") without modifying the core orchestrator.
+
+## 👨‍💻 Author
+
+**0day (0xP4X)**
+- GitHub: [@0xP4X](https://github.com/0xP4X)
 
 ## ⚠️ Disclaimer
 
