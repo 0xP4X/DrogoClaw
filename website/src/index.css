@@ -16,6 +16,7 @@
   --terminal-text: #a0a0a0;
   --terminal-prompt: #5c6370;
   --code-bg: rgba(0, 0, 0, 0.4);
+  --code-text: #e5c07b;
   --footer-bg: rgba(5, 5, 8, 0.4);
   --hero-gradient: linear-gradient(135deg, #fff 0%, #a5a5a5 100%);
   --grid-line: rgba(255, 255, 255, 0.02);
@@ -41,6 +42,7 @@
   --terminal-text: #4a4a55;
   --terminal-prompt: #9ba1ad;
   --code-bg: rgba(230, 230, 235, 0.8);
+  --code-text: #aa3320;
   --footer-bg: rgba(235, 235, 238, 0.8);
   --hero-gradient: linear-gradient(135deg, #111 0%, #444 100%);
   --grid-line: rgba(0, 0, 0, 0.03);
@@ -397,7 +399,8 @@ nav {
 }
 
 .code-block code {
-  color: #e5c07b;
+  color: var(--code-text);
+  transition: color 0.4s ease;
 }
 
 .copy-btn {
