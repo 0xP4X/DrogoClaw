@@ -10,10 +10,37 @@
   --accent-glow: rgba(255, 42, 75, 0.3);
   --border-color: rgba(255, 255, 255, 0.08);
   --border-hover: rgba(255, 255, 255, 0.15);
-  
+  --nav-bg: rgba(10, 10, 15, 0.4);
+  --terminal-bg: rgba(5, 5, 8, 0.8);
+  --code-bg: rgba(0, 0, 0, 0.4);
+  --footer-bg: rgba(5, 5, 8, 0.4);
+  --hero-gradient: linear-gradient(135deg, #fff 0%, #a5a5a5 100%);
+  --grid-line: rgba(255, 255, 255, 0.02);
+  --radial-bg: rgba(30, 10, 15, 0.5);
+
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
+
+[data-theme="light"] {
+  --bg-base: #f5f5f7;
+  --bg-card: rgba(255, 255, 255, 0.8);
+  --bg-card-hover: rgba(255, 255, 255, 0.95);
+  --text-main: #111111;
+  --text-muted: #555e6d;
+  --accent: #cc0a2b;
+  --accent-glow: rgba(204, 10, 43, 0.2);
+  --border-color: rgba(0, 0, 0, 0.08);
+  --border-hover: rgba(0, 0, 0, 0.15);
+  --nav-bg: rgba(245, 245, 247, 0.75);
+  --terminal-bg: rgba(20, 20, 24, 0.95);
+  --code-bg: rgba(230, 230, 235, 0.8);
+  --footer-bg: rgba(235, 235, 238, 0.8);
+  --hero-gradient: linear-gradient(135deg, #111 0%, #444 100%);
+  --grid-line: rgba(0, 0, 0, 0.03);
+  --radial-bg: rgba(200, 180, 185, 0.3);
+}
+
 
 * {
   box-sizing: border-box;
@@ -39,9 +66,10 @@ body {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: radial-gradient(circle at 50% 0%, rgba(30, 10, 15, 0.5), transparent 60%);
+  background: radial-gradient(circle at 50% 0%, var(--radial-bg), transparent 60%);
   z-index: -2;
   pointer-events: none;
+  transition: background 0.4s ease;
 }
 
 .grid-overlay {
@@ -51,13 +79,14 @@ body {
   width: 100vw;
   height: 100vh;
   background-image: 
-    linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px);
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
   background-size: 50px 50px;
   mask-image: radial-gradient(circle at center, black, transparent 80%);
   -webkit-mask-image: radial-gradient(circle at center, black, transparent 80%);
   z-index: -1;
   pointer-events: none;
+  transition: background-image 0.4s ease;
 }
 
 .container {
@@ -77,12 +106,13 @@ nav {
   position: sticky;
   top: 1rem;
   z-index: 100;
-  background: rgba(10, 10, 15, 0.4);
+  background: var(--nav-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border-color);
   border-radius: 16px;
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  transition: background 0.4s ease, border-color 0.4s ease;
 }
 
 .nav-brand {
@@ -150,7 +180,7 @@ nav {
   line-height: 1.1;
   margin-bottom: 1.5rem;
   letter-spacing: -1.5px;
-  background: linear-gradient(135deg, #fff 0%, #a5a5a5 100%);
+  background: var(--hero-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -296,7 +326,7 @@ nav {
 }
 
 .terminal-window {
-  background: rgba(5, 5, 8, 0.8);
+  background: var(--terminal-bg);
   backdrop-filter: blur(20px);
   border: 1px solid var(--border-color);
   border-radius: 12px;
@@ -305,6 +335,7 @@ nav {
   box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
   max-width: 800px;
   margin: 0 auto;
+  transition: border-color 0.4s ease;
 }
 
 .terminal-header {
@@ -345,7 +376,7 @@ nav {
 }
 
 .code-block {
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--code-bg);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 1.5rem;
@@ -354,6 +385,7 @@ nav {
   justify-content: space-between;
   align-items: center;
   margin-top: 1rem;
+  transition: background 0.4s ease;
 }
 
 .code-block code {
@@ -384,7 +416,35 @@ footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(5, 5, 8, 0.4);
+  background: var(--footer-bg);
+  transition: background 0.4s ease;
+}
+
+/* Theme Toggle Button */
+.theme-toggle {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  padding: 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  width: 36px;
+  height: 36px;
+}
+
+.theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
+  border-color: var(--border-hover);
+}
+
+/* Body transition for smooth theme switching */
+body {
+  transition: background-color 0.4s ease, color 0.4s ease;
 }
 
 @media (max-width: 768px) {
