@@ -76,6 +76,9 @@ export function getLLMProvider(options?: LLMProviderOptions): BaseChatModel {
           temperature: 0,
           configuration: {
             baseURL: `${normalizedBaseUrl}/v1`,
+            defaultHeaders: {
+              "User-Agent": "DrogonClaw/1.0",
+            },
           },
           openAIApiKey: "ollama",
           maxRetries,
@@ -86,7 +89,7 @@ export function getLLMProvider(options?: LLMProviderOptions): BaseChatModel {
         const apiKey = ConfigManager.get("OPENROUTER_API_KEY") || process.env.OPENROUTER_API_KEY;
         if (!apiKey) throw new Error("OPENROUTER_API_KEY is not set in config.");
         return new ChatOpenAI({
-          modelName: ConfigManager.get("OPENROUTER_MODEL_NAME") || process.env.OPENROUTER_MODEL_NAME || "anthropic/claude-sonnet-4.6",
+          modelName: ConfigManager.get("OPENROUTER_MODEL_NAME") || process.env.OPENROUTER_MODEL_NAME || "anthropic/claude-3.5-sonnet",
           temperature: 0,
           configuration: {
             baseURL: "https://openrouter.ai/api/v1",
