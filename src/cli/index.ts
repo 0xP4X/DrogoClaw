@@ -63,10 +63,39 @@ async function checkForUpdates(): Promise<void> {
       const shouldUpdate = await confirm({ message: "Would you like to install the update now?", default: true });
       
       if (shouldUpdate) {
-        console.log(chalk.cyan("\n  [*] Installing update via npm..."));
-        execSync("npm install -g drogonclaw@latest", { stdio: "inherit" });
-        console.log(chalk.green("\n  ✓ Update complete. Please restart DrogonClaw.\n"));
-        process.exit(0);
+        console.log("");
+        await new Promise<void>((resolve) => {
+          let progress = 0;
+          const barWidth = 40;
+          
+          const renderBar = (pct: number) => {
+            const p = Math.floor(pct);
+            const filled = Math.round((p / 100) * barWidth);
+            const empty = barWidth - filled;
+            const bar = chalk.green('█'.repeat(filled)) + chalk.gray('░'.repeat(empty));
+            process.stdout.write(`\r  ${chalk.cyan('[*] Installing Update:')} [${bar}] ${p}% `);
+          };
+
+          const interval = setInterval(() => {
+            if (progress < 99) {
+              const increment = progress < 60 ? Math.random() * 5 : progress < 90 ? Math.random() * 2 : Math.random() * 0.5;
+              progress = Math.min(99.9, progress + increment);
+              renderBar(progress);
+            }
+          }, 150);
+
+          const { spawn } = await import("child_process");
+          const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+          const child = spawn(npmCmd, ['install', '-g', 'drogonclaw@latest'], { stdio: 'ignore' });
+
+          child.on('close', () => {
+            clearInterval(interval);
+            renderBar(100);
+            process.stdout.write('\n');
+            console.log(chalk.green("\n  ✓ Update complete. Please restart DrogonClaw.\n"));
+            process.exit(0);
+          });
+        });
       }
     }
   } catch (e) {
