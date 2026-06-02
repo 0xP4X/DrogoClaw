@@ -47,9 +47,37 @@ async function printBanner(): Promise<void> {
   });
 }
 
+import { execSync } from "child_process";
+
+async function checkForUpdates(): Promise<void> {
+  try {
+    const response = await fetch("https://registry.npmjs.org/drogonclaw/latest", { signal: AbortSignal.timeout(2500) });
+    if (!response.ok) return;
+    const data = await response.json() as any;
+    const latestVersion = data.version;
+
+    if (latestVersion && latestVersion !== VERSION) {
+      console.log(chalk.yellow(`\n  🚀 A new version of DrogonClaw is available: `) + chalk.red(`${VERSION} `) + chalk.gray(`→ `) + chalk.green(`${latestVersion}`));
+      
+      const { confirm } = await import("@inquirer/prompts");
+      const shouldUpdate = await confirm({ message: "Would you like to install the update now?", default: true });
+      
+      if (shouldUpdate) {
+        console.log(chalk.cyan("\n  [*] Installing update via npm..."));
+        execSync("npm install -g drogonclaw@latest", { stdio: "inherit" });
+        console.log(chalk.green("\n  ✓ Update complete. Please restart DrogonClaw.\n"));
+        process.exit(0);
+      }
+    }
+  } catch (e) {
+    // Silently fail if offline or timeout
+  }
+}
+
 async function startInteractiveMode(): Promise<void> {
   try {
     await printBanner();
+    await checkForUpdates();
 
     if (!isEnvConfigured()) {
       await runOnboarding();
