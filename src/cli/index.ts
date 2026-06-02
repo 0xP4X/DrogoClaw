@@ -19,7 +19,7 @@ import ora from "ora";
 import { startChatSession } from "./chat.js";
 import { AgentOrchestrator } from "../agent/orchestrator.js";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 
 async function printBanner(): Promise<void> {
   console.clear();
