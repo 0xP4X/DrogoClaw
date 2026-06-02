@@ -125,6 +125,112 @@ export class GatewayServer {
           return;
         }
 
+        if (instruction === "/help") {
+          await ctx.reply(
+            "╭─ *Commands* ──────────────────\n" +
+            "├ /skills - Interactive capability explorer\n" +
+            "├ /new - Wipe the agent memory and start fresh\n" +
+            "├ /health - Run system diagnostics\n" +
+            "├ /install <url> - Install external plugins\n" +
+            "├ /stealth - Toggle stealth mode (OPSEC)\n" +
+            "├ /autopilot - Toggle infinite autonomy\n" +
+            "├ /noisy - Toggle neural telemetry stream\n" +
+            "├ /report - Generate intelligence report\n" +
+            "╰─────────────────────────────",
+            { parse_mode: "Markdown" }
+          );
+          return;
+        }
+        if (instruction === "/skills") {
+          await ctx.reply(
+            "🛠 *DrogonClaw Capabilities*\n\n" +
+            "• *Network Reconnaissance:* Active port scanning & service discovery (Nmap)\n" +
+            "• *Web Enumeration:* Directory fuzzing & vulnerability crawling (Gobuster, Nuclei)\n" +
+            "• *Exploitation:* Custom Python & Stateful Bash Execution\n" +
+            "• *Heuristic Analysis:* Binary reversing & strings extraction\n" +
+            "• *Social Engineering:* Spear-Phishing Generation & Evilginx2 AitM\n" +
+            "• *APT Capabilities:* Zero-Day mutational fuzzing, Dynamic AES payload compilation, Autonomous Swarm Pivoting\n\n" +
+            "_Reply with any of these objectives to execute them._",
+            { parse_mode: "Markdown" }
+          );
+          return;
+        }
+        if (instruction === "/stealth" || instruction === "/stealth on") {
+          this.orchestrator.opsecManager.enableStealthMode();
+          await ctx.reply("🟡 *Stealth mode enabled*\nTiming jitter on, noisy scanners suppressed.", { parse_mode: "Markdown" });
+          return;
+        }
+        if (instruction === "/stealth off") {
+          this.orchestrator.opsecManager.disableStealthMode();
+          await ctx.reply("🔴 *Stealth mode disabled*\nAggressive scanning active.", { parse_mode: "Markdown" });
+          return;
+        }
+        if (instruction === "/health") {
+          const statusMessage = await ctx.reply("🩺 Running system diagnostics...");
+          try {
+            const { HealthChecker } = await import("../core/health-checker.js");
+            const checker = new HealthChecker();
+            await checker.runDiagnostics();
+            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined, "✅ *System Diagnostics Passed*\nAll required binaries and dependencies are present.", { parse_mode: "Markdown" });
+          } catch (e: any) {
+            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined, `❌ *Health check failed:*\n${e.message}`, { parse_mode: "Markdown" });
+          }
+          return;
+        }
+        if (instruction.startsWith("/install ")) {
+          const url = instruction.substring(9).trim();
+          if (!url) {
+             await ctx.reply("❌ Usage: /install <url_to_raw_ts_file>");
+             return;
+          }
+          const statusMessage = await ctx.reply(`⏳ Downloading plugin from ${url}...`);
+          try {
+            const { execSync } = await import("child_process");
+            const fs = await import("fs");
+            const path = await import("path");
+            
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+            const code = await response.text();
+            
+            const pluginsDir = path.join(process.cwd(), "skills", "plugins");
+            if (!fs.existsSync(pluginsDir)) fs.mkdirSync(pluginsDir, { recursive: true });
+            
+            const pluginName = "plugin_" + Date.now();
+            const tsPath = path.join(pluginsDir, `${pluginName}.ts`);
+            const jsDir = path.join(process.cwd(), "dist", "skills", "plugins");
+            const jsPath = path.join(jsDir, `${pluginName}.js`);
+            
+            fs.writeFileSync(tsPath, code);
+            
+            const tsconfigPath = path.join(pluginsDir, "tsconfig.json");
+            if (!fs.existsSync(tsconfigPath)) {
+               fs.writeFileSync(tsconfigPath, JSON.stringify({
+                  compilerOptions: { module: "NodeNext", moduleResolution: "NodeNext", target: "ES2022", outDir: "../../dist/skills/plugins" }
+               }, null, 2));
+            }
+            execSync(`npx tsc ${tsPath} --outDir ${jsDir} --module NodeNext --moduleResolution NodeNext --target ES2022`, { stdio: 'ignore' });
+            
+            const fileUrl = `file:///${jsPath.replace(/\\/g, '/')}`;
+            const pluginModule = await import(fileUrl);
+            const { globalPluginRegistry } = await import("../plugins/plugin-registry.js");
+            
+            let count = 0;
+            for (const key of Object.keys(pluginModule)) {
+               if (pluginModule[key] && pluginModule[key].id && pluginModule[key].execute) {
+                  globalPluginRegistry.register(pluginModule[key]);
+                  count++;
+               }
+            }
+            
+            if (count === 0) throw new Error("No valid SkillPlugin objects exported.");
+            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined, `✅ *Successfully installed ${count} plugin(s)!*\nPlugin is now active in the agent's context.`, { parse_mode: "Markdown" });
+          } catch (e: any) {
+            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined, `❌ *Install error:*\n${e.message}`, { parse_mode: "Markdown" });
+          }
+          return;
+        }
+
         // Handle mission shortcuts from documentation
         const cmdParts = instruction.split(" ");
         const baseCmd = cmdParts[0].toLowerCase();
@@ -132,7 +238,7 @@ export class GatewayServer {
              // Let these through to the natural language processor by stripping the slash
              instruction = instruction.substring(1); 
         } else if (instruction !== "/start") {
-          await ctx.reply("I operate on natural language. Just tell me what to do directly. (Type /new to wipe memory, /autopilot on to enable infinite autonomy, or /report to get a final document)");
+          await ctx.reply("I operate on natural language. Just tell me what to do directly. (Type /help to see available system commands)");
           return;
         }
       }
@@ -208,6 +314,16 @@ export class GatewayServer {
 
     // Launch the bot polling loop
     try {
+      await this.bot.telegram.setMyCommands([
+        { command: "help", description: "Display tactical manual & command list" },
+        { command: "skills", description: "Interactive capability explorer" },
+        { command: "new", description: "Purge neural memory & reset session" },
+        { command: "health", description: "Run system diagnostics" },
+        { command: "stealth", description: "Toggle OPSEC stealth mode" },
+        { command: "autopilot", description: "Toggle infinite autonomy" },
+        { command: "noisy", description: "Toggle neural telemetry stream" },
+        { command: "report", description: "Generate intelligence report" }
+      ]);
       this.bot.launch();
       console.log(chalk.green("✅ DrogonClaw Telegram Gateway is listening for instructions..."));
     } catch (e: any) {
