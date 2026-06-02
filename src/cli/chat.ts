@@ -527,30 +527,7 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
       continue;
     }
 
-    // ── Pre-Execution Fast Paths (Zero Latency) ──────────
-    const fastCommand = command.trim().toLowerCase();
-    const commonGreetings = ["hi", "hey", "hello", "yo", "hola", "help"];
-    const identityQuestions = ["who are you", "what are you", "what is your name", "what's my name", "who am i", "what is my name"];
-    
-    if (commonGreetings.includes(fastCommand) || fastCommand.length < 3) {
-       console.log(chalk.cyan("\n  ╭─ DrogonClaw ──────────────────────────────────────────"));
-       console.log("  Greetings, operator. I am synchronized and ready for deployment.");
-       console.log(chalk.cyan("  ╰───────────────────────────────────────────────────────\n"));
-       continue;
-    }
-
-    if (identityQuestions.some(q => fastCommand.includes(q))) {
-       const operator = activeOrchestrator.getMemoryGraph().getOperatorProfile();
-       const name = operator?.name || "seed";
-       console.log(chalk.cyan("\n  ╭─ Identity Protocol ───────────────────────────────────"));
-       if (fastCommand.includes("my name") || fastCommand.includes("who am i")) {
-         console.log(`  Target Operator Alias: ${chalk.bold.green(name)}`);
-       } else {
-         console.log("  Framework: DrogonClaw v0.2.0 (High-Precision Autonomous C2)");
-       }
-       console.log(chalk.cyan("  ╰───────────────────────────────────────────────────────\n"));
-       continue;
-    }
+    // ── All inputs flow directly to the Agent Orchestrator ──
 
     // ── Agent Execution ──────────────────────────────────────
     console.log("");

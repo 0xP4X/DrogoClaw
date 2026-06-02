@@ -62,25 +62,6 @@ Return strictly JSON matching this schema:
     const profile = this.graph.getOperatorProfile();
     const opName = profile ? profile.name : "zero";
 
-    // Fast path for ultra-short greetings
-    const lower = objective.toLowerCase().trim();
-    if (["hi", "hello", "hey", "yo"].includes(lower)) {
-      return {
-        isValidMission: false,
-        objective: `Greetings, ${opName}. Tactical systems online. Awaiting mission parameters.`,
-        steps: []
-      };
-    }
-
-    // Fast path for identity checks
-    if (lower.includes("name") || lower.includes("who are you") || lower.includes("who am i")) {
-       return {
-         isValidMission: false,
-         objective: `I am DrogonClaw. You are the operator, ${opName}. My neural pathways are optimized for our cooperation.`,
-         steps: []
-       };
-    }
-
     // Use Context Compression for large graphs
     const graphState = this.graph.getRelevantContext();
     const prompt = `Current Intelligence Context:\n${graphState}\n\nUser Objective: ${objective}`;

@@ -186,45 +186,9 @@ export class AgentOrchestrator {
   public async execute(prompt: string, onToolCall?: (toolName: string, input: any) => void): Promise<string> {
     if (!this.agent) return "Agent core is not initialized.";
 
-    // Fast-path for common greetings/short chat to avoid dual LLM latency
     const trimmed = prompt.trim().toLowerCase();
-    
-    // 1. Name change fast-path
-    const nameMatch = prompt.match(/(?:change|set)\s+(?:my\s+)?name\s+(?:to\s+)?([a-zA-Z0-9_-]+)/i) ||
-                      prompt.match(/i am\s+([a-zA-Z0-9_-]+)/i) ||
-                      prompt.match(/call me\s+([a-zA-Z0-9_-]+)/i);
-    
-    if (nameMatch) {
-      const newName = nameMatch[1];
-      onToolCall?.("status", { message: `Re-calibrating neural identity for ${newName}...` });
-      await this.memoryGraph.updateOperatorProfile({ name: newName, skillLevel: "elite", preferences: "" });
-      return `Neural pathways adjusted. Welcome, ${newName}. How shall we proceed with the mission?`;
-    }
 
-    // 2. Technical status / Health fast-path
-    if (trimmed.includes("health") || trimmed.includes("status") || trimmed === "diagnostics") {
-      onToolCall?.("status", { message: "Running rapid core diagnostics..." });
-      return "All tactical subsystems are nominal. Ollama backend is responsive, neural graph is synchronized, and toolkit is verified for deployment.";
-    }
-
-    const commonGreetings = ["hi", "hey", "hello", "yo", "hola", "help"];
-    const identityQuestions = ["who are you", "what are you", "what is your name", "what's my name", "who am i", "what is my name"];
-    
-    if (commonGreetings.includes(trimmed) || trimmed.length < 3) {
-       return "Greetings, operator. DrogonClaw is ready. Specify a target or mission objective (e.g., 'scan example.com').";
-    }
-
-    if (identityQuestions.some(q => trimmed.includes(q))) {
-       onToolCall?.("status", { message: "Querying neural identity..." });
-       const operator = await this.memoryGraph.getOperatorProfile();
-       const name = operator?.name || "seed";
-       if (trimmed.includes("my name") || trimmed.includes("who am i")) {
-         return `Your identity is confirmed as: ${name}. You are the master operator of this C2 instance.`;
-       }
-       return "I am DrogonClaw, an autonomous offensive security framework. I orchestrate low-level tools into high-level tactical missions.";
-    }
-
-    // 3. Decide if we need the heavy MissionPlanner or just the ReAct agent
+    // Decide if we need the heavy MissionPlanner or just the ReAct agent
     const missionKeywords = [
         "scan", "hack", "exploit", "fuzz", "enumerate", "brute", "attack", 
         "recon", "nmap", "sqlmap", "metasploit", "osint", "whois", 
@@ -238,23 +202,16 @@ export class AgentOrchestrator {
       onToolCall?.("status", { message: "Generating tactical mission strategy..." });
       try {
         plan = await this.missionPlanner.generatePlan(prompt);
-        // Force mission mode if we detected keywords but the planner was lazy
-        if (!plan.isValidMission && missionKeywords.some(k => trimmed.includes(k))) {
-            plan.isValidMission = true;
-            plan.steps = [{ id: "step-1", action: "Execute autonomous objective evaluation", targetAssetId: "unknown", expectedOutcome: "Complete the mission", status: "PENDING" }];
-        }
       } catch (err) {
-        // Fallback if planner fails
-        plan = { isValidMission: true, steps: [{ id: "fallback", action: "Direct agent execution", status: "PENDING" }] };
+        // Planner failed — let the ReAct agent handle it directly without a plan
+        onToolCall?.("status", { message: "Mission planner unavailable. Agent will operate directly." });
       }
     } else {
       onToolCall?.("status", { message: "Processing command..." });
     }
 
-    // If it's still not a mission after the override, return conversational response
-    if (!plan.isValidMission && plan.objective && plan.objective.length > 15) {
-      return plan.objective;
-    }
+    // If the planner returned a conversational response, pass it through the LLM anyway
+    // so the agent can craft a persona-consistent reply
 
     let executionPrompt = prompt;
 
@@ -322,6 +279,22 @@ export class AgentOrchestrator {
            const err = new Error("HitLPauseError");
            err.name = "HitLPauseError";
            throw err;
+        }
+
+        // Evidence Validation: validate tool outputs for hallucination detection
+        if (lastMessage._getType() === "tool" && typeof lastMessage.content === "string" && lastMessage.content.length > 100) {
+          try {
+            const validation = await this.evidenceValidator.validateEvidence(
+              lastMessage.name || "unknown_tool",
+              lastMessage.content,
+              prompt
+            );
+            if (!validation.isValid && validation.confidenceScore < 30) {
+              onToolCall?.("status", { message: `⚠ Evidence Validator: Low confidence (${validation.confidenceScore}%) — ${validation.reasoning}` });
+            }
+          } catch {
+            // Validation is best-effort, don't block execution
+          }
         }
 
         finalState = event;

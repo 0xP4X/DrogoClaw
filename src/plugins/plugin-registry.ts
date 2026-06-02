@@ -57,8 +57,21 @@ export class PluginRegistry {
    * (This acts as the bridge between the Plugin Ecosystem and the LangGraph orchestrator)
    */
   public getLangChainTools(): any[] {
-    // In a full implementation, this dynamically wraps SkillPlugins into DynamicStructuredTools
-    return [];
+    const { DynamicStructuredTool } = require("@langchain/core/tools");
+    return Array.from(this.plugins.values()).map(plugin => {
+      return new DynamicStructuredTool({
+        name: plugin.id,
+        description: plugin.description,
+        schema: plugin.schema,
+        func: async (input: Record<string, any>) => {
+          const context: SkillExecutionContext = {
+            target: input.target || "",
+            args: input
+          };
+          return plugin.execute(context);
+        }
+      });
+    });
   }
 }
 
