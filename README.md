@@ -5,7 +5,7 @@
 </div>
 
 > **AI-Driven Offensive Security Framework**
-> *Developed by 0day (0xP4X)*
+> *Developed by 0xP4X*
 
 DrogonClaw is a next-generation cyber operations platform. Rather than acting as a simple wrapper for Kali tools, DrogonClaw operates as a **Command-and-Control (C2) Brain**. It understands objectives, plans attack workflows, adapts to new discoveries, and orchestrates a swarm of specialized autonomous agents through a unified intelligence core.
 
@@ -87,7 +87,7 @@ DrogonClaw is designed to scale into collaborative agent swarms. You can inject 
 
 ## 👨‍💻 Author
 
-**0day (0xP4X)**
+**0xP4X**
 - GitHub: [@0xP4X](https://github.com/0xP4X)
 
 ## ⚠️ Disclaimer

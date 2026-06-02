@@ -38,7 +38,7 @@ async function printBanner(): Promise<void> {
       }
       console.log(chalk.red.bold("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
       console.log(chalk.gray(`  Autonomous Offensive Security Framework`) + chalk.red(` v${VERSION}`) + chalk.gray(` | Root: `) + chalk.green(`Active`));
-      console.log(chalk.gray(`  Developed by 0day (0xP4X)`));
+      console.log(chalk.gray(`  Developed by 0xP4X`));
       console.log(chalk.red.bold("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"));
       console.log(chalk.green("  Tip: Run `drogonclaw setup` to reconfigure models, or use /setup inside the CLI."));
       console.log("");
