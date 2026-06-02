@@ -396,19 +396,19 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
       const answer = await select({
         message: 'Explore DrogonClaw Capabilities:',
         choices: [
-          { name: 'Network Reconnaissance', value: 'Perform network reconnaissance and active port scanning using nmap', description: 'Active port scanning & service discovery (Nmap)' },
-          { name: 'Web Enumeration', value: 'Perform web enumeration, directory fuzzing, and vulnerability crawling using gobuster and nuclei', description: 'Directory fuzzing & vulnerability crawling (Gobuster, Nuclei)' },
-          { name: 'Exploitation & Shells', value: 'Write a python exploit or stateful bash script for the target', description: 'Custom Python & Stateful Bash Execution' },
-          { name: 'Heuristic Analysis', value: 'Perform heuristic analysis, binary reversing and strings extraction on the target binary', description: 'Binary reversing & strings extraction' },
-          { name: 'Social Engineering', value: 'Generate spear-phishing campaigns and setup Evilginx2 AitM', description: 'Spear-Phishing Generation & Evilginx2 AitM' },
-          { name: 'Hardware Attacks', value: 'Generate Hak5 Rubber Ducky payloads', description: 'Hak5 Rubber Ducky Payload Generation' },
-          { name: 'GUI Automation', value: 'Control a headless browser using playwright to bypass CAPTCHAs or execute login flows', description: 'Headless Browser Control (Playwright) for CAPTCHAs & Login Flows' },
-          new Separator("--- APT Capabilities ---"),
-          { name: 'Zero-Day Fuzzing Engine', value: 'Use the zero-day fuzzing engine for autonomous mutational fuzzing', description: 'Autonomous mutational fuzzing for unknown vulnerabilities' },
-          { name: 'Dynamic Payload Compiler', value: 'Compile a dynamic, AES-encrypted syscall payload for AV Evasion', description: 'AES-encrypted, Syscall C#/Go malware droppers for AV Evasion' },
-          { name: 'Autonomous Swarm Pivoting', value: 'Execute autonomous swarm pivoting via Ligolo/Chisel for internal AD compromise', description: 'Dynamic Ligolo/Chisel deployment for internal Active Directory compromise' },
+          { name: '📡 Network Reconnaissance', value: 'Perform network reconnaissance and active port scanning using nmap', description: 'Active port scanning & service discovery (Nmap)' },
+          { name: '🌐 Web Enumeration', value: 'Perform web enumeration, directory fuzzing, and vulnerability crawling using gobuster and nuclei', description: 'Directory fuzzing & vulnerability crawling (Gobuster, Nuclei)' },
+          { name: '💻 Exploitation & Shells', value: 'Write a python exploit or stateful bash script for the target', description: 'Custom Python & Stateful Bash Execution' },
+          { name: '🔬 Heuristic Analysis', value: 'Perform heuristic analysis, binary reversing and strings extraction on the target binary', description: 'Binary reversing & strings extraction' },
+          { name: '🎣 Social Engineering', value: 'Generate spear-phishing campaigns and setup Evilginx2 AitM', description: 'Spear-Phishing Generation & Evilginx2 AitM' },
+          { name: '🔌 Hardware Attacks', value: 'Generate Hak5 Rubber Ducky payloads', description: 'Hak5 Rubber Ducky Payload Generation' },
+          { name: '🤖 GUI Automation', value: 'Control a headless browser using playwright to bypass CAPTCHAs or execute login flows', description: 'Headless Browser Control (Playwright) for CAPTCHAs & Login Flows' },
+          new Separator("☠️ --- APT Capabilities ---"),
+          { name: '💥 Zero-Day Fuzzing Engine', value: 'Use the zero-day fuzzing engine for autonomous mutational fuzzing', description: 'Autonomous mutational fuzzing for unknown vulnerabilities' },
+          { name: '⚙️ Dynamic Payload Compiler', value: 'Compile a dynamic, AES-encrypted syscall payload for AV Evasion', description: 'AES-encrypted, Syscall C#/Go malware droppers for AV Evasion' },
+          { name: '🕷️ Autonomous Swarm Pivoting', value: 'Execute autonomous swarm pivoting via Ligolo/Chisel for internal AD compromise', description: 'Dynamic Ligolo/Chisel deployment for internal Active Directory compromise' },
           new Separator(),
-          { name: 'Go Back', value: 'back' }
+          { name: '⬅️ Go Back', value: 'back' }
         ]
       });
       rl.resume();
