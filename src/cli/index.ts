@@ -96,28 +96,38 @@ async function checkForUpdates(): Promise<void> {
           }, 150);
 
 
-          const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-          const child = spawn(npmCmd, ['install', '-g', 'drogonclaw@latest'], { stdio: 'ignore' });
+          try {
+            const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+            const child = spawn(npmCmd, ['install', '-g', 'drogonclaw@latest'], { 
+              stdio: 'ignore',
+              shell: process.platform === 'win32'
+            });
 
-          child.on('close', (code) => {
-            clearInterval(interval);
-            if (code === 0) {
-              renderBar(100);
-              process.stdout.write('\n');
-              console.log(chalk.green("\n  ✓ Update complete. Please restart DrogonClaw.\n"));
-            } else {
-              process.stdout.write('\n');
-              console.log(chalk.red("\n  [x] Update failed. Please run 'npm install -g drogonclaw@latest' manually.\n"));
-            }
-            process.exit(0);
-          });
+            child.on('close', (code) => {
+              clearInterval(interval);
+              if (code === 0) {
+                renderBar(100);
+                process.stdout.write('\n');
+                console.log(chalk.green("\n  ✓ Update complete. Please restart DrogonClaw.\n"));
+              } else {
+                process.stdout.write('\n');
+                console.log(chalk.red("\n  [x] Update failed. Please run 'npm install -g drogonclaw@latest' manually.\n"));
+              }
+              process.exit(0);
+            });
 
-          child.on('error', () => {
+            child.on('error', () => {
+              clearInterval(interval);
+              process.stdout.write('\n');
+              console.log(chalk.red("\n  [x] Failed to start npm. Please install manually.\n"));
+              process.exit(0);
+            });
+          } catch (spawnError) {
             clearInterval(interval);
             process.stdout.write('\n');
-            console.log(chalk.red("\n  [x] Failed to start npm. Please install manually.\n"));
+            console.log(chalk.red("\n  [x] Failed to spawn npm process. Please install manually.\n"));
             process.exit(0);
-          });
+          }
         });
       } else {
         console.log(chalk.gray("  [-] Update skipped. Continuing with current version...\n"));
