@@ -4,7 +4,7 @@ import { AgentOrchestrator } from "../agent/orchestrator.js";
 import ora from "ora";
 import { marked } from "marked";
 import TerminalRenderer from "marked-terminal";
-import { select, Separator } from "@inquirer/prompts";
+import { select, Separator, confirm } from "@inquirer/prompts";
 import { ConfigManager } from "../core/config-manager.js";
 import { runOnboarding } from "./onboarding.js";
 
@@ -106,16 +106,15 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
   renderStatus(activeOrchestrator);
   console.log(chalk.gray("  Welcome, ") + chalk.bold.white(operatorName) + chalk.gray(". Type '/' for commands or 'exit' to quit.\n"));
 
-  const commands = ['/help', '/skills', '/new', '/health', '/swarm', '/stealth', '/report', '/clear', '/setup', 'exit', 'quit'];
+  const commands = ['/help', '/skills', '/new', '/health', '/install', '/stealth', '/clear', '/setup', 'exit', 'quit'];
   
   const descs: Record<string, string> = {
     '/help':    'Display tactical manual & command list',
     '/skills':  'Interactive module explorer & toolkit',
     '/new':     'Purge neural memory & reset session',
     '/health':  'System diagnostic & binary verification',
-    '/swarm':   'Initialize multi-agent neural swarm',
+    '/install': 'Install external LangChain plugins from a URL',
     '/stealth': 'Toggle OPSEC & intrusion suppression',
-    '/report':  'Generate tactical operations report',
     '/setup':   'Reconfigure AI provider & neural engine',
     '/clear':   'Purge terminal buffer',
     'exit':     'Terminate C2 session'
@@ -123,9 +122,8 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
 
   const categories: Record<string, string> = {
     '/help': 'SYSTEM', '/setup': 'SYSTEM', '/clear': 'SYSTEM',
-    '/skills': 'TACTICAL', '/swarm': 'TACTICAL',
+    '/skills': 'TACTICAL', '/install': 'TACTICAL',
     '/stealth': 'OPSEC',
-    '/report': 'INTEL',
     '/new': 'CORE', '/health': 'CORE',
     'exit': 'SYSTEM'
   };
@@ -386,8 +384,7 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
       console.log(chalk.gray("  │  ") + chalk.cyan("/skills    ") + chalk.gray("Interactive capability explorer"));
       console.log(chalk.gray("  │  ") + chalk.cyan("/new       ") + chalk.gray("Wipe the agent memory and start fresh"));
       console.log(chalk.gray("  │  ") + chalk.cyan("/health    ") + chalk.gray("Run system diagnostics and verify toolkit"));
-      console.log(chalk.gray("  │  ") + chalk.cyan("/swarm     ") + chalk.gray("Split a complex mission into parallel agents"));
-      console.log(chalk.gray("  │  ") + chalk.cyan("/report    ") + chalk.gray("Generate a professional Markdown report"));
+      console.log(chalk.gray("  │  ") + chalk.cyan("/install   ") + chalk.gray("Install external skills/plugins from URL"));
       console.log(chalk.gray("  │  ") + chalk.cyan("/stealth   ") + chalk.gray("Toggle stealth mode (OPSEC enforcement)"));
       console.log(chalk.gray("  ╰─────────────────────────────────────────────────────\n"));
       continue;
@@ -399,24 +396,28 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
       const answer = await select({
         message: 'Explore DrogonClaw Capabilities:',
         choices: [
-          { name: 'Network Reconnaissance', value: 'recon', description: 'Active port scanning & service discovery (Nmap)' },
-          { name: 'Web Enumeration', value: 'web', description: 'Directory fuzzing & vulnerability crawling (Gobuster, Nuclei)' },
-          { name: 'Exploitation & Shells', value: 'exploit', description: 'Custom Python & Stateful Bash Execution' },
-          { name: 'Heuristic Analysis', value: 'heuristic', description: 'Binary reversing & strings extraction' },
-          { name: 'Social Engineering', value: 'phishing', description: 'Spear-Phishing Generation & Evilginx2 AitM' },
-          { name: 'Hardware Attacks', value: 'hardware', description: 'Hak5 Rubber Ducky Payload Generation' },
-          { name: 'GUI Automation', value: 'gui', description: 'Headless Browser Control (Playwright) for CAPTCHAs & Login Flows' },
+          { name: 'Network Reconnaissance', value: 'Perform network reconnaissance and active port scanning using nmap', description: 'Active port scanning & service discovery (Nmap)' },
+          { name: 'Web Enumeration', value: 'Perform web enumeration, directory fuzzing, and vulnerability crawling using gobuster and nuclei', description: 'Directory fuzzing & vulnerability crawling (Gobuster, Nuclei)' },
+          { name: 'Exploitation & Shells', value: 'Write a python exploit or stateful bash script for the target', description: 'Custom Python & Stateful Bash Execution' },
+          { name: 'Heuristic Analysis', value: 'Perform heuristic analysis, binary reversing and strings extraction on the target binary', description: 'Binary reversing & strings extraction' },
+          { name: 'Social Engineering', value: 'Generate spear-phishing campaigns and setup Evilginx2 AitM', description: 'Spear-Phishing Generation & Evilginx2 AitM' },
+          { name: 'Hardware Attacks', value: 'Generate Hak5 Rubber Ducky payloads', description: 'Hak5 Rubber Ducky Payload Generation' },
+          { name: 'GUI Automation', value: 'Control a headless browser using playwright to bypass CAPTCHAs or execute login flows', description: 'Headless Browser Control (Playwright) for CAPTCHAs & Login Flows' },
           new Separator("--- APT Capabilities ---"),
-          { name: 'Zero-Day Fuzzing Engine', value: 'fuzzer', description: 'Autonomous mutational fuzzing for unknown vulnerabilities' },
-          { name: 'Dynamic Payload Compiler', value: 'payloads', description: 'AES-encrypted, Syscall C#/Go malware droppers for AV Evasion' },
-          { name: 'Autonomous Swarm Pivoting', value: 'pivot', description: 'Dynamic Ligolo/Chisel deployment for internal Active Directory compromise' },
+          { name: 'Zero-Day Fuzzing Engine', value: 'Use the zero-day fuzzing engine for autonomous mutational fuzzing', description: 'Autonomous mutational fuzzing for unknown vulnerabilities' },
+          { name: 'Dynamic Payload Compiler', value: 'Compile a dynamic, AES-encrypted syscall payload for AV Evasion', description: 'AES-encrypted, Syscall C#/Go malware droppers for AV Evasion' },
+          { name: 'Autonomous Swarm Pivoting', value: 'Execute autonomous swarm pivoting via Ligolo/Chisel for internal AD compromise', description: 'Dynamic Ligolo/Chisel deployment for internal Active Directory compromise' },
           new Separator(),
           { name: 'Go Back', value: 'back' }
         ]
       });
       rl.resume();
       console.log("");
-      continue;
+      if (answer !== 'back') {
+        command = answer;
+      } else {
+        continue;
+      }
     }
 
     if (command.toLowerCase() === "/new") {
@@ -475,42 +476,93 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
       continue;
     }
 
-    if (command.toLowerCase().startsWith("/swarm ")) {
-      const swarmMission = command.substring(7).trim();
-      if (!swarmMission) {
-        console.log(chalk.red("\n  [x] ") + chalk.gray("Usage: /swarm <objective>\n"));
+    if (command.toLowerCase().startsWith("/install ")) {
+      const url = command.substring(9).trim();
+      if (!url) {
+        console.log(chalk.red("\n  [x] ") + chalk.gray("Usage: /install <url_to_raw_ts_file>\n"));
         continue;
       }
       
-      const { SwarmCommander } = await import("../agent/swarm-commander.js");
-      const commander = new SwarmCommander();
-      
-      const swarmSpinner = ora({ text: chalk.gray("Dispatching parallel agents..."), color: "cyan", spinner: "bouncingBar" }).start();
+      const installSpinner = ora({ text: chalk.gray(`Downloading plugin from ${url}...`), color: "cyan", spinner: "bouncingBar" }).start();
       try {
-        const result = await commander.executeSwarm(swarmMission);
-        swarmSpinner.stop();
-        console.log(chalk.cyan("\n  ╭─ Swarm Report ─────────────────────────────────────────"));
-        console.log(result.split('\n').map((line: string) => chalk.gray("  │ ") + line).join('\n'));
+        const { execSync } = await import("child_process");
+        const fs = await import("fs");
+        const path = await import("path");
+        
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+        const code = await response.text();
+        
+        installSpinner.stop();
+        console.log(chalk.cyan("\n  ╭─ Plugin Security Review ────────────────────────────────"));
+        const preview = code.substring(0, 300).split("\n").map(l => "  │ " + chalk.gray(l)).join("\n");
+        console.log(preview + chalk.gray("\n  │ ..."));
         console.log(chalk.cyan("  ╰───────────────────────────────────────────────────────\n"));
-      } catch (error: any) {
-        swarmSpinner.stop();
-        console.log(chalk.red("\n  [x] ") + chalk.gray(`Swarm error: ${error.message}\n`));
-      }
-      continue;
-    }
+        
+        rl.pause();
+        const allow = await confirm({ message: chalk.yellow("Do you want to install and trust this third-party plugin?"), default: false });
+        rl.resume();
+        
+        if (!allow) {
+          console.log(chalk.red("\n  [x] ") + chalk.gray("Installation aborted.\n"));
+          continue;
+        }
+        
+        installSpinner.start(chalk.gray("Compiling and registering plugin..."));
+        
+        const pluginsDir = path.join(process.cwd(), "skills", "plugins");
+        if (!fs.existsSync(pluginsDir)) fs.mkdirSync(pluginsDir, { recursive: true });
+        
+        const pluginName = "plugin_" + Date.now();
+        const tsPath = path.join(pluginsDir, `${pluginName}.ts`);
+        const jsDir = path.join(process.cwd(), "dist", "skills", "plugins");
+        const jsPath = path.join(jsDir, `${pluginName}.js`);
+        
+        fs.writeFileSync(tsPath, code);
+        
+        // Create tsconfig.json for plugins if not exist
+        const tsconfigPath = path.join(pluginsDir, "tsconfig.json");
+        if (!fs.existsSync(tsconfigPath)) {
+           fs.writeFileSync(tsconfigPath, JSON.stringify({
+              compilerOptions: {
+                 module: "NodeNext",
+                 moduleResolution: "NodeNext",
+                 target: "ES2022",
+                 outDir: "../../dist/skills/plugins"
+              }
+           }, null, 2));
+        }
 
-    if (command.toLowerCase() === "/report") {
-      const reportSpinner = ora({ text: chalk.gray("Generating report..."), color: "cyan", spinner: "bouncingBar" }).start();
-      try {
-        const { ReportGenerator } = await import("../core/report-generator.js");
-        const generator = new ReportGenerator(activeOrchestrator.getMemoryGraph());
-        const { textPath, docPath } = await generator.generateReport();
-        reportSpinner.stop();
-        console.log(chalk.green("\n  [+] ") + chalk.white("Raw Markdown saved to: ") + chalk.underline.gray(textPath));
-        console.log(chalk.green("  [+] ") + chalk.white("Styled Report saved to:  ") + chalk.underline.cyan(docPath) + "\n");
+        execSync(`npx tsc ${tsPath} --outDir ${jsDir} --module NodeNext --moduleResolution NodeNext --target ES2022`, { stdio: 'ignore' });
+        
+        // The file URL must have absolute path on Windows, need to replace backslashes
+        const fileUrl = `file:///${jsPath.replace(/\\/g, '/')}`;
+        const pluginModule = await import(fileUrl);
+        
+        const { globalPluginRegistry } = await import("../plugins/plugin-registry.js");
+        
+        const pluginsToRegister = [];
+        for (const key of Object.keys(pluginModule)) {
+           if (pluginModule[key] && pluginModule[key].id && pluginModule[key].execute) {
+              pluginsToRegister.push(pluginModule[key]);
+           }
+        }
+        
+        if (pluginsToRegister.length === 0) {
+           throw new Error("No valid SkillPlugin objects exported by the module.");
+        }
+        
+        for (const p of pluginsToRegister) {
+           globalPluginRegistry.register(p);
+        }
+        
+        installSpinner.stop();
+        console.log(chalk.green("\n  [+] ") + chalk.white(`Successfully installed ${pluginsToRegister.length} plugin(s)!`));
+        console.log(chalk.gray(`  [+] Plugin is now active in the agent's context.\n`));
+        
       } catch (error: any) {
-        reportSpinner.stop();
-        console.log(chalk.red("\n  [x] ") + chalk.gray(`Report error: ${error.message}\n`));
+        installSpinner.stop();
+        console.log(chalk.red("\n  [x] ") + chalk.gray(`Install error: ${error.message}\n`));
       }
       continue;
     }
