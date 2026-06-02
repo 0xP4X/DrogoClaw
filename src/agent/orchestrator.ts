@@ -69,7 +69,7 @@ export class AgentOrchestrator {
         console.log(chalk.red("\n  [!] FATAL: Core is already locked by another process (Gateway or CLI)."));
         console.log(chalk.gray("      Running multiple instances will corrupt the neural state."));
         console.log(chalk.gray("      If you are sure no other instance is running, delete .drogonclaw.lock\n"));
-        process.exit(1);
+        throw new Error("LOCKED_BY_ANOTHER_PROCESS");
       }
     }
     

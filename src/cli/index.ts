@@ -151,8 +151,11 @@ async function startInteractiveMode(): Promise<void> {
         }
         spinner.stop();
         return { completed: true };
-      } catch (e) {
+      } catch (e: any) {
         spinner.stop();
+        if (e.message === "LOCKED_BY_ANOTHER_PROCESS") {
+          process.exit(1);
+        }
         return { completed: false };
       }
     };
