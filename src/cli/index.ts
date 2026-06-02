@@ -47,7 +47,7 @@ async function printBanner(): Promise<void> {
   });
 }
 
-import { execSync } from "child_process";
+import { execSync, spawn } from "child_process";
 
 async function checkForUpdates(): Promise<void> {
   try {
@@ -84,7 +84,7 @@ async function checkForUpdates(): Promise<void> {
             }
           }, 150);
 
-          const { spawn } = await import("child_process");
+
           const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
           const child = spawn(npmCmd, ['install', '-g', 'drogonclaw@latest'], { stdio: 'ignore' });
 
