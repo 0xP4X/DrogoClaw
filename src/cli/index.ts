@@ -19,7 +19,18 @@ import ora from "ora";
 import { startChatSession } from "./chat.js";
 import { AgentOrchestrator } from "../agent/orchestrator.js";
 
-const VERSION = "0.3.0";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJsonPath = join(__dirname, "..", "..", "..", "package.json");
+let VERSION = "0.3.0";
+try {
+  const pkg = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
+  if (pkg.version) VERSION = pkg.version;
+} catch(e) {}
 
 async function printBanner(): Promise<void> {
   console.clear();
