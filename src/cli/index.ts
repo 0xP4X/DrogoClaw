@@ -96,6 +96,8 @@ async function checkForUpdates(): Promise<void> {
             process.exit(0);
           });
         });
+      } else {
+        console.log(chalk.gray("  [-] Update skipped. Continuing with current version...\n"));
       }
     }
   } catch (e) {
