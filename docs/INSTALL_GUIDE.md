@@ -168,7 +168,7 @@ npm run build
 
 ## Support
 
-- Documentation: https://drogonclaw.dev
+- Documentation: https://drogonclaw.xyz
 - Issues: https://github.com/yourusername/drogonclaw/issues
 - Contributing: See `CONTRIBUTING.md`
 

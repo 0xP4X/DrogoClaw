@@ -395,7 +395,7 @@ npm run gateway
 
 ## 🆘 Support
 
-- **Documentation**: https://drogonclaw.dev
+- **Documentation**: https://drogonclaw.xyz
 - **Issues**: https://github.com/yourusername/drogonclaw/issues
 - **Discussions**: https://github.com/yourusername/drogonclaw/discussions
 - **Email**: support@drogonclaw.dev
