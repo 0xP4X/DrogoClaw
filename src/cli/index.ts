@@ -111,7 +111,7 @@ async function checkForUpdates(): Promise<void> {
             const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
             const child = spawn(npmCmd, ['install', '-g', 'drogonclaw@latest'], { 
               stdio: 'ignore',
-              shell: process.platform === 'win32'
+              shell: true
             });
 
             child.on('close', (code) => {
