@@ -157,8 +157,8 @@ export async function runOnboarding(): Promise<void> {
           loop: false,
           message: "Select the OpenRouter model:",
           choices: [
-            { name: "🤖 Anthropic: Claude 3.5 Sonnet", value: "anthropic/claude-3.5-sonnet" },
-            { name: "🤖 Anthropic: Claude 3 Opus", value: "anthropic/claude-3-opus" },
+            { name: "🤖 Anthropic: Claude 4.6 Sonnet", value: "anthropic/claude-sonnet-4.6" },
+            { name: "🤖 Anthropic: Claude 4.8 Opus", value: "anthropic/claude-opus-4.8" },
             { name: "🧠 OpenAI: GPT-4o", value: "openai/gpt-4o" },
             { name: "🔬 OpenAI: o1-pro", value: "openai/o1-pro" },
             { name: "✨ Google: Gemini 2.5 Pro", value: "google/gemini-2.5-pro" },
