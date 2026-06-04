@@ -38,7 +38,7 @@ function getVersion(): string {
     } catch(e) {}
     currentDir = join(currentDir, "..");
   }
-  return "0.3.10";
+  return "0.3.12";
 }
 
 const VERSION = getVersion();
