@@ -59,6 +59,8 @@ export async function runOnboarding(): Promise<void> {
     process.exit(1);
   }
 
+  console.clear();
+
   const envConfigMap = new Map<string, string>();
 
   // Helper Functions for Wizards

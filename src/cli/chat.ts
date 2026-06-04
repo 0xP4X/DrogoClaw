@@ -90,7 +90,19 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
 
   const renderStatus = (orch: AgentOrchestrator) => {
     const provider = (ConfigManager.get("AI_PROVIDER") || process.env.AI_PROVIDER || "unset").toString();
-    const model = (ConfigManager.get("OLLAMA_MODEL_NAME") || ConfigManager.get("OPENAI_MODEL_NAME") || process.env.OLLAMA_MODEL_NAME || process.env.OPENAI_MODEL_NAME || "unset").toString();
+    const model = (
+      ConfigManager.get("OPENROUTER_MODEL_NAME") ||
+      ConfigManager.get("ANTHROPIC_MODEL_NAME") ||
+      ConfigManager.get("GEMINI_MODEL_NAME") ||
+      ConfigManager.get("OLLAMA_MODEL_NAME") || 
+      ConfigManager.get("OPENAI_MODEL_NAME") || 
+      process.env.OPENROUTER_MODEL_NAME || 
+      process.env.ANTHROPIC_MODEL_NAME || 
+      process.env.GEMINI_MODEL_NAME || 
+      process.env.OLLAMA_MODEL_NAME || 
+      process.env.OPENAI_MODEL_NAME || 
+      "unset"
+    ).toString();
     const stealth = orch.opsecManager.isStealthModeActive() ? chalk.green('ACTIVE') : chalk.gray('SILENT');
     const autopilot = orch.isAutopilot() ? chalk.yellow('ENABLED') : chalk.gray('MANUAL');
     const nodes = orch.getMemoryGraph().getNodesCount();

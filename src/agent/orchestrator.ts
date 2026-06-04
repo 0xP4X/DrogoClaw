@@ -131,6 +131,9 @@ export class AgentOrchestrator {
         if (msg.includes("does not support tools")) {
           msg = "The selected Ollama model does not support tool calling. Switch to a tool-capable model such as llama3.1, qwen2.5, or mistral-nemo, then update OLLAMA_MODEL_NAME.";
         }
+        if (msg.includes("support tool use") || msg.includes("intelligent_smart_scan")) {
+          msg = "The selected model does not support tool calling (required for autonomous operations). Please switch to a tool-capable model like Claude 4.6 Sonnet or GPT-4o.";
+        }
         if (msg.includes("401")) msg = "Invalid API Key provided.";
         if (msg.includes("404")) msg = "Model or endpoint not found.";
         if (msg.includes("ECONNREFUSED")) msg = "Connection refused by AI provider/local server.";
