@@ -86,10 +86,10 @@ export class HealthChecker {
         if (isInstalled) {
           installedInCategory++;
           totalInstalled++;
-          console.log(chalk.green(`    ✓ ${tool.name}`));
+          console.log(chalk.green(`    [+] ${tool.name}`));
         } else {
           missingTools.push(tool);
-          console.log(chalk.red(`    ✗ ${tool.name}`) + chalk.gray(" — not installed"));
+          console.log(chalk.red(`    [-] ${tool.name}`) + chalk.gray(" — not installed"));
         }
       });
 
@@ -105,7 +105,7 @@ export class HealthChecker {
     console.log(chalk.cyan("  ──────────────────────────────────────────────────────────\n"));
 
     if (missingTools.length === 0) {
-      console.log(chalk.green("  ✓ ") + chalk.gray("All tools are installed and ready.\n"));
+      console.log(chalk.green("  [+] ") + chalk.gray("All tools are installed and ready.\n"));
       return;
     }
 
@@ -163,6 +163,6 @@ export class HealthChecker {
       }
     }
 
-    console.log(chalk.green("\n  ✓ ") + chalk.gray("Installation complete.\n"));
+    console.log(chalk.green("\n  [+] ") + chalk.gray("Installation complete.\n"));
   }
 }

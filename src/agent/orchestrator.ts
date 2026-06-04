@@ -7,6 +7,7 @@ import { MemorySaver } from "@langchain/langgraph";
 import { MissionPlanner } from "../core/mission-planner.js";
 import { EvidenceValidator } from "../core/evidence-validator.js";
 import { MemoryGraph } from "../core/memory-graph.js";
+import { CleanupRegistry } from "../core/cleanup-registry.js";
 import { ConfigManager } from "../core/config-manager.js";
 import fs from "fs";
 import path from "path";
@@ -77,14 +78,17 @@ export class AgentOrchestrator {
     fs.writeFileSync(this.lockFilePath, `LOCKED_BY_PID_${process.pid}`, "utf8");
 
     // Graceful release on exit
-    const releaseLock = () => {
+    const releaseLock = async () => {
       if (fs.existsSync(this.lockFilePath)) {
         fs.unlinkSync(this.lockFilePath);
       }
+      await CleanupRegistry.getInstance().executeAll();
     };
-    process.on("exit", releaseLock);
-    process.on("SIGINT", () => { releaseLock(); process.exit(0); });
-    process.on("SIGTERM", () => { releaseLock(); process.exit(0); });
+    process.on("exit", () => {
+      if (fs.existsSync(this.lockFilePath)) fs.unlinkSync(this.lockFilePath);
+    });
+    process.on("SIGINT", async () => { await releaseLock(); process.exit(0); });
+    process.on("SIGTERM", async () => { await releaseLock(); process.exit(0); });
 
     this.lastError = null;
     try {

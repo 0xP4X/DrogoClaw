@@ -16,7 +16,7 @@ export class OpsecManager {
   public getOpsecInstructions(): string {
     if (!this.stealthMode) return "Stealth mode is OFFLINE. Execute aggressively.";
 
-    return `⚠️ STEALTH MODE ACTIVE ⚠️
+    return `[!] STEALTH MODE ACTIVE [!]
 You must operate with maximum OPSEC. Do NOT trigger intrusion detection systems.
 1. Add random jitter to all brute-force/fuzzing tools (e.g., gobuster --delay 2s).
 2. Rate-limit Nmap scans (e.g., -T2, --max-rate 10).

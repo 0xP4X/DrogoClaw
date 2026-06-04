@@ -22,7 +22,7 @@ async function fetchOllamaModels(baseUrl: string): Promise<string[] | null> {
 }
 
 export async function runOnboarding(): Promise<void> {
-  console.log(chalk.red("🐉 DrogonClaw — I speak fluent bash, mild sarcasm, and aggressive tab-completion energy.\n"));
+  console.log(chalk.red("[*] DrogonClaw — I speak fluent bash, mild sarcasm, and aggressive tab-completion energy.\n"));
   
   console.log(chalk.red("▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄"));
   console.log(chalk.red("██████╗ ██████╗  ██████╗  ██████╗  ██████╗ ███╗   ██╗ ██████╗██╗      █████╗ ██╗    ██╗"));
@@ -32,7 +32,7 @@ export async function runOnboarding(): Promise<void> {
   console.log(chalk.red("██████╔╝██║  ██║╚██████╔╝╚██████╔╝╚██████╔╝██║ ╚████║╚██████╗███████╗██║  ██║╚███╔███╔╝"));
   console.log(chalk.red("╚═════╝ ╚═╝  ╚═╝ ╚═════╝  ╚═════╝  ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝ "));
   console.log(chalk.red("▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀"));
-  console.log(chalk.red("                                  🐉 DROGONCLAW 🐉\n"));
+  console.log(chalk.red("                                  [*] DROGONCLAW [*]\n"));
 
   console.log(chalk.cyan("┌  DrogonClaw setup"));
   console.log(chalk.cyan("│"));
@@ -74,11 +74,11 @@ export async function runOnboarding(): Promise<void> {
           loop: false,
         message: "Select your AI Backend:",
         choices: [
-          { name: "🧠 OpenAI (Recommended for Novices)", value: "openai" },
-          { name: "🤖 Anthropic (Claude) (Recommended for Advanced Coding)", value: "anthropic" },
-          { name: "✨ Google Gemini", value: "gemini" },
+          { name: "[*] OpenAI (Recommended for Novices)", value: "openai" },
+          { name: "[*] Anthropic (Claude) (Recommended for Advanced Coding)", value: "anthropic" },
+          { name: "[*] Google Gemini", value: "gemini" },
           { name: "🌐 OpenRouter (Model Aggregator)", value: "openrouter" },
-          { name: "🦙 Ollama (Local / On-Premise) (Advanced)", value: "ollama" },
+          { name: "[*] Ollama (Local / On-Premise) (Advanced)", value: "ollama" },
         ],
       });
 
@@ -98,10 +98,10 @@ export async function runOnboarding(): Promise<void> {
           loop: false,
           message: "Select the OpenAI model:",
           choices: [
-            { name: "✨ gpt-4o (Best overall)", value: "gpt-4o" },
-            { name: "⚡ gpt-4o-mini (Faster & cheaper)", value: "gpt-4o-mini" },
-            { name: "🔬 o1-pro (Advanced reasoning)", value: "o1-pro" },
-            { name: "❌ Cancel & Re-select Provider", value: "back" }
+            { name: "[*] gpt-4o (Best overall)", value: "gpt-4o" },
+            { name: "[+] gpt-4o-mini (Faster & cheaper)", value: "gpt-4o-mini" },
+            { name: "[*] o1-pro (Advanced reasoning)", value: "o1-pro" },
+            { name: "[x] Cancel & Re-select Provider", value: "back" }
           ]
         });
         if (model === "back") continue;
@@ -119,9 +119,9 @@ export async function runOnboarding(): Promise<void> {
           loop: false,
           message: "Select the Anthropic model:",
           choices: [
-            { name: "⚡ Claude 4.6 Sonnet (Best overall)", value: "claude-sonnet-4-6-20260218" },
-            { name: "🧠 Claude 4.8 Opus (Most powerful)", value: "claude-opus-4-8-20260515" },
-            { name: "❌ Cancel & Re-select Provider", value: "back" }
+            { name: "[+] Claude 4.6 Sonnet (Best overall)", value: "claude-sonnet-4-6-20260218" },
+            { name: "[*] Claude 4.8 Opus (Most powerful)", value: "claude-opus-4-8-20260515" },
+            { name: "[x] Cancel & Re-select Provider", value: "back" }
           ]
         });
         if (model === "back") continue;
@@ -139,9 +139,9 @@ export async function runOnboarding(): Promise<void> {
           loop: false,
           message: "Select the Gemini model:",
           choices: [
-            { name: "🧠 Gemini 2.5 Pro (Best performance)", value: "gemini-2.5-pro" },
-            { name: "⚡ Gemini 2.5 Flash (Fastest)", value: "gemini-2.5-flash" },
-            { name: "❌ Cancel & Re-select Provider", value: "back" }
+            { name: "[*] Gemini 2.5 Pro (Best performance)", value: "gemini-2.5-pro" },
+            { name: "[+] Gemini 2.5 Flash (Fastest)", value: "gemini-2.5-flash" },
+            { name: "[x] Cancel & Re-select Provider", value: "back" }
           ]
         });
         if (model === "back") continue;
@@ -159,17 +159,17 @@ export async function runOnboarding(): Promise<void> {
           loop: false,
           message: "Select the OpenRouter model:",
           choices: [
-            { name: "🤖 Anthropic: Claude 4.6 Sonnet", value: "anthropic/claude-sonnet-4.6" },
-            { name: "🤖 Anthropic: Claude 4.8 Opus", value: "anthropic/claude-opus-4.8" },
-            { name: "🧠 OpenAI: GPT-4o", value: "openai/gpt-4o" },
-            { name: "🔬 OpenAI: o1-pro", value: "openai/o1-pro" },
-            { name: "✨ Google: Gemini 2.5 Pro", value: "google/gemini-2.5-pro" },
-            { name: "⚡ Google: Gemini 2.5 Flash", value: "google/gemini-2.5-flash" },
-            { name: "🦙 Meta: Hermes 3 Llama 405B", value: "nousresearch/hermes-3-llama-3.1-405b" },
-            { name: "🦙 Meta: Llama 3.1 70B Instruct", value: "meta-llama/llama-3.1-70b-instruct" },
-            { name: "🌪️ Mistral: Mixtral 8x22B Instruct", value: "mistralai/mixtral-8x22b-instruct" },
-            { name: "🌪️ Mistral: Mistral Large", value: "mistralai/mistral-large" },
-            { name: "❌ Cancel & Re-select Provider", value: "back" }
+            { name: "[*] Anthropic: Claude 4.6 Sonnet", value: "anthropic/claude-sonnet-4.6" },
+            { name: "[*] Anthropic: Claude 4.8 Opus", value: "anthropic/claude-opus-4.8" },
+            { name: "[*] OpenAI: GPT-4o", value: "openai/gpt-4o" },
+            { name: "[*] OpenAI: o1-pro", value: "openai/o1-pro" },
+            { name: "[*] Google: Gemini 2.5 Pro", value: "google/gemini-2.5-pro" },
+            { name: "[+] Google: Gemini 2.5 Flash", value: "google/gemini-2.5-flash" },
+            { name: "[*] Meta: Hermes 3 Llama 405B", value: "nousresearch/hermes-3-llama-3.1-405b" },
+            { name: "[*] Meta: Llama 3.1 70B Instruct", value: "meta-llama/llama-3.1-70b-instruct" },
+            { name: "[*] Mistral: Mixtral 8x22B Instruct", value: "mistralai/mixtral-8x22b-instruct" },
+            { name: "[*] Mistral: Mistral Large", value: "mistralai/mistral-large" },
+            { name: "[x] Cancel & Re-select Provider", value: "back" }
           ]
         });
         if (model === "back") continue;
@@ -205,14 +205,14 @@ export async function runOnboarding(): Promise<void> {
           loop: false,
              message: "Select a standard Ollama model (ensure you pull it later):",
              choices: [
-               { name: "🦙 llama3.1", value: "llama3.1" },
-               { name: "🦙 llama3", value: "llama3" },
-               { name: "🌪️ mistral", value: "mistral" },
-               { name: "🌪️ mixtral", value: "mixtral" },
-               { name: "✨ qwen2.5", value: "qwen2.5" },
-               { name: "🔬 phi3", value: "phi3" },
-               { name: "💎 gemma2", value: "gemma2" },
-               { name: "❌ Cancel & Re-select Provider", value: "back" }
+               { name: "[*] llama3.1", value: "llama3.1" },
+               { name: "[*] llama3", value: "llama3" },
+               { name: "[*] mistral", value: "mistral" },
+               { name: "[*] mixtral", value: "mixtral" },
+               { name: "[*] qwen2.5", value: "qwen2.5" },
+               { name: "[*] phi3", value: "phi3" },
+               { name: "[*] gemma2", value: "gemma2" },
+               { name: "[x] Cancel & Re-select Provider", value: "back" }
              ]
           });
           if (fallbackModel === "back") continue;
@@ -236,8 +236,8 @@ export async function runOnboarding(): Promise<void> {
           loop: false,
        message: "Would you like to setup remote Command & Control via Telegram?",
        choices: [
-         { name: "✅ Yes, configure Telegram Bot", value: "yes" },
-         { name: "⏭️ No, skip for now (CLI only)", value: "skip" }
+         { name: "[+] Yes, configure Telegram Bot", value: "yes" },
+         { name: "[-] No, skip for now (CLI only)", value: "skip" }
        ]
     });
     
@@ -290,10 +290,10 @@ export async function runOnboarding(): Promise<void> {
           loop: false,
       message: "Review your setup:",
       choices: [
-        { name: "🚀 [✓] Finish & Boot DrogonClaw", value: "boot" },
-        { name: "🧠 [✎] Edit AI Provider", value: "edit_ai" },
-        { name: "📱 [✎] Edit Telegram Setup", value: "edit_tg" },
-        { name: "❌ [x] Abort Setup", value: "abort" }
+        { name: "[+] [[+]] Finish & Boot DrogonClaw", value: "boot" },
+        { name: "[*] [✎] Edit AI Provider", value: "edit_ai" },
+        { name: "[*] [✎] Edit Telegram Setup", value: "edit_tg" },
+        { name: "[x] [x] Abort Setup", value: "abort" }
       ]
     });
 

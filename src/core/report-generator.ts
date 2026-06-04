@@ -37,7 +37,7 @@ It must include:
 Here is the raw memory graph:
 ${JSON.stringify(memoryDump, null, 2)}`;
 
-    console.log(chalk.yellow("📝 Drafting compliance-ready report..."));
+    console.log(chalk.yellow("[*] Drafting compliance-ready report..."));
     
     try {
       const response = await llm.invoke([new HumanMessage(prompt)]);

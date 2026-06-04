@@ -21,7 +21,7 @@ export class GatewayServer {
     this.allowedChatId = ConfigManager.get("TELEGRAM_CHAT_ID") || "";
 
     if (!token) {
-      console.log(chalk.red("❌ TELEGRAM_TOKEN is not set in .env"));
+      console.log(chalk.red("[x] TELEGRAM_TOKEN is not set in .env"));
       process.exit(1);
     }
 
@@ -42,7 +42,7 @@ export class GatewayServer {
     await this.orchestrator.initialize();
     
     if (!this.orchestrator.isReady()) {
-      console.log(chalk.red("❌ Agent Core failed to initialize. Check your AI Provider keys."));
+      console.log(chalk.red("[x] Agent Core failed to initialize. Check your AI Provider keys."));
       process.exit(1);
     }
 
@@ -52,13 +52,13 @@ export class GatewayServer {
       
       if (!this.allowedChatId) {
         console.log(chalk.red(`[Security Block] No TELEGRAM_CHAT_ID set in .env. Dropping message from Chat ID: ${chatId}. Security is mandatory.`));
-        await ctx.reply("❌ Administrator has not configured a secure Chat ID whitelist. Access denied.");
+        await ctx.reply("[x] Administrator has not configured a secure Chat ID whitelist. Access denied.");
         return;
       }
 
       if (chatId !== this.allowedChatId) {
         console.log(chalk.yellow(`[Security Warning] Unauthorized access attempt from Chat ID: ${chatId}`));
-        await ctx.reply("❌ Unauthorized. You are not the administrator of this DrogonClaw instance.");
+        await ctx.reply("[x] Unauthorized. You are not the administrator of this DrogonClaw instance.");
         return;
       }
 
@@ -68,7 +68,7 @@ export class GatewayServer {
     // Start command (optional, but standard for Telegram bots)
     this.bot.start((ctx) => {
       ctx.reply(
-        "🐉🔥 *DrogonClaw Online*\n\n" +
+        "[*][!] *DrogonClaw Online*\n\n" +
         "I am your autonomous offensive security agent. Send me a natural language instruction (e.g., 'Scan target.com for open ports') and I will execute the mission.",
         { parse_mode: "Markdown" }
       );
@@ -77,7 +77,7 @@ export class GatewayServer {
     // Human-in-the-Loop Event Listener
     HitL.on("approval_requested", async ({ question, requestId }) => {
       try {
-        await this.bot.telegram.sendMessage(this.allowedChatId, `⚠️ *AGENT REQUIRES APPROVAL*\n\n_${question}_\n\nPlease reply directly to this message with your decision.`, { parse_mode: "Markdown" });
+        await this.bot.telegram.sendMessage(this.allowedChatId, `[!] *AGENT REQUIRES APPROVAL*\n\n_${question}_\n\nPlease reply directly to this message with your decision.`, { parse_mode: "Markdown" });
       } catch (e) {
         console.error(chalk.red(`[Gateway Error] Failed to send HitL request: ${e}`));
       }
@@ -91,37 +91,37 @@ export class GatewayServer {
       if (instruction.startsWith("/")) {
         if (instruction === "/new") {
           this.orchestrator.newSession();
-          await ctx.reply("🔄 Agent memory wiped. Ready for a new mission.");
+          await ctx.reply("[*] Agent memory wiped. Ready for a new mission.");
           return;
         }
         if (instruction === "/report") {
-          const statusMessage = await ctx.reply("📝 Compiling raw intelligence into compliance report. Please wait...");
+          const statusMessage = await ctx.reply("[*] Compiling raw intelligence into compliance report. Please wait...");
           try {
             const { ReportGenerator } = await import("../core/report-generator.js");
             const generator = new ReportGenerator(this.orchestrator.getMemoryGraph());
             const { docPath } = await generator.generateReport();
             
             await ctx.telegram.deleteMessage(ctx.chat.id, statusMessage.message_id);
-            await ctx.replyWithDocument({ source: docPath }, { caption: "📋 Mission Intelligence Report Generated." });
+            await ctx.replyWithDocument({ source: docPath }, { caption: "[+] Mission Intelligence Report Generated." });
           } catch (e: any) {
-            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined, `❌ Report generation failed: ${e.message}`);
+            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined, `[x] Report generation failed: ${e.message}`);
           }
           return;
         }
         if (instruction === "/autopilot on") {
           this.orchestrator.autopilotEnabled = true;
-          await ctx.reply("🔥 *AUTOPILOT MODE ACTIVATED*\nI will now run autonomously, compile my own tools, and only stop when the objective is completely destroyed. Send your mission.", { parse_mode: "Markdown" });
+          await ctx.reply("[!] *AUTOPILOT MODE ACTIVATED*\nI will now run autonomously, compile my own tools, and only stop when the objective is completely destroyed. Send your mission.", { parse_mode: "Markdown" });
           return;
         }
         if (instruction === "/autopilot off") {
           this.orchestrator.autopilotEnabled = false;
-          await ctx.reply("🛑 Autopilot deactivated. I will return to standard step-by-step execution.");
+          await ctx.reply("[x] Autopilot deactivated. I will return to standard step-by-step execution.");
           return;
         }
         if (instruction === "/noisy") {
           this.noisyMode = !this.noisyMode;
           const status = this.noisyMode ? "ENABLED" : "DISABLED";
-          await ctx.reply(`⚡ *Noisy Mode ${status}*\nLive neural telemetry stream is now active.`, { parse_mode: "Markdown" });
+          await ctx.reply(`[+] *Noisy Mode ${status}*\nLive neural telemetry stream is now active.`, { parse_mode: "Markdown" });
           return;
         }
 
@@ -143,7 +143,7 @@ export class GatewayServer {
         }
         if (instruction === "/skills") {
           await ctx.reply(
-            "🛠 *DrogonClaw Capabilities*\n\n" +
+            "[*] *DrogonClaw Capabilities*\n\n" +
             "• *Network Reconnaissance:* Active port scanning & service discovery (Nmap)\n" +
             "• *Web Enumeration:* Directory fuzzing & vulnerability crawling (Gobuster, Nuclei)\n" +
             "• *Exploitation:* Custom Python & Stateful Bash Execution\n" +
@@ -157,30 +157,30 @@ export class GatewayServer {
         }
         if (instruction === "/stealth" || instruction === "/stealth on") {
           this.orchestrator.opsecManager.enableStealthMode();
-          await ctx.reply("🟡 *Stealth mode enabled*\nTiming jitter on, noisy scanners suppressed.", { parse_mode: "Markdown" });
+          await ctx.reply("[~] *Stealth mode enabled*\nTiming jitter on, noisy scanners suppressed.", { parse_mode: "Markdown" });
           return;
         }
         if (instruction === "/stealth off") {
           this.orchestrator.opsecManager.disableStealthMode();
-          await ctx.reply("🔴 *Stealth mode disabled*\nAggressive scanning active.", { parse_mode: "Markdown" });
+          await ctx.reply("[!] *Stealth mode disabled*\nAggressive scanning active.", { parse_mode: "Markdown" });
           return;
         }
         if (instruction === "/health") {
-          const statusMessage = await ctx.reply("🩺 Running system diagnostics...");
+          const statusMessage = await ctx.reply("[*] Running system diagnostics...");
           try {
             const { HealthChecker } = await import("../core/health-checker.js");
             const checker = new HealthChecker();
             await checker.runDiagnostics();
-            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined, "✅ *System Diagnostics Passed*\nAll required binaries and dependencies are present.", { parse_mode: "Markdown" });
+            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined, "[+] *System Diagnostics Passed*\nAll required binaries and dependencies are present.", { parse_mode: "Markdown" });
           } catch (e: any) {
-            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined, `❌ *Health check failed:*\n${e.message}`, { parse_mode: "Markdown" });
+            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined, `[x] *Health check failed:*\n${e.message}`, { parse_mode: "Markdown" });
           }
           return;
         }
         if (instruction.startsWith("/install ")) {
           const url = instruction.substring(9).trim();
           if (!url) {
-             await ctx.reply("❌ Usage: /install <url_to_raw_ts_file>");
+             await ctx.reply("[x] Usage: /install <url_to_raw_ts_file>");
              return;
           }
           const statusMessage = await ctx.reply(`⏳ Downloading plugin from ${url}...`);
@@ -224,9 +224,9 @@ export class GatewayServer {
             }
             
             if (count === 0) throw new Error("No valid SkillPlugin objects exported.");
-            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined, `✅ *Successfully installed ${count} plugin(s)!*\nPlugin is now active in the agent's context.`, { parse_mode: "Markdown" });
+            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined, `[+] *Successfully installed ${count} plugin(s)!*\nPlugin is now active in the agent's context.`, { parse_mode: "Markdown" });
           } catch (e: any) {
-            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined, `❌ *Install error:*\n${e.message}`, { parse_mode: "Markdown" });
+            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined, `[x] *Install error:*\n${e.message}`, { parse_mode: "Markdown" });
           }
           return;
         }
@@ -246,14 +246,14 @@ export class GatewayServer {
       // If HitL is waiting for a reply, resolve it instead of launching a new execution!
       if (HitL.hasPendingRequest()) {
         HitL.resolveRequest(instruction);
-        await ctx.reply("✅ Answer received. Agent execution resuming...");
+        await ctx.reply("[+] Answer received. Agent execution resuming...");
         return;
       }
 
       console.log(chalk.cyan(`\n[Telegram Gateway] Received mission: "${instruction}"`));
       
       // Send initial acknowledgment
-      const statusMessage = await ctx.reply("🔥 *Mission Acknowledged.*\nInitializing Orchestration Core...", { parse_mode: "Markdown" });
+      const statusMessage = await ctx.reply("[!] *Mission Acknowledged.*\nInitializing Orchestration Core...", { parse_mode: "Markdown" });
 
       try {
         // Execute the agent, passing a callback to stream tool updates back to Telegram
@@ -262,14 +262,14 @@ export class GatewayServer {
           try {
             if (toolName === "thought") {
               if (this.noisyMode) {
-                await ctx.reply(`🧠 *Neural Thought:*\n_${args.thought.substring(0, 1000)}_`, { parse_mode: "Markdown" });
+                await ctx.reply(`[*] *Neural Thought:*\n_${args.thought.substring(0, 1000)}_`, { parse_mode: "Markdown" });
               }
             } else if (toolName === "status") {
               await ctx.telegram.editMessageText(
                 ctx.chat.id,
                 statusMessage.message_id,
                 undefined,
-                `📡 *Tactical Status:* ${args.message}`,
+                `[*] *Tactical Status:* ${args.message}`,
                 { parse_mode: "Markdown" }
               );
             } else {
@@ -277,7 +277,7 @@ export class GatewayServer {
                 ctx.chat.id,
                 statusMessage.message_id,
                 undefined,
-                `⚙️ *Executing Tool:* \`${toolName}\`\n\`\`\`json\n${JSON.stringify(args, null, 2).substring(0, 500)}\`\`\``,
+                `[*] *Executing Tool:* \`${toolName}\`\n\`\`\`json\n${JSON.stringify(args, null, 2).substring(0, 500)}\`\`\``,
                 { parse_mode: "Markdown" }
               );
             }
@@ -295,7 +295,7 @@ export class GatewayServer {
         // Telegram limits messages to 4096 chars, so we chunk if necessary
         const chunks = this.chunkString(finalResponse, 4000);
         for (const chunk of chunks) {
-          await ctx.reply(`📋 *Agent Report:*\n\n${chunk}`, { parse_mode: "Markdown" });
+          await ctx.reply(`[+] *Agent Report:*\n\n${chunk}`, { parse_mode: "Markdown" });
         }
 
         console.log(chalk.green(`[Telegram Gateway] Mission complete. Report delivered.`));
@@ -308,7 +308,7 @@ export class GatewayServer {
         }
 
         console.error(chalk.red(`[Telegram Gateway Error] ${error.message}`));
-        await ctx.reply(`❌ *Mission Failed:*\n\n${error.message}`, { parse_mode: "Markdown" });
+        await ctx.reply(`[x] *Mission Failed:*\n\n${error.message}`, { parse_mode: "Markdown" });
       }
     });
 
@@ -325,7 +325,7 @@ export class GatewayServer {
         { command: "report", description: "Generate intelligence report" }
       ]);
       this.bot.launch();
-      console.log(chalk.green("✅ DrogonClaw Telegram Gateway is listening for instructions..."));
+      console.log(chalk.green("[+] DrogonClaw Telegram Gateway is listening for instructions..."));
     } catch (e: any) {
       if (e.message.includes("409")) {
         console.error(chalk.red("\n[FATAL ERROR] Telegram Bot Conflict (409)"));
@@ -359,5 +359,5 @@ export class GatewayServer {
 // Start the gateway if called directly
 const gateway = new GatewayServer();
 gateway.start().catch((err) => {
-  console.error(chalk.red("❌ Failed to start Telegram Gateway:"), err);
+  console.error(chalk.red("[x] Failed to start Telegram Gateway:"), err);
 });
