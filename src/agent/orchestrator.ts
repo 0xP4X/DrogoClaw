@@ -316,8 +316,19 @@ export class AgentOrchestrator {
       if (e.name === "HitLPauseError") {
          throw e;
       }
-      console.error(chalk.red(`\n[Execution Error] ${e.message}`));
-      return `Critical failure during operation: ${e.message}`;
+      
+      let msg = e.message || "Unknown execution error";
+      if (msg.includes("does not support tools")) {
+        msg = "The selected Ollama model does not support tool calling. Switch to a tool-capable model.";
+      }
+      if (msg.includes("support tool use") || msg.includes("intelligent_smart_scan")) {
+        msg = "The selected model does not support tool calling (required for autonomous operations). Please type '/setup' and switch to a tool-capable model like Claude 3.5 Sonnet or GPT-4o.";
+      }
+      if (msg.includes("401")) msg = "Invalid API Key provided.";
+      if (msg.includes("404")) msg = "Model or endpoint not found.";
+      if (msg.includes("ECONNREFUSED")) msg = "Connection refused by AI provider/local server.";
+
+      throw new Error(msg);
     } finally {
       this.currentAbortController = null;
     }
