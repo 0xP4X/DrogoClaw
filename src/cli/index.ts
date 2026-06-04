@@ -38,7 +38,7 @@ function getVersion(): string {
     } catch(e) {}
     currentDir = join(currentDir, "..");
   }
-  return "0.3.12";
+  return "0.0.0-unknown"; // Fallback to unknown if package.json is completely lost
 }
 
 const VERSION = getVersion();
