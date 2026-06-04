@@ -11,6 +11,10 @@ DrogonClaw is a next-generation cyber operations platform. Rather than acting as
 
 DrogonClaw focuses on **high-confidence autonomous workflows**, explainable findings, and reproducible evidence, avoiding the hallucinations common in early AI security tools.
 
+> [!WARNING]
+> **Linux Only**
+> DrogonClaw is strictly designed and optimized for **Linux-based operating systems** (such as Kali Linux, Ubuntu, or Debian). It relies heavily on Linux-specific networking APIs, native filesystem permissions, and process management. It will **not** function on Windows or macOS.
+
 ## 🏛️ Architectural Pillars
 
 The platform revolves around three major pillars:
