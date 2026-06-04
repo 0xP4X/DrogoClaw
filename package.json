@@ -1,6 +1,6 @@
 {
   "name": "drogonclaw",
-  "version": "0.3.16",
+  "version": "0.3.17",
   "description": "🐉🔥 DrogonClaw — Autonomous AI Penetration Testing Framework",
   "main": "dist/src/cli/index.js",
   "bin": {
@@ -16,6 +16,7 @@
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build",
+    "postinstall": "chmod +x dist/src/cli/index.js",
     "dev": "tsx --watch --no-warnings src/cli/index.ts",
     "cli": "tsx --no-warnings src/cli/index.ts",
     "start": "tsx --no-warnings src/cli/index.ts start",
