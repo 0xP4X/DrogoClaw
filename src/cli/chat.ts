@@ -74,17 +74,26 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
   const profile = activeOrchestrator.getMemoryGraph().getOperatorProfile();
   const operatorName = profile ? profile.name : "Unknown Operator";
 
+  // Helper to calculate raw string length ignoring chalk color codes
+  const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*m/g, '');
+
   // Dynamic status summary (quick glance)
   const drawBox = (lines: string[], title?: string) => {
     const pad = 2;
-    const width = Math.max(...lines.map((l) => l.length), (title?.length || 0) + 4);
+    const width = Math.max(...lines.map((l) => stripAnsi(l).length), (title?.length || 0) + 4);
     
     // Use heavy border characters for "unique" design
     const top = title 
       ? `┏━ ${chalk.bold(title)} ${'━'.repeat(width - title.length + pad * 2 - 4)}┓`
       : `┏${'━'.repeat(width + pad * 2)}┓`;
     const bottom = `┗${'━'.repeat(width + pad * 2)}┛`;
-    const middle = lines.map((l) => `┃${' '.repeat(pad)}${l.padEnd(width)}${' '.repeat(pad)}┃`).join('\n');
+    
+    const middle = lines.map((l) => {
+      const visibleLen = stripAnsi(l).length;
+      const paddingNeeded = width - visibleLen;
+      return `┃${' '.repeat(pad)}${l}${' '.repeat(paddingNeeded)}${' '.repeat(pad)}┃`;
+    }).join('\n');
+    
     return chalk.cyan(top + '\n' + middle + '\n' + bottom);
   };
 
