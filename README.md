@@ -18,6 +18,36 @@ DrogonClaw focuses on **high-confidence autonomous workflows**, explainable find
 
 ## 🏛️ Architectural Pillars
 
+```mermaid
+flowchart TD
+    subgraph UI ["User Interfaces"]
+        CLI["💻 CLI Terminal"]
+        TG["📱 Telegram C2 Gateway"]
+    end
+
+    subgraph Core ["🧠 DrogonClaw Engine"]
+        Orchestrator["LangChain ReAct Orchestrator"]
+        LootDB[("LootDB (SQLite)")]
+        OPSEC["OPSEC Cleanup Registry"]
+    end
+
+    subgraph Execution ["Isolated Execution Environment"]
+        Docker["🐳 Ephemeral Docker Sandbox"]
+        Tools["Nmap, Metasploit, Custom Exploits"]
+    end
+
+    Target((("🎯 Target Network")))
+
+    UI -->|Natural Language Instructions| Orchestrator
+    Orchestrator <-->|Decoupled Memory| LootDB
+    Orchestrator -->|Registers Processes| OPSEC
+    Orchestrator -->|Deploys Payloads| Docker
+    Docker --- Tools
+    Tools -->|Exploits & Recon| Target
+    
+    OPSEC -.->|LIFO Kill Signal| Execution
+```
+
 The platform revolves around three major pillars:
 
 ### 1. The Orchestration Core

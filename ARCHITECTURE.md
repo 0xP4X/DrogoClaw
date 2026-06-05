@@ -26,6 +26,29 @@ Stealth and professionalism are guaranteed by the `CleanupRegistry`.
 - Whenever a tool modifies the filesystem or spawns a background proxy, it registers a reverse-action shell command.
 - If the operator aborts the mission (e.g., `SIGINT`), the engine intercepts the exit, executes all cleanup commands in reverse-order (LIFO), and removes all traces before safely dying.
 
+```mermaid
+sequenceDiagram
+    actor Operator
+    participant Orchestrator
+    participant Sandbox
+    participant OPSEC Registry
+    
+    Operator->>Orchestrator: Start Mission
+    Orchestrator->>Sandbox: Execute Port Forward (Ligolo)
+    Orchestrator->>OPSEC Registry: Register Cleanup ("killall ligolo")
+    Orchestrator->>Sandbox: Drop Exploit Payload
+    Orchestrator->>OPSEC Registry: Register Cleanup ("rm -rf /tmp/payload")
+    
+    Operator-->>Orchestrator: Press Ctrl+C (SIGINT)
+    Note over Orchestrator,OPSEC Registry: Mission Aborted!
+    
+    Orchestrator->>OPSEC Registry: Intercept Exit & Execute LIFO
+    OPSEC Registry->>Sandbox: Run "rm -rf /tmp/payload"
+    OPSEC Registry->>Sandbox: Run "killall ligolo"
+    OPSEC Registry-->>Orchestrator: Footprints Erased
+    Orchestrator-->>Operator: Safe Exit
+```
+
 ## Execution Modes
 
 1. **Manual Mode:** The Orchestrator strictly enforces Human-in-the-Loop (HitL) authorization. Before running an aggressive exploit or dropping a payload, the agent will pause and prompt the user via the `ask_human_approval` tool.
