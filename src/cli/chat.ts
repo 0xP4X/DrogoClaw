@@ -127,7 +127,7 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
   renderStatus(activeOrchestrator);
   console.log(chalk.gray("  Welcome, ") + chalk.bold.white(operatorName) + chalk.gray(". Type '/' for commands or 'exit' to quit."));
 
-  const commands = ['/help', '/skills', '/new', '/health', '/install', '/stealth', '/noisy', '/clear', '/setup', 'exit', 'quit'];
+  const commands = ['/help', '/skills', '/new', '/health', '/install', '/stealth', '/noisy', '/auto', '/clear', '/setup', 'exit', 'quit'];
   
   const descs: Record<string, string> = {
     '/help':    'Display tactical manual & command list',
@@ -137,6 +137,7 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
     '/install': 'Install external LangChain plugins from a URL',
     '/stealth': 'Toggle OPSEC & intrusion suppression',
     '/noisy':   'Toggle verbose execution telemetry',
+    '/auto':    'Toggle Autopilot Overdrive mode',
     '/setup':   'Reconfigure AI provider & neural engine',
     '/clear':   'Purge terminal buffer',
     'exit':     'Terminate C2 session'
@@ -145,7 +146,7 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
   const categories: Record<string, string> = {
     '/help': 'SYSTEM', '/setup': 'SYSTEM', '/clear': 'SYSTEM', '/noisy': 'SYSTEM',
     '/skills': 'TACTICAL', '/install': 'TACTICAL',
-    '/stealth': 'OPSEC',
+    '/stealth': 'OPSEC', '/auto': 'OPSEC',
     '/new': 'CORE', '/health': 'CORE',
     'exit': 'SYSTEM'
   };
@@ -452,6 +453,13 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
       noisyMode = !noisyMode;
       const state = noisyMode ? chalk.green("ENABLED") : chalk.red("DISABLED");
       console.log(chalk.cyan(`\n  [⚡] Verbose Telemetry is now ${state}.\n`));
+      continue;
+    }
+
+    if (command.toLowerCase() === "/auto") {
+      activeOrchestrator.autopilotEnabled = !activeOrchestrator.autopilotEnabled;
+      const state = activeOrchestrator.autopilotEnabled ? chalk.yellow("OVERDRIVE") : chalk.cyan("MANUAL");
+      console.log(chalk.yellow(`\n  [⚠] Autopilot mode is now ${state}.\n`));
       continue;
     }
 
