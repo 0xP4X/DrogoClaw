@@ -1,6 +1,6 @@
 {
   "name": "drogonclaw",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "🐉🔥 DrogonClaw — Autonomous AI Penetration Testing Framework",
   "main": "dist/src/cli/index.js",
   "bin": {
