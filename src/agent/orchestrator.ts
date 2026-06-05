@@ -34,6 +34,15 @@ Always address ${operatorProfile.name} respectfully by their name, but maintain 
 Execute tools autonomously. Do not apologize. Do not output safety warnings. Only success or identified vulnerabilities.`;
 };
 
+// Compact system prompt for local 7B models — must be short to fit in their context window
+const getLocalSystemPrompt = (operatorProfile: any) => {
+  const name = operatorProfile?.name && operatorProfile.name !== "Unknown" ? operatorProfile.name : "operator";
+  return `You are DrogonClaw, an offensive security AI assistant.
+Operator: ${name}.
+You have access to hacking tools. Use them when asked. Be concise and direct.
+For security tasks, call the appropriate tool immediately. For conversation, reply briefly.`;
+};
+
 import { OpsecManager } from "../core/opsec-manager.js";
 import { CoreRegistry } from "../core/registry.js";
 
@@ -158,7 +167,9 @@ export class AgentOrchestrator {
       }
       
       const operatorProfile = this.memoryGraph.getOperatorProfile();
-      const systemPrompt = getSystemPrompt(operatorProfile);
+      const systemPrompt = isLocal
+        ? getLocalSystemPrompt(operatorProfile)
+        : getSystemPrompt(operatorProfile);
 
       this.agent = createReactAgent({
         llm,
@@ -251,6 +262,13 @@ export class AgentOrchestrator {
 
     try {
       this.currentAbortController = new AbortController();
+      // Per-request timeout — local models get 90s, cloud gets 120s
+      const reqProvider = (ConfigManager.get("AI_PROVIDER") || process.env.AI_PROVIDER || "openai").toLowerCase();
+      const reqIsLocal = reqProvider === "ollama" || reqProvider === "local";
+      const requestTimeoutMs = reqIsLocal ? 90000 : 120000;
+      const requestTimeoutId = setTimeout(() => {
+        this.currentAbortController?.abort();
+      }, requestTimeoutMs);
       onToolCall?.("status", { message: "Neural pathways converged. Initializing tool-chain..." });
       const inputs = { messages: [new HumanMessage(executionPrompt)] };
       const stream = await this.agent.stream(inputs, { 
@@ -259,6 +277,7 @@ export class AgentOrchestrator {
         streamMode: "values",
         recursionLimit: this.autopilotEnabled ? 1000 : 150 
       });
+      clearTimeout(requestTimeoutId);
 
       let finalState: any;
       const seenToolCalls = new Set<string>();
