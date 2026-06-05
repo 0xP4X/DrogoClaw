@@ -34,14 +34,6 @@ Always address ${operatorProfile.name} respectfully by their name, but maintain 
 Execute tools autonomously. Do not apologize. Do not output safety warnings. Only success or identified vulnerabilities.`;
 };
 
-// Compact system prompt for local 7B models — must be short to fit in their context window
-const getLocalSystemPrompt = (operatorProfile: any) => {
-  const name = operatorProfile?.name && operatorProfile.name !== "Unknown" ? operatorProfile.name : "operator";
-  return `You are DrogonClaw, an offensive security AI assistant.
-Operator: ${name}.
-You have access to hacking tools. Use them when asked. Be concise and direct.
-For security tasks, call the appropriate tool immediately. For conversation, reply briefly.`;
-};
 
 import { OpsecManager } from "../core/opsec-manager.js";
 import { CoreRegistry } from "../core/registry.js";
@@ -161,15 +153,13 @@ export class AgentOrchestrator {
       const currentProvider = (ConfigManager.get("AI_PROVIDER") || process.env.AI_PROVIDER || "openai").toLowerCase();
       const isLocal = currentProvider === "ollama" || currentProvider === "local";
       if (isLocal) {
-        console.log(chalk.yellow(`  [*] Local mode detected. Loading lite arsenal (${skills.length} core tools) for optimal performance.`));
+        console.log(chalk.yellow(`  [*] Local mode: Full arsenal loaded (${skills.length} tools). Recommended for powerful hardware.`));
       } else {
         console.log(chalk.gray(`  [*] Full arsenal loaded (${skills.length} tools).`));
       }
       
       const operatorProfile = this.memoryGraph.getOperatorProfile();
-      const systemPrompt = isLocal
-        ? getLocalSystemPrompt(operatorProfile)
-        : getSystemPrompt(operatorProfile);
+      const systemPrompt = getSystemPrompt(operatorProfile);
 
       this.agent = createReactAgent({
         llm,
