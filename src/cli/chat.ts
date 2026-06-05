@@ -99,19 +99,15 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
 
   const renderStatus = (orch: AgentOrchestrator) => {
     const provider = (ConfigManager.get("AI_PROVIDER") || process.env.AI_PROVIDER || "unset").toString();
-    const model = (
-      ConfigManager.get("OPENROUTER_MODEL_NAME") ||
-      ConfigManager.get("ANTHROPIC_MODEL_NAME") ||
-      ConfigManager.get("GEMINI_MODEL_NAME") ||
-      ConfigManager.get("OLLAMA_MODEL_NAME") || 
-      ConfigManager.get("OPENAI_MODEL_NAME") || 
-      process.env.OPENROUTER_MODEL_NAME || 
-      process.env.ANTHROPIC_MODEL_NAME || 
-      process.env.GEMINI_MODEL_NAME || 
-      process.env.OLLAMA_MODEL_NAME || 
-      process.env.OPENAI_MODEL_NAME || 
-      "unset"
-    ).toString();
+    let model = "unset";
+    if (provider === "ollama" || provider === "local") model = ConfigManager.get("OLLAMA_MODEL_NAME") || process.env.OLLAMA_MODEL_NAME || "unset";
+    else if (provider === "openai") model = ConfigManager.get("OPENAI_MODEL_NAME") || process.env.OPENAI_MODEL_NAME || "unset";
+    else if (provider === "anthropic") model = ConfigManager.get("ANTHROPIC_MODEL_NAME") || process.env.ANTHROPIC_MODEL_NAME || "unset";
+    else if (provider === "gemini") model = ConfigManager.get("GEMINI_MODEL_NAME") || process.env.GEMINI_MODEL_NAME || "unset";
+    else if (provider === "openrouter") model = ConfigManager.get("OPENROUTER_MODEL_NAME") || process.env.OPENROUTER_MODEL_NAME || "unset";
+    else model = "unset";
+    
+    model = model.toString();
     const stealth = orch.opsecManager.isStealthModeActive() ? chalk.green('ON') : chalk.gray('OFF');
     const autopilot = orch.isAutopilot() ? chalk.yellow('ON') : chalk.gray('OFF');
     const nodes = orch.getMemoryGraph().getNodesCount();
