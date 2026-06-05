@@ -1,4 +1,5 @@
 import { ChatOpenAI } from "@langchain/openai";
+import { ChatOllama } from "@langchain/ollama";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
@@ -71,16 +72,10 @@ export function getLLMProvider(options?: LLMProviderOptions): BaseChatModel {
           process.env.OLLAMA_MODEL ||
           "llama3.1:latest";
         const normalizedBaseUrl = baseUrl.replace(/\/$/, "");
-        return new ChatOpenAI({
-          modelName,
+        return new ChatOllama({
+          baseUrl: normalizedBaseUrl,
+          model: modelName,
           temperature: 0,
-          configuration: {
-            baseURL: `${normalizedBaseUrl}/v1`,
-            defaultHeaders: {
-              "User-Agent": "DrogonClaw/1.0",
-            },
-          },
-          openAIApiKey: "ollama",
           maxRetries,
         });
       }
