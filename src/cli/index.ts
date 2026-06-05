@@ -13,7 +13,7 @@ process.emit = function (event: string, ...args: any[]) {
 };
 import { program } from "commander";
 import chalk from "chalk";
-import figlet from "figlet";
+
 import { runOnboarding, isEnvConfigured } from "./onboarding.js";
 import ora from "ora";
 import { startChatSession } from "./chat.js";
@@ -46,26 +46,34 @@ const VERSION = getVersion();
 async function printBanner(): Promise<void> {
   console.clear();
   return new Promise((resolve) => {
-    figlet.text("DROGONCLAW", { font: "ANSI Shadow", horizontalLayout: "fitted" }, (err, data) => {
-      console.log("");
-      if (!err && data) {
-        // Apply a subtle red-to-dark gradient effect
-        const lines = data.split('\n');
-        lines.forEach((line, i) => {
-          const intensity = Math.max(50, 255 - (i * 20));
-          console.log(chalk.rgb(intensity, 0, 0).bold(line));
-        });
-      } else {
-        console.log(chalk.red.bold("  [*] DROGONCLAW"));
-      }
-      console.log(chalk.red.bold("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
-      console.log(chalk.gray(`  Autonomous Offensive Security Framework`) + chalk.red(` v${VERSION}`) + chalk.gray(` | Root: `) + chalk.green(`Active`));
-      console.log(chalk.gray(`  Developed by 0xP4X | `) + chalk.blueBright(`https://drogonclaw.xyz`));
-      console.log(chalk.red.bold("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"));
-      console.log(chalk.green("  Tip: Run `drogonclaw setup` to reconfigure models, or use /setup inside the CLI."));
-      console.log("");
-      resolve();
+    const logo = [
+      "                              ",
+      "                   ⢀⣤⣤⣤       ",
+      "               ⢀⣤⣴⣾⣿⠿⣫⣶⡏      ",
+      "             ⣀⣴⣶⣶⣿⡙⡿⣮⣻⠞⠁      ",
+      "           ⣀⡺⠿⢿⡿⣿⣿⣳⢶⣏         ",
+      "       ⢀⣤⡰⣿⡟⣶⣟⡍⣵⣆⢻⡆⣎⣿⣇        ",
+      "      ⢀⢼⣷⠇⣥⡺⣿⠗⠱⢿⣯⠉ ⠙⠿⣋⣾⡆      ",
+      "      ⣼⣷⠅⢸⣿⣷⠁⢠⣿⣧⡁   ⢠⣮⣿⠄      ",
+      "      ⠸⡇ ⣬⣻⠇  ⣟⣿    ⢀⣿⠏       ",
+      "       ⠁ ⣿⣾⠃  ⣿⣷    ⠋⠁        ",
+      "         ⠘⣿   ⠹⣷              ",
+      "          ⠈⠃   ⠈              ",
+      "                              "
+    ];
+    
+    console.log("");
+    logo.forEach(line => {
+      console.log(chalk.red.bold(line));
     });
+
+    console.log(chalk.red.bold("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
+    console.log(chalk.gray(`  Autonomous Offensive Security Framework`) + chalk.red(` v${VERSION}`) + chalk.gray(` | Root: `) + chalk.green(`Active`));
+    console.log(chalk.gray(`  Developed by 0xP4X | `) + chalk.blueBright(`https://drogonclaw.xyz`));
+    console.log(chalk.red.bold("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"));
+    console.log(chalk.green("  Tip: Run `drogonclaw setup` to reconfigure models, or use /setup inside the CLI."));
+    console.log("");
+    resolve();
   });
 }
 
