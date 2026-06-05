@@ -271,18 +271,18 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
     }
   };
 
+  rl.on('SIGINT', () => {
+    if (isExecuting) {
+      process.stdout.write(chalk.yellow("\n[!] Gracefully aborting execution sequence...\n"));
+      activeOrchestrator.abortCurrentExecution();
+      return;
+    }
+    process.exit(0);
+  });
+
   process.stdin.on('keypress', (str, key) => {
     if (inPalette) return;
     if (!key) return; // Guard for undefined keys
-
-    if (key.ctrl && key.name === 'c') {
-      if (isExecuting) {
-        process.stdout.write(chalk.yellow("\n[!] Gracefully aborting execution sequence...\n"));
-        activeOrchestrator.abortCurrentExecution();
-        return;
-      }
-      process.exit(0);
-    }
     
     // Clear hints on enter or backspace to avoid ghosts
     if (key.name === 'return' || key.name === 'enter' || key.name === 'backspace') {
