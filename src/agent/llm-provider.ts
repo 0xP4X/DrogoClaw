@@ -70,7 +70,7 @@ export function getLLMProvider(options?: LLMProviderOptions): BaseChatModel {
           ConfigManager.get("OLLAMA_MODEL") ||
           process.env.OLLAMA_MODEL_NAME ||
           process.env.OLLAMA_MODEL ||
-          "llama3.1:latest";
+          "qwen2.5:7b";
         const normalizedBaseUrl = baseUrl.replace(/\/$/, "");
         return new ChatOllama({
           baseUrl: normalizedBaseUrl,

@@ -68,7 +68,7 @@ export async function runOnboarding(): Promise<void> {
     while (true) {
       console.log(chalk.cyan("\n  [Step 1: AI Provider Configuration]"));
       console.log(chalk.gray("  For Novices: We recommend OpenAI (gpt-4o) or Anthropic (Claude 3.5 Sonnet)"));
-      console.log(chalk.gray("  For Experts: Local models (Ollama) can be used, but require tool-support (e.g. llama3.1)"));
+      console.log(chalk.gray("  For Experts: Local models (Ollama) can be used, but MUST support tool-calling (e.g. qwen2.5, mistral-nemo, phi3)"));
       
       const provider = await select({
           loop: false,
@@ -205,13 +205,13 @@ export async function runOnboarding(): Promise<void> {
           loop: false,
              message: "Select a standard Ollama model (ensure you pull it later):",
              choices: [
-               { name: "[*] llama3.1", value: "llama3.1" },
-               { name: "[*] llama3", value: "llama3" },
-               { name: "[*] mistral", value: "mistral" },
-               { name: "[*] mixtral", value: "mixtral" },
-               { name: "[*] qwen2.5", value: "qwen2.5" },
-               { name: "[*] phi3", value: "phi3" },
-               { name: "[*] gemma2", value: "gemma2" },
+               { name: "[✓] qwen2.5        — Confirmed tool-call support (Recommended)", value: "qwen2.5" },
+               { name: "[✓] qwen2.5:7b     — Confirmed tool-call support (Fastest)", value: "qwen2.5:7b" },
+               { name: "[✓] mistral-nemo   — Good tool-call support", value: "mistral-nemo" },
+               { name: "[✓] phi3           — Lightweight tool-call support", value: "phi3" },
+               { name: "[✓] gemma2         — Good reasoning model", value: "gemma2" },
+               { name: "[✗] llama3         — WARNING: No tool-call support, will crash", value: "llama3" },
+               { name: "[✗] llama3.1       — WARNING: Limited tool-call support", value: "llama3.1" },
                { name: "[x] Cancel & Re-select Provider", value: "back" }
              ]
           });
