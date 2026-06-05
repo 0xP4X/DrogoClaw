@@ -103,8 +103,8 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
       process.env.OPENAI_MODEL_NAME || 
       "unset"
     ).toString();
-    const stealth = orch.opsecManager.isStealthModeActive() ? chalk.green('ACTIVE') : chalk.gray('SILENT');
-    const autopilot = orch.isAutopilot() ? chalk.yellow('ENABLED') : chalk.gray('MANUAL');
+    const stealth = orch.opsecManager.isStealthModeActive() ? chalk.green('ON') : chalk.gray('OFF');
+    const autopilot = orch.isAutopilot() ? chalk.yellow('ON') : chalk.gray('OFF');
     const nodes = orch.getMemoryGraph().getNodesCount();
 
     const lines = [];
@@ -358,16 +358,16 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
     const currentAgentName = currentAgentProfile ? currentAgentProfile.name : "DrogonClaw";
 
     // Dynamic Tactical Status Bar
-    const stealthStatus = activeOrchestrator.opsecManager.isStealthModeActive() ? chalk.green("STEALTH:ON") : chalk.red("STEALTH:OFF");
-    const autopilotStatus = activeOrchestrator.isAutopilot() ? chalk.yellow("AUTO:ON") : chalk.cyan("AUTO:OFF");
-    const telemetryStatus = noisyMode ? chalk.green("NOISY:ON") : chalk.gray("NOISY:OFF");
-    const nodeCount = activeOrchestrator.getMemoryGraph().getRelevantContext().length > 50 ? "50+" : "SYNCED";
+    const stealthStatus = activeOrchestrator.opsecManager.isStealthModeActive() ? chalk.green("ON") : chalk.red("OFF");
+    const autopilotStatus = activeOrchestrator.isAutopilot() ? chalk.yellow("ON") : chalk.gray("OFF");
+    const telemetryStatus = noisyMode ? chalk.green("ON") : chalk.gray("OFF");
+    const nodeCount = activeOrchestrator.getMemoryGraph().getNodesCount();
     
     process.stdout.write(
-      chalk.gray(`  ${stealthStatus} | ${autopilotStatus} | ${telemetryStatus} | GRAPH:${nodeCount} | IDENTITY:${currentOperatorName}\n`)
+      chalk.gray(`  [ OPSEC: `) + stealthStatus + chalk.gray(` | AUTO: `) + autopilotStatus + chalk.gray(` | NOISY: `) + telemetryStatus + chalk.gray(` | GRAPH: ${nodeCount} NODES ]\n`)
     );
 
-    const promptText = chalk.cyan(`┏━ `) + chalk.bold.white(currentOperatorName) + chalk.cyan(`@`) + chalk.bold.cyan(currentAgentName.toLowerCase()) + chalk.cyan(` `) + chalk.gray(`[${activeOrchestrator.getSessionId().substring(0,8)}]`) + chalk.cyan(`\n┗━❯ `);
+    const promptText = chalk.cyan(`┏━ `) + chalk.bold.white(currentOperatorName) + chalk.cyan(`@`) + chalk.bold.cyan(currentAgentName.toLowerCase()) + chalk.gray(` [Session: ${activeOrchestrator.getSessionId().substring(0,8)}]`) + chalk.cyan(`\n┗━❯ `);
     const prompt = await ask(promptText + chalk.white(""));
 
     let command = prompt.trim();
