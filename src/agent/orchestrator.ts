@@ -149,6 +149,13 @@ export class AgentOrchestrator {
       const llm = getLLMProvider();
 
       const skills = getPentestSkills(this);
+      const currentProvider = (ConfigManager.get("AI_PROVIDER") || process.env.AI_PROVIDER || "openai").toLowerCase();
+      const isLocal = currentProvider === "ollama" || currentProvider === "local";
+      if (isLocal) {
+        console.log(chalk.yellow(`  [*] Local mode detected. Loading lite arsenal (${skills.length} core tools) for optimal performance.`));
+      } else {
+        console.log(chalk.gray(`  [*] Full arsenal loaded (${skills.length} tools).`));
+      }
       
       const operatorProfile = this.memoryGraph.getOperatorProfile();
       const systemPrompt = getSystemPrompt(operatorProfile);
