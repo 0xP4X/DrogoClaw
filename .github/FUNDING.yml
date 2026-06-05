@@ -1,6 +1,4 @@
 # These are supported funding model platforms
+# Once you generate your Paystack link, replace "INSERT_YOUR_PAYSTACK_LINK_HERE" with your actual link
 
-patreon: 0xP4X
-ko_fi: 0xP4X
-# open_collective: # Replace with a single Open Collective username
-custom: ['https://drogonclaw.xyz', 'https://buymeacoffee.com/0xP4X']
+custom: ['https://paystack.com/pay/INSERT_YOUR_PAYSTACK_LINK_HERE', 'https://drogonclaw.xyz']
