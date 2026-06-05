@@ -190,7 +190,12 @@ async function startInteractiveMode(): Promise<void> {
     };
 
     while (true) {
-      const initResult = await initializeWithTimeout(orchestrator, Number(process.env.DROGON_INIT_TIMEOUT_MS || 10000));
+      // Give Ollama extra time since it needs to load the model into RAM
+      const { ConfigManager } = await import("../core/config-manager.js");
+      const activeProvider = (ConfigManager.get("AI_PROVIDER") || process.env.AI_PROVIDER || "openai").toLowerCase();
+      const isOllama = ["ollama", "local"].includes(activeProvider);
+      const defaultTimeout = isOllama ? 90000 : 30000;
+      const initResult = await initializeWithTimeout(orchestrator, Number(process.env.DROGON_INIT_TIMEOUT_MS || defaultTimeout));
       if (initResult.completed && orchestrator.isReady()) break;
 
       console.log(chalk.yellow("\n  [-] Agent Core is taking longer than expected or failed to initialize."));
@@ -262,6 +267,9 @@ program
   .description("Run the setup wizard to reconfigure the agent")
   .action(async () => {
     await runOnboarding();
+    // After setup, boot straight into the interactive session
+    console.log(chalk.cyan("\n  [*] Launching DrogonClaw...\n"));
+    await startInteractiveMode();
   });
 
 program
