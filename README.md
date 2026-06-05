@@ -132,3 +132,7 @@ DrogonClaw is designed for **authorized security testing only**. Always ensure y
 ## 📄 License
 
 MIT
+
+## 🌟 Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=0xP4X/DrogonClaw&type=Date)](https://star-history.com/#0xP4X/DrogonClaw&Date)
