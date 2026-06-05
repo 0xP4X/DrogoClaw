@@ -127,7 +127,7 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
   renderStatus(activeOrchestrator);
   console.log(chalk.gray("  Welcome, ") + chalk.bold.white(operatorName) + chalk.gray(". Type '/' for commands or 'exit' to quit."));
 
-  const commands = ['/help', '/skills', '/new', '/health', '/install', '/stealth', '/clear', '/setup', 'exit', 'quit'];
+  const commands = ['/help', '/skills', '/new', '/health', '/install', '/stealth', '/noisy', '/clear', '/setup', 'exit', 'quit'];
   
   const descs: Record<string, string> = {
     '/help':    'Display tactical manual & command list',
@@ -136,13 +136,14 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
     '/health':  'System diagnostic & binary verification',
     '/install': 'Install external LangChain plugins from a URL',
     '/stealth': 'Toggle OPSEC & intrusion suppression',
+    '/noisy':   'Toggle verbose execution telemetry',
     '/setup':   'Reconfigure AI provider & neural engine',
     '/clear':   'Purge terminal buffer',
     'exit':     'Terminate C2 session'
   };
 
   const categories: Record<string, string> = {
-    '/help': 'SYSTEM', '/setup': 'SYSTEM', '/clear': 'SYSTEM',
+    '/help': 'SYSTEM', '/setup': 'SYSTEM', '/clear': 'SYSTEM', '/noisy': 'SYSTEM',
     '/skills': 'TACTICAL', '/install': 'TACTICAL',
     '/stealth': 'OPSEC',
     '/new': 'CORE', '/health': 'CORE',
@@ -444,6 +445,13 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
     if (command.toLowerCase() === "/new") {
       activeOrchestrator.newSession();
       console.log(chalk.green("\n  [+] ") + chalk.gray("Memory wiped. New session started.\n"));
+      continue;
+    }
+
+    if (command.toLowerCase() === "/noisy") {
+      noisyMode = !noisyMode;
+      const state = noisyMode ? chalk.green("ENABLED") : chalk.red("DISABLED");
+      console.log(chalk.cyan(`\n  [⚡] Verbose Telemetry is now ${state}.\n`));
       continue;
     }
 
