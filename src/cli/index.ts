@@ -64,7 +64,7 @@ async function printBanner(): Promise<void> {
     
     console.log("");
     logo.forEach(line => {
-      console.log(chalk.red.bold(line));
+      console.log("                         " + chalk.red.bold(line));
     });
 
     console.log(chalk.red.bold("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
