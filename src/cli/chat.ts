@@ -121,11 +121,11 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
     lines.push(`${chalk.gray('OPSEC  ')} ❯ Stealth:${stealth} | Autopilot:${autopilot}`);
     lines.push(`${chalk.gray('INTEL  ')} ❯ ${chalk.magenta(nodes)} entries in neural graph`);
 
-    process.stdout.write("\n" + drawBox(lines, "DROGONCLAW C2 MONITOR") + "\n\n");
+    process.stdout.write("\n" + drawBox(lines, "DROGONCLAW C2 MONITOR") + "\n");
   };
 
   renderStatus(activeOrchestrator);
-  console.log(chalk.gray("  Welcome, ") + chalk.bold.white(operatorName) + chalk.gray(". Type '/' for commands or 'exit' to quit.\n"));
+  console.log(chalk.gray("  Welcome, ") + chalk.bold.white(operatorName) + chalk.gray(". Type '/' for commands or 'exit' to quit."));
 
   const commands = ['/help', '/skills', '/new', '/health', '/install', '/stealth', '/clear', '/setup', 'exit', 'quit'];
   
@@ -682,7 +682,7 @@ export async function startChatSession(orchestrator: AgentOrchestrator): Promise
       // Custom border style for typewriter
       const styledResult = rendered.trimEnd();
       await streamText(styledResult);
-      console.log(chalk.cyan(`${bottomBorder}\n`));
+      console.log(chalk.cyan(`${bottomBorder}`));
     } catch (error: any) {
       spinner.stop();
       if (error.name === "HitLPauseError") {
