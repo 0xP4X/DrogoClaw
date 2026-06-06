@@ -15,8 +15,8 @@ import { ConfigManager, DrogonConfig } from "../core/config-manager.js";
 // ─────────────────────────────────────────────────────────────────────────────
 function getSupabaseCredentials(): { url: string; anonKey: string } {
   return {
-    url: "https://skidcsgrcotgjjmzsthy.supabase.co",
-    anonKey: "sb_publishable_iKdrsLVaSFoAjOI3cytOhQ_lExVM8GU"
+    url: process.env.SUPABASE_URL || "https://skidcsgrcotgjjmzsthy.supabase.co",
+    anonKey: process.env.SUPABASE_ANON_KEY || "sb_publishable_iKdrsLVaSFoAjOI3cytOhQ_lExVM8GU"
   };
 }
 

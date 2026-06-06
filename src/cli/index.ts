@@ -207,7 +207,7 @@ async function startInteractiveMode(): Promise<void> {
 
     // F5 fix: Validate against the Supabase Edge Function, not localhost
     // F13 fix: Use the stable SHA-256 hardware ID
-    const supabaseUrl = "https://skidcsgrcotgjjmzsthy.supabase.co";
+    const supabaseUrl = process.env.SUPABASE_URL || "https://skidcsgrcotgjjmzsthy.supabase.co";
 
     const hardwareId = computeHardwareId();
     const validateUrl = `${supabaseUrl}/functions/v1/validate-license`;
