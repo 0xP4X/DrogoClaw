@@ -9,22 +9,15 @@ import { createClient } from "@supabase/supabase-js";
 import { ConfigManager, DrogonConfig } from "../core/config-manager.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// F1 fix: Supabase credentials are NEVER hardcoded.
-// They must be set in environment variables or .drogonclaw/.env (local only).
+// The URL and Anon Key are public publishable credentials meant to be embedded
+// in client applications. They only grant access to row-level security (RLS)
+// constrained tables.
 // ─────────────────────────────────────────────────────────────────────────────
 function getSupabaseCredentials(): { url: string; anonKey: string } {
-  const url = process.env.SUPABASE_URL;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
-
-  if (!url || !anonKey) {
-    console.error(chalk.red(
-      "\n  [x] Missing SUPABASE_URL or SUPABASE_ANON_KEY environment variables.\n" +
-      "      These must be set before running DrogonClaw.\n" +
-      "      See .env.example for configuration reference.\n"
-    ));
-    process.exit(1);
-  }
-  return { url, anonKey };
+  return {
+    url: "https://skidcsgrcotgjjmzsthy.supabase.co",
+    anonKey: "sb_publishable_iKdrsLVaSFoAjOI3cytOhQ_lExVM8GU"
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

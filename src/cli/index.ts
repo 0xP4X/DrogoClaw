@@ -207,14 +207,7 @@ async function startInteractiveMode(): Promise<void> {
 
     // F5 fix: Validate against the Supabase Edge Function, not localhost
     // F13 fix: Use the stable SHA-256 hardware ID
-    const supabaseUrl = process.env.SUPABASE_URL;
-    if (!supabaseUrl) {
-      const errorMsg = chalk.red.bold(`CONFIGURATION ERROR\n\n`) +
-        chalk.gray(`SUPABASE_URL environment variable is not set.\n`) +
-        chalk.yellow(`Ensure your environment is configured before starting.`);
-      console.log(boxen(errorMsg, { padding: 1, margin: 1, borderColor: "red", borderStyle: "double" }));
-      process.exit(1);
-    }
+    const supabaseUrl = "https://skidcsgrcotgjjmzsthy.supabase.co";
 
     const hardwareId = computeHardwareId();
     const validateUrl = `${supabaseUrl}/functions/v1/validate-license`;
