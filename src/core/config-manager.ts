@@ -3,6 +3,7 @@ import path from "path";
 
 export interface DrogonConfig {
   DROGONCLAW_LICENSE_KEY?: string;
+  DROGONCLAW_HARDWARE_ID?: string;
   AI_PROVIDER?: string;
   OPENAI_API_KEY?: string;
   OPENAI_MODEL_NAME?: string;
@@ -45,7 +46,7 @@ class ConfigManagerSingleton {
       try {
         const data = fs.readFileSync(this.currentProfilePath, "utf-8");
         this.config = JSON.parse(data);
-        
+
         // Push config into process.env for legacy compatibility
         for (const key in this.config) {
           process.env[key] = (this.config as any)[key];
@@ -61,6 +62,16 @@ class ConfigManagerSingleton {
   public save(newConfig: DrogonConfig): void {
     this.config = { ...this.config, ...newConfig };
     fs.writeFileSync(this.currentProfilePath, JSON.stringify(this.config, null, 2), "utf-8");
+
+    // F15 fix: restrict file permissions to owner-only (rw-------)
+    // This prevents other OS users and world-readable processes from reading API keys.
+    // chmod is a no-op on Windows but harmless.
+    try {
+      fs.chmodSync(this.currentProfilePath, 0o600);
+    } catch {
+      // Non-fatal — Windows doesn't support Unix permissions
+    }
+
     this.load(path.basename(this.currentProfilePath, ".json"));
   }
 

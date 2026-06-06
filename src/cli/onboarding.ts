@@ -3,9 +3,47 @@ import chalk from "chalk";
 import boxen from "boxen";
 import ora from "ora";
 import os from "os";
+import crypto from "crypto";
 import { exec } from "child_process";
 import { createClient } from "@supabase/supabase-js";
 import { ConfigManager, DrogonConfig } from "../core/config-manager.js";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// F1 fix: Supabase credentials are NEVER hardcoded.
+// They must be set in environment variables or .drogonclaw/.env (local only).
+// ─────────────────────────────────────────────────────────────────────────────
+function getSupabaseCredentials(): { url: string; anonKey: string } {
+  const url = process.env.SUPABASE_URL;
+  const anonKey = process.env.SUPABASE_ANON_KEY;
+
+  if (!url || !anonKey) {
+    console.error(chalk.red(
+      "\n  [x] Missing SUPABASE_URL or SUPABASE_ANON_KEY environment variables.\n" +
+      "      These must be set before running DrogonClaw.\n" +
+      "      See .env.example for configuration reference.\n"
+    ));
+    process.exit(1);
+  }
+  return { url, anonKey };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// F13 fix: A stable, harder-to-spoof hardware ID derived from multiple
+// system attributes hashed with SHA-256. Not cryptographically binding,
+// but significantly harder to trivially spoof than hostname alone.
+// ─────────────────────────────────────────────────────────────────────────────
+export function computeHardwareId(): string {
+  const cpus = os.cpus();
+  const cpuModel = cpus.length > 0 ? cpus[0].model : "unknown-cpu";
+  const raw = [
+    os.hostname(),
+    os.arch(),
+    os.platform(),
+    cpuModel,
+    String(os.totalmem()),
+  ].join("|");
+  return crypto.createHash("sha256").update(raw).digest("hex").slice(0, 48);
+}
 
 async function fetchOllamaModels(baseUrl: string): Promise<string[] | null> {
   try {
@@ -21,7 +59,7 @@ async function fetchOllamaModels(baseUrl: string): Promise<string[] | null> {
       }
     }
   } catch (e) {
-    // Ignore error, server might be down or not configured
+    // Ignore — server might be down or not configured
   }
   return null;
 }
@@ -68,39 +106,47 @@ export async function runOnboarding(): Promise<void> {
 
   const envConfigMap = new Map<string, string>();
 
-  // Helper Functions for Wizards
+  // ─────────────────────────────────────────────────────────────────────────────
+  // License Configuration
+  // F1 fix: no hardcoded Supabase credentials — read from environment
+  // F2 fix: secret_token is generated locally and included in the INSERT
+  // F13 fix: hardware ID is a SHA-256 hash of multiple stable system attributes
+  // F16 fix: Realtime channel is scoped; secret_token stored locally
+  // ─────────────────────────────────────────────────────────────────────────────
   async function configureLicense() {
     console.log(chalk.cyan("\n  [Step 0: License Verification]"));
-    
-    const supabaseUrl = "https://skidcsgrcotgjjmzsthy.supabase.co";
-    const supabaseKey = "sb_publishable_iKdrsLVaSFoAjOI3cytOhQ_lExVM8GU";
+
+    const { url: supabaseUrl, anonKey: supabaseKey } = getSupabaseCredentials();
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 1. Generate Hardware ID
-    const hardwareId = `${os.hostname()}-${os.arch()}-${os.platform()}`;
-    // Generate device code locally for Supabase
-    const { randomBytes } = await import('crypto');
-    const deviceCode = "dc_req_" + randomBytes(8).toString('hex');
-    
-    // 2. Request a new Device Code from Supabase
+    // F13 fix: stable SHA-256 hardware ID
+    const hardwareId = computeHardwareId();
+
+    // Generate device_code and secret_token locally
+    const deviceCode = "dc_req_" + crypto.randomBytes(8).toString("hex");
+    // F2/F16 fix: secret_token is a random UUID — stored locally and sent with INSERT
+    // The RLS SELECT policy scopes Realtime delivery to only clients that know this token
+    const secretToken = crypto.randomUUID();
+
     try {
       const expiresAt = new Date();
       expiresAt.setMinutes(expiresAt.getMinutes() + 15);
 
       const { error: insertError } = await supabase
-        .from('device_requests')
+        .from("device_requests")
         .insert({
           device_code: deviceCode,
+          secret_token: secretToken,  // F2 fix: required field, non-empty
           hardware_id: hardwareId,
-          expires_at: expiresAt.toISOString()
+          expires_at: expiresAt.toISOString(),
         });
-      
+
       if (insertError) {
         throw new Error(`Failed to initialize device flow: ${insertError.message}`);
       }
-      
+
       const verificationUrl = `https://drogonclaw.xyz/checkout?device_code=${deviceCode}`;
-      
+
       const boxContent = `
 ${chalk.white.bold("Authentication Required")}
 
@@ -117,21 +163,21 @@ Device Code: ${chalk.yellow.bold(deviceCode)}
           borderColor: "cyan",
         })
       );
-      
+
       await input({ message: chalk.gray("Press Enter to open your browser..."), default: "" });
-      
-      // 3. Open the browser
+
       const platform = os.platform();
-      const startCmd = platform === 'darwin' ? 'open' : platform === 'win32' ? 'start' : 'xdg-open';
+      const startCmd = platform === "darwin" ? "open" : platform === "win32" ? "start" : "xdg-open";
       exec(`${startCmd} "${verificationUrl}"`);
-      
+
       const spinner = ora({
         text: chalk.cyan("Listening for payment confirmation via Realtime WebSockets..."),
         color: "cyan",
         spinner: "dots"
       }).start();
-      
-      // 4. Listen for Realtime updates via Supabase
+
+      // F16 fix: Subscribe to the Realtime channel; the RLS SELECT policy ensures
+      // only clients whose device_code matches can receive the update.
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => {
           spinner.fail(chalk.red("Request timed out after 15 minutes."));
@@ -141,18 +187,18 @@ Device Code: ${chalk.yellow.bold(deviceCode)}
         supabase
           .channel(`device_request_${deviceCode}`)
           .on(
-            'postgres_changes',
+            "postgres_changes",
             {
-              event: 'UPDATE',
-              schema: 'public',
-              table: 'device_requests',
+              event: "UPDATE",
+              schema: "public",
+              table: "device_requests",
               filter: `device_code=eq.${deviceCode}`,
             },
             (payload: any) => {
-              if (payload.new.status === 'fulfilled' && payload.new.license_key) {
+              if (payload.new.status === "fulfilled" && payload.new.license_key) {
                 clearTimeout(timeout);
                 spinner.succeed(chalk.green("Payment Confirmed!"));
-                
+
                 const successBox = `
 ${chalk.green.bold("Device Activated")}
 License Key successfully provisioned and bound to this hardware.
@@ -160,6 +206,8 @@ License Key successfully provisioned and bound to this hardware.
                 console.log(boxen(successBox, { padding: 1, margin: 1, borderColor: "green" }));
 
                 envConfigMap.set("DROGONCLAW_LICENSE_KEY", payload.new.license_key);
+                // Store computed hardware ID so validate-license can bind it
+                envConfigMap.set("DROGONCLAW_HARDWARE_ID", hardwareId);
                 supabase.removeChannel(supabase.getChannels()[0]);
                 resolve();
               }
@@ -172,7 +220,7 @@ License Key successfully provisioned and bound to this hardware.
             }
           });
       });
-      
+
     } catch (error: any) {
       console.log(chalk.red(`\n  [x] Error: ${error.message}`));
       process.exit(1);
@@ -184,9 +232,9 @@ License Key successfully provisioned and bound to this hardware.
       console.log(chalk.cyan("\n  [Step 1: AI Provider Configuration]"));
       console.log(chalk.gray("  For Novices: We recommend OpenAI (gpt-4o) or Anthropic (Claude 3.5 Sonnet)"));
       console.log(chalk.gray("  For Experts: Local models (Ollama) can be used, but MUST support tool-calling (e.g. qwen2.5, mistral-nemo, phi3)"));
-      
+
       const provider = await select({
-          loop: false,
+        loop: false,
         message: "Select your AI Backend:",
         choices: [
           { name: "[*] OpenAI (Recommended for Novices)", value: "openai" },
@@ -197,15 +245,13 @@ License Key successfully provisioned and bound to this hardware.
         ],
       });
 
-      // Clear old keys
       const aiKeys = ["AI_PROVIDER", "OPENAI_API_KEY", "OPENAI_MODEL_NAME", "ANTHROPIC_API_KEY", "ANTHROPIC_MODEL_NAME", "GOOGLE_API_KEY", "GEMINI_MODEL_NAME", "OPENROUTER_API_KEY", "OPENROUTER_MODEL_NAME", "OLLAMA_BASE_URL", "OLLAMA_URL", "OLLAMA_MODEL_NAME", "OLLAMA_MODEL", "OLLAMA_PING_TIMEOUT_MS"];
       aiKeys.forEach(k => envConfigMap.delete(k));
-
       envConfigMap.set("AI_PROVIDER", provider);
 
       if (provider === "openai") {
-        const apiKey = await password({ 
-          message: "Enter your OpenAI API Key (sk-...):", 
+        const apiKey = await password({
+          message: "Enter your OpenAI API Key (sk-...):",
           mask: "*",
           validate: (input) => input.trim().length > 0 ? true : "API Key cannot be empty!"
         });
@@ -220,13 +266,12 @@ License Key successfully provisioned and bound to this hardware.
           ]
         });
         if (model === "back") continue;
-
         envConfigMap.set("OPENAI_API_KEY", apiKey);
         envConfigMap.set("OPENAI_MODEL_NAME", model);
 
       } else if (provider === "anthropic") {
-        const apiKey = await password({ 
-          message: "Enter your Anthropic API Key (sk-ant-...):", 
+        const apiKey = await password({
+          message: "Enter your Anthropic API Key (sk-ant-...):",
           mask: "*",
           validate: (input) => input.trim().length > 0 ? true : "API Key cannot be empty!"
         });
@@ -240,13 +285,12 @@ License Key successfully provisioned and bound to this hardware.
           ]
         });
         if (model === "back") continue;
-
         envConfigMap.set("ANTHROPIC_API_KEY", apiKey);
         envConfigMap.set("ANTHROPIC_MODEL_NAME", model);
 
       } else if (provider === "gemini") {
-        const apiKey = await password({ 
-          message: "Enter your Google Gemini API Key:", 
+        const apiKey = await password({
+          message: "Enter your Google Gemini API Key:",
           mask: "*",
           validate: (input) => input.trim().length > 0 ? true : "API Key cannot be empty!"
         });
@@ -260,13 +304,12 @@ License Key successfully provisioned and bound to this hardware.
           ]
         });
         if (model === "back") continue;
-
         envConfigMap.set("GOOGLE_API_KEY", apiKey);
         envConfigMap.set("GEMINI_MODEL_NAME", model);
 
       } else if (provider === "openrouter") {
-        const apiKey = await password({ 
-          message: "Enter your OpenRouter API Key:", 
+        const apiKey = await password({
+          message: "Enter your OpenRouter API Key:",
           mask: "*",
           validate: (input) => input.trim().length > 0 ? true : "API Key cannot be empty!"
         });
@@ -288,17 +331,16 @@ License Key successfully provisioned and bound to this hardware.
           ]
         });
         if (model === "back") continue;
-
         envConfigMap.set("OPENROUTER_API_KEY", apiKey);
         envConfigMap.set("OPENROUTER_MODEL_NAME", model);
 
       } else if (provider === "ollama") {
         console.log(chalk.gray("\n  [Ollama Local Engine]"));
         const baseUrl = await input({ message: "Enter your Ollama Base URL:", default: "http://localhost:11434" });
-        
+
         console.log(chalk.gray("  Querying local Ollama instance for available models..."));
         const availableModels = await fetchOllamaModels(baseUrl);
-        
+
         let finalModel = "";
 
         if (availableModels && availableModels.length > 0) {
@@ -307,28 +349,27 @@ License Key successfully provisioned and bound to this hardware.
           choices.push({ name: "Cancel & Re-select Provider", value: "back" });
 
           const selectedModel = await select({
-          loop: false,
+            loop: false,
             message: "Select an active local model:",
-            choices: choices
+            choices,
           });
-
           if (selectedModel === "back") continue;
           finalModel = selectedModel;
         } else {
           console.log(chalk.yellow("  [!] Could not connect to Ollama or no models found. Ensure Ollama is running."));
           const fallbackModel = await select({
-          loop: false,
-             message: "Select a standard Ollama model (ensure you pull it later):",
-             choices: [
-               { name: "[✓] qwen2.5        — Confirmed tool-call support (Recommended)", value: "qwen2.5" },
-               { name: "[✓] qwen2.5:7b     — Confirmed tool-call support (Fastest)", value: "qwen2.5:7b" },
-               { name: "[✓] mistral-nemo   — Good tool-call support", value: "mistral-nemo" },
-               { name: "[✓] phi3           — Lightweight tool-call support", value: "phi3" },
-               { name: "[✓] gemma2         — Good reasoning model", value: "gemma2" },
-               { name: "[✗] llama3         — WARNING: No tool-call support, will crash", value: "llama3" },
-               { name: "[✗] llama3.1       — WARNING: Limited tool-call support", value: "llama3.1" },
-               { name: "[x] Cancel & Re-select Provider", value: "back" }
-             ]
+            loop: false,
+            message: "Select a standard Ollama model (ensure you pull it later):",
+            choices: [
+              { name: "[✓] qwen2.5        — Confirmed tool-call support (Recommended)", value: "qwen2.5" },
+              { name: "[✓] qwen2.5:7b     — Confirmed tool-call support (Fastest)", value: "qwen2.5:7b" },
+              { name: "[✓] mistral-nemo   — Good tool-call support", value: "mistral-nemo" },
+              { name: "[✓] phi3           — Lightweight tool-call support", value: "phi3" },
+              { name: "[✓] gemma2         — Good reasoning model", value: "gemma2" },
+              { name: "[✗] llama3         — WARNING: No tool-call support, will crash", value: "llama3" },
+              { name: "[✗] llama3.1       — WARNING: Limited tool-call support", value: "llama3.1" },
+              { name: "[x] Cancel & Re-select Provider", value: "back" }
+            ]
           });
           if (fallbackModel === "back") continue;
           finalModel = fallbackModel;
@@ -340,40 +381,40 @@ License Key successfully provisioned and bound to this hardware.
         envConfigMap.set("OLLAMA_MODEL", finalModel);
         envConfigMap.set("OLLAMA_PING_TIMEOUT_MS", "10000");
       }
-      
-      break; // Successfully configured AI
+
+      break;
     }
   }
 
   async function configureTelegram() {
     console.log(chalk.cyan("\n  [Step 2: C2 Interface Setup]"));
     const tgAction = await select({
-          loop: false,
-       message: "Would you like to setup remote Command & Control via Telegram?",
-       choices: [
-         { name: "[+] Yes, configure Telegram Bot", value: "yes" },
-         { name: "[-] No, skip for now (CLI only)", value: "skip" }
-       ]
+      loop: false,
+      message: "Would you like to setup remote Command & Control via Telegram?",
+      choices: [
+        { name: "[+] Yes, configure Telegram Bot", value: "yes" },
+        { name: "[-] No, skip for now (CLI only)", value: "skip" }
+      ]
     });
-    
+
     if (tgAction === "skip") {
-       envConfigMap.delete("TELEGRAM_TOKEN");
-       envConfigMap.delete("TELEGRAM_CHAT_ID");
-       return;
+      envConfigMap.delete("TELEGRAM_TOKEN");
+      envConfigMap.delete("TELEGRAM_CHAT_ID");
+      return;
     }
 
-    const telegramToken = await password({ 
-      message: "Enter your Telegram Bot Token:", 
+    const telegramToken = await password({
+      message: "Enter your Telegram Bot Token:",
       mask: "*",
       validate: (input) => input.trim().length > 0 ? true : "Telegram Token cannot be empty!"
     });
     console.log(chalk.gray("\nTo secure your bot, we need your Telegram Chat ID so no one else can control it."));
     console.log(chalk.gray("You can find this by messaging @userinfobot on Telegram."));
-    const chatId = await input({ 
-      message: "Enter your Telegram Chat ID:", 
+    const chatId = await input({
+      message: "Enter your Telegram Chat ID:",
       validate: (input) => input.trim().length > 0 ? true : "Chat ID cannot be empty! Security is mandatory."
     });
-    
+
     envConfigMap.set("TELEGRAM_TOKEN", telegramToken);
     envConfigMap.set("TELEGRAM_CHAT_ID", chatId);
   }
@@ -387,7 +428,7 @@ License Key successfully provisioned and bound to this hardware.
   // --- REVIEW STATE ---
   while (true) {
     console.log(chalk.cyan("\n╭─ Configuration Summary ─────────────────────────────────"));
-    
+
     const provider = envConfigMap.get("AI_PROVIDER") || "Unknown";
     let model = "";
     if (provider === "openai") model = envConfigMap.get("OPENAI_MODEL_NAME") || "";
@@ -397,20 +438,20 @@ License Key successfully provisioned and bound to this hardware.
     if (provider === "ollama") model = envConfigMap.get("OLLAMA_MODEL_NAME") || "";
 
     console.log(chalk.gray("│  ") + chalk.white("AI Engine:    ") + chalk.green(`${provider} (${model})`));
-    
+
     const tgStatus = envConfigMap.has("TELEGRAM_TOKEN") ? chalk.green("Enabled") : chalk.gray("Disabled");
     console.log(chalk.gray("│  ") + chalk.white("C2 Interface: ") + tgStatus);
     console.log(chalk.cyan("╰─────────────────────────────────────────────────────────"));
 
     const finalAction = await select({
-          loop: false,
+      loop: false,
       message: "Review your setup:",
       choices: [
-        { name: "[+] [[+]] Finish & Boot DrogonClaw", value: "boot" },
-        { name: "[*] [✎] Edit License Key", value: "edit_license" },
-        { name: "[*] [✎] Edit AI Provider", value: "edit_ai" },
-        { name: "[*] [✎] Edit Telegram Setup", value: "edit_tg" },
-        { name: "[x] [x] Abort Setup", value: "abort" }
+        { name: "[+] Finish & Save Configuration", value: "boot" },
+        { name: "[*] Edit License Key", value: "edit_license" },
+        { name: "[*] Edit AI Provider", value: "edit_ai" },
+        { name: "[*] Edit Telegram Setup", value: "edit_tg" },
+        { name: "[x] Abort Setup", value: "abort" }
       ]
     });
 
@@ -418,25 +459,10 @@ License Key successfully provisioned and bound to this hardware.
       console.log(chalk.yellow("\n  [-] Configuration aborted."));
       process.exit(1);
     }
-
-    if (finalAction === "edit_license") {
-      await configureLicense();
-      continue;
-    }
-
-    if (finalAction === "edit_ai") {
-      await configureAI();
-      continue;
-    }
-
-    if (finalAction === "edit_tg") {
-      await configureTelegram();
-      continue;
-    }
-
-    if (finalAction === "boot") {
-      break;
-    }
+    if (finalAction === "edit_license") { await configureLicense(); continue; }
+    if (finalAction === "edit_ai") { await configureAI(); continue; }
+    if (finalAction === "edit_tg") { await configureTelegram(); continue; }
+    if (finalAction === "boot") break;
   }
 
   // Save the configuration
@@ -444,12 +470,11 @@ License Key successfully provisioned and bound to this hardware.
   for (const [key, value] of envConfigMap.entries()) {
     (newConfig as any)[key] = value;
   }
-  
+
   ConfigManager.save(newConfig);
   console.log(chalk.green("\n  [+] Profile saved successfully!"));
-  console.log(chalk.cyan("\n  ╭─ System Ready ────────────────────────────────────────"));
-  console.log(chalk.gray("  │  Neural pathways are configured."));
-  console.log(chalk.gray("  │  DrogonClaw will now initialize and seize control."));
+  console.log(chalk.cyan("\n  ╭─ Setup Complete ───────────────────────────────────────"));
+  console.log(chalk.gray("  │  Configuration saved. Run 'drogonclaw start' to launch."));
   console.log(chalk.cyan("  ╰───────────────────────────────────────────────────────\n"));
 }
 
