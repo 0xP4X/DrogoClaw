@@ -13,6 +13,7 @@ process.emit = function (event: string, ...args: any[]) {
 };
 import { program } from "commander";
 import chalk from "chalk";
+import boxen from "boxen";
 
 import { runOnboarding, isEnvConfigured } from "./onboarding.js";
 import ora from "ora";
@@ -46,31 +47,33 @@ const VERSION = getVersion();
 async function printBanner(): Promise<void> {
   console.clear();
   return new Promise((resolve) => {
-    const logo = [
-      "                              ",
-      "                   ⢀⣤⣤⣤       ",
-      "               ⢀⣤⣴⣾⣿⠿⣫⣶⡏      ",
-      "             ⣀⣴⣶⣶⣿⡙⡿⣮⣻⠞⠁      ",
-      "           ⣀⡺⠿⢿⡿⣿⣿⣳⢶⣏         ",
-      "       ⢀⣤⡰⣿⡟⣶⣟⡍⣵⣆⢻⡆⣎⣿⣇        ",
-      "      ⢀⢼⣷⠇⣥⡺⣿⠗⠱⢿⣯⠉ ⠙⠿⣋⣾⡆      ",
-      "      ⣼⣷⠅⢸⣿⣷⠁⢠⣿⣧⡁   ⢠⣮⣿⠄      ",
-      "      ⠸⡇ ⣬⣻⠇  ⣟⣿    ⢀⣿⠏       ",
-      "       ⠁ ⣿⣾⠃  ⣿⣷    ⠋⠁        ",
-      "         ⠘⣿   ⠹⣷              ",
-      "          ⠈⠃   ⠈              ",
-      "                              "
-    ];
-    
-    console.log("");
-    logo.forEach(line => {
-      console.log("                         " + chalk.red.bold(line));
-    });
+    const content = `
+${chalk.red.bold("                  ⢀⣤⣤⣤")}
+${chalk.red.bold("              ⢀⣤⣴⣾⣿⠿⣫⣶⡏")}
+${chalk.red.bold("            ⣀⣴⣶⣶⣿⡙⡿⣮⣻⠞⠁")}
+${chalk.red.bold("          ⣀⡺⠿⢿⡿⣿⣿⣳⢶⣏")}
+${chalk.red.bold("      ⢀⣤⡰⣿⡟⣶⣟⡍⣵⣆⢻⡆⣎⣿⣇")}
+${chalk.red.bold("     ⢀⢼⣷⠇⣥⡺⣿⠗⠱⢿⣯⠉ ⠙⠿⣋⣾⡆")}
+${chalk.red.bold("     ⣼⣷⠅⢸⣿⣷⠁⢠⣿⣧⡁   ⢠⣮⣿⠄")}
+${chalk.red.bold("     ⠸⡇ ⣬⣻⠇  ⣟⣿    ⢀⣿⠏")}
+${chalk.red.bold("      ⠁ ⣿⣾⠃  ⣿⣷    ⠋⠁")}
+${chalk.red.bold("        ⠘⣿   ⠹⣷")}
+${chalk.red.bold("         ⠈⠃   ⠈")}
 
-    console.log(chalk.red.bold("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
-    console.log(chalk.gray(`  Autonomous Offensive Security Framework`) + chalk.red(` v${VERSION}`) + chalk.gray(` | Root: `) + chalk.green(`Active`));
-    console.log(chalk.gray(`  Developed by 0xP4X | `) + chalk.blueBright(`https://drogonclaw.xyz`));
-    console.log(chalk.red.bold("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"));
+${chalk.gray("Autonomous Offensive Security Framework ")}${chalk.red(`v${VERSION}`)}
+${chalk.gray("Developed by 0xP4X | ")}${chalk.blueBright("https://drogonclaw.xyz")}
+`;
+
+    console.log(
+      boxen(content, {
+        padding: 1,
+        margin: 1,
+        borderStyle: "round",
+        borderColor: "red",
+        title: chalk.red.bold(" DROGONCLAW CLI "),
+        titleAlignment: "center",
+      })
+    );
     console.log(chalk.green("  Tip: Run `drogonclaw setup` to reconfigure models, or use /setup inside the CLI."));
     console.log("");
     resolve();
@@ -164,6 +167,31 @@ async function startInteractiveMode(): Promise<void> {
 
     if (!isEnvConfigured()) {
       await runOnboarding();
+    }
+
+    const { ConfigManager } = await import("../core/config-manager.js");
+    const licenseKey = ConfigManager.get("DROGONCLAW_LICENSE_KEY");
+    
+    const spinner = ora({ text: chalk.gray("Validating DrogonClaw License..."), color: "cyan", spinner: "dots" }).start();
+    try {
+      const res = await fetch("http://localhost:8080/api/v1/licenses/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: licenseKey, hardwareId: "cli-machine-id" }) // In a real app, use machine-id library
+      });
+      const data = await res.json() as any;
+      if (!res.ok || !data.valid) {
+        spinner.stop();
+        const errorMsg = chalk.red.bold(`ACCESS DENIED\n\n`) + chalk.gray(`${data.error || 'Invalid or revoked license key.'}\n\n`) + chalk.yellow(`Run 'drogonclaw setup' to configure a valid Enterprise License.`);
+        console.log(boxen(errorMsg, { padding: 1, margin: 1, borderColor: "red", borderStyle: "double" }));
+        process.exit(1);
+      }
+      spinner.succeed(chalk.green(` License Verified: Welcome, ${data.email}`));
+    } catch (err) {
+      spinner.stop();
+      const errorMsg = chalk.red.bold(`ACCESS DENIED\n\n`) + chalk.gray(`Could not connect to validation server. Ensure the backend is running.`);
+      console.log(boxen(errorMsg, { padding: 1, margin: 1, borderColor: "red", borderStyle: "double" }));
+      process.exit(1);
     }
 
     let orchestrator = new AgentOrchestrator();

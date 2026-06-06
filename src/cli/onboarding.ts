@@ -1,5 +1,10 @@
 import { select, input, password, confirm } from "@inquirer/prompts";
 import chalk from "chalk";
+import boxen from "boxen";
+import ora from "ora";
+import os from "os";
+import { exec } from "child_process";
+import { createClient } from "@supabase/supabase-js";
 import { ConfigManager, DrogonConfig } from "../core/config-manager.js";
 
 async function fetchOllamaModels(baseUrl: string): Promise<string[] | null> {
@@ -64,6 +69,116 @@ export async function runOnboarding(): Promise<void> {
   const envConfigMap = new Map<string, string>();
 
   // Helper Functions for Wizards
+  async function configureLicense() {
+    console.log(chalk.cyan("\n  [Step 0: License Verification]"));
+    
+    const supabaseUrl = "https://skidcsgrcotgjjmzsthy.supabase.co";
+    const supabaseKey = "sb_publishable_iKdrsLVaSFoAjOI3cytOhQ_lExVM8GU";
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // 1. Generate Hardware ID
+    const hardwareId = `${os.hostname()}-${os.arch()}-${os.platform()}`;
+    // Generate device code locally for Supabase
+    const { randomBytes } = await import('crypto');
+    const deviceCode = "dc_req_" + randomBytes(8).toString('hex');
+    
+    // 2. Request a new Device Code from Supabase
+    try {
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+
+      const { error: insertError } = await supabase
+        .from('device_requests')
+        .insert({
+          device_code: deviceCode,
+          hardware_id: hardwareId,
+          expires_at: expiresAt.toISOString()
+        });
+      
+      if (insertError) {
+        throw new Error(`Failed to initialize device flow: ${insertError.message}`);
+      }
+      
+      const verificationUrl = `https://drogonclaw.xyz/checkout?device_code=${deviceCode}`;
+      
+      const boxContent = `
+${chalk.white.bold("Authentication Required")}
+
+To activate this device, please open the following link:
+${chalk.blueBright.underline(verificationUrl)}
+
+Device Code: ${chalk.yellow.bold(deviceCode)}
+`;
+      console.log(
+        boxen(boxContent, {
+          padding: 1,
+          margin: 1,
+          borderStyle: "round",
+          borderColor: "cyan",
+        })
+      );
+      
+      await input({ message: chalk.gray("Press Enter to open your browser..."), default: "" });
+      
+      // 3. Open the browser
+      const platform = os.platform();
+      const startCmd = platform === 'darwin' ? 'open' : platform === 'win32' ? 'start' : 'xdg-open';
+      exec(`${startCmd} "${verificationUrl}"`);
+      
+      const spinner = ora({
+        text: chalk.cyan("Listening for payment confirmation via Realtime WebSockets..."),
+        color: "cyan",
+        spinner: "dots"
+      }).start();
+      
+      // 4. Listen for Realtime updates via Supabase
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          spinner.fail(chalk.red("Request timed out after 15 minutes."));
+          reject(new Error("Request timed out."));
+        }, 15 * 60 * 1000);
+
+        supabase
+          .channel(`device_request_${deviceCode}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'device_requests',
+              filter: `device_code=eq.${deviceCode}`,
+            },
+            (payload: any) => {
+              if (payload.new.status === 'fulfilled' && payload.new.license_key) {
+                clearTimeout(timeout);
+                spinner.succeed(chalk.green("Payment Confirmed!"));
+                
+                const successBox = `
+${chalk.green.bold("Device Activated")}
+License Key successfully provisioned and bound to this hardware.
+`;
+                console.log(boxen(successBox, { padding: 1, margin: 1, borderColor: "green" }));
+
+                envConfigMap.set("DROGONCLAW_LICENSE_KEY", payload.new.license_key);
+                supabase.removeChannel(supabase.getChannels()[0]);
+                resolve();
+              }
+            }
+          )
+          .subscribe((status, err) => {
+            if (err) {
+              spinner.fail(chalk.red("WebSocket connection failed."));
+              reject(err);
+            }
+          });
+      });
+      
+    } catch (error: any) {
+      console.log(chalk.red(`\n  [x] Error: ${error.message}`));
+      process.exit(1);
+    }
+  }
+
   async function configureAI() {
     while (true) {
       console.log(chalk.cyan("\n  [Step 1: AI Provider Configuration]"));
@@ -265,6 +380,7 @@ export async function runOnboarding(): Promise<void> {
 
   // --- WIZARD FLOW ---
   console.log(chalk.cyan("\n╭─ Initializing Setup Wizard ─────────────────────────────"));
+  await configureLicense();
   await configureAI();
   await configureTelegram();
 
@@ -291,6 +407,7 @@ export async function runOnboarding(): Promise<void> {
       message: "Review your setup:",
       choices: [
         { name: "[+] [[+]] Finish & Boot DrogonClaw", value: "boot" },
+        { name: "[*] [✎] Edit License Key", value: "edit_license" },
         { name: "[*] [✎] Edit AI Provider", value: "edit_ai" },
         { name: "[*] [✎] Edit Telegram Setup", value: "edit_tg" },
         { name: "[x] [x] Abort Setup", value: "abort" }
@@ -300,6 +417,11 @@ export async function runOnboarding(): Promise<void> {
     if (finalAction === "abort") {
       console.log(chalk.yellow("\n  [-] Configuration aborted."));
       process.exit(1);
+    }
+
+    if (finalAction === "edit_license") {
+      await configureLicense();
+      continue;
     }
 
     if (finalAction === "edit_ai") {
@@ -333,10 +455,13 @@ export async function runOnboarding(): Promise<void> {
 
 export function isEnvConfigured(): boolean {
   return (
-    !!ConfigManager.get("OPENAI_API_KEY") ||
-    !!ConfigManager.get("ANTHROPIC_API_KEY") ||
-    !!ConfigManager.get("GOOGLE_API_KEY") ||
-    !!ConfigManager.get("OPENROUTER_API_KEY") ||
-    !!ConfigManager.get("OLLAMA_BASE_URL") || !!ConfigManager.get("OLLAMA_MODEL_NAME") || !!ConfigManager.get("OLLAMA_MODEL")
+    !!ConfigManager.get("DROGONCLAW_LICENSE_KEY") &&
+    (
+      !!ConfigManager.get("OPENAI_API_KEY") ||
+      !!ConfigManager.get("ANTHROPIC_API_KEY") ||
+      !!ConfigManager.get("GOOGLE_API_KEY") ||
+      !!ConfigManager.get("OPENROUTER_API_KEY") ||
+      !!ConfigManager.get("OLLAMA_BASE_URL") || !!ConfigManager.get("OLLAMA_MODEL_NAME") || !!ConfigManager.get("OLLAMA_MODEL")
+    )
   );
 }

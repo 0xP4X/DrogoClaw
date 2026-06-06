@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 
 export interface DrogonConfig {
+  DROGONCLAW_LICENSE_KEY?: string;
   AI_PROVIDER?: string;
   OPENAI_API_KEY?: string;
   OPENAI_MODEL_NAME?: string;

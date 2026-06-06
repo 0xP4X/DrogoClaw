@@ -1,28 +1,36 @@
 import { ChatOpenAI } from "@langchain/openai";
-import { HumanMessage } from "@langchain/core/messages";
 
-async function test() {
-  console.log("Starting ping...");
-  const llm = new ChatOpenAI({
-    modelName: "llama3:latest",
+async function testOpenRouter() {
+  const model = new ChatOpenAI({
+    modelName: "fake/model",
     temperature: 0,
     configuration: {
-      baseURL: "http://127.0.0.1:11434/v1",
+      baseURL: "https://openrouter.ai/api/v1",
     },
-    openAIApiKey: "ollama",
-    maxRetries: 0,
+    openAIApiKey: "sk-or-v1-fake-key",
   });
 
   try {
-    const start = Date.now();
-    const res = await llm.invoke([new HumanMessage("ping")]);
-    console.log("Response:", res.content);
-    console.log("Time taken:", Date.now() - start, "ms");
-  } catch (err: any) {
-    console.error("Error Name:", err.name);
-    console.error("Error Message:", err.message);
-    if (err.cause) console.error("Error Cause:", err.cause);
+    await model.invoke("Hello");
+  } catch (e: any) {
+    console.log("OpenRouter error:", e.message);
   }
 }
 
-test();
+testOpenRouter();
+
+async function testAnthropic() {
+  const model = new ChatAnthropic({
+    modelName: "claude-sonnet-4-6-20260218",
+    temperature: 0,
+    anthropicApiKey: "sk-ant-fake-key",
+  });
+
+  try {
+    await model.invoke("Hello");
+  } catch (e: any) {
+    console.log("Anthropic error:", e.message);
+  }
+}
+
+testOpenRouter().then(testAnthropic);
