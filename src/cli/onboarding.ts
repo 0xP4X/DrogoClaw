@@ -64,15 +64,18 @@ async function fetchOllamaModels(baseUrl: string): Promise<string[] | null> {
 export async function runOnboarding(): Promise<void> {
   console.log(chalk.red("[*] DrogonClaw — I speak fluent bash, mild sarcasm, and aggressive tab-completion energy.\n"));
   
-  console.log(chalk.red("▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄"));
-  console.log(chalk.red("██████╗ ██████╗  ██████╗  ██████╗  ██████╗ ███╗   ██╗ ██████╗██╗      █████╗ ██╗    ██╗"));
-  console.log(chalk.red("██╔══██╗██╔══██╗██╔═══██╗██╔════╝ ██╔═══██╗████╗  ██║██╔════╝██║     ██╔══██╗██║    ██║"));
-  console.log(chalk.red("██║  ██║██████╔╝██║   ██║██║  ███╗██║   ██║██╔██╗ ██║██║     ██║     ███████║██║ █╗ ██║"));
-  console.log(chalk.red("██║  ██║██╔══██╗██║   ██║██║   ██║██║   ██║██║╚██╗██║██║     ██║     ██╔══██║██║███╗██║"));
-  console.log(chalk.red("██████╔╝██║  ██║╚██████╔╝╚██████╔╝╚██████╔╝██║ ╚████║╚██████╗███████╗██║  ██║╚███╔███╔╝"));
-  console.log(chalk.red("╚═════╝ ╚═╝  ╚═╝ ╚═════╝  ╚═════╝  ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝ "));
-  console.log(chalk.red("▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀"));
-  console.log(chalk.red("                                  [*] DROGONCLAW [*]\n"));
+  console.log(chalk.red.bold("                  ⢀⣤⣤⣤"));
+  console.log(chalk.red.bold("              ⢀⣤⣴⣾⣿⠿⣫⣶⡏"));
+  console.log(chalk.red.bold("            ⣀⣴⣶⣶⣿⡙⡿⣮⣻⠞⠁"));
+  console.log(chalk.red.bold("          ⣀⡺⠿⢿⡿⣿⣿⣳⢶⣏"));
+  console.log(chalk.red.bold("      ⢀⣤⡰⣿⡟⣶⣟⡍⣵⣆⢻⡆⣎⣿⣇"));
+  console.log(chalk.red.bold("     ⢀⢼⣷⠇⣥⡺⣿⠗⠱⢿⣯⠉ ⠙⠿⣋⣾⡆"));
+  console.log(chalk.red.bold("     ⣼⣷⠅⢸⣿⣷⠁⢠⣿⣧⡁   ⢠⣮⣿⠄"));
+  console.log(chalk.red.bold("     ⠸⡇ ⣬⣻⠇  ⣟⣿    ⢀⣿⠏"));
+  console.log(chalk.red.bold("      ⠁ ⣿⣾⠃  ⣿⣷    ⠋⠁"));
+  console.log(chalk.red.bold("        ⠘⣿   ⠹⣷"));
+  console.log(chalk.red.bold("         ⠈⠃   ⠈"));
+  console.log(chalk.gray("\n                                  [*] DROGONCLAW [*]\n"));
 
   console.log(chalk.cyan("┌  DrogonClaw setup"));
   console.log(chalk.cyan("│"));
