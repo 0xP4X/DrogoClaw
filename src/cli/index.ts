@@ -15,6 +15,10 @@ process.emit = function (event: string, ...args: any[]) {
 import { program } from "commander";
 import chalk from "chalk";
 import boxen from "boxen";
+import dns from "node:dns";
+
+// Fix for WSL IPv6 blackhole causing "TypeError: fetch failed"
+dns.setDefaultResultOrder("ipv4first");
 
 import { runOnboarding, isEnvConfigured, computeHardwareId } from "./onboarding.js";
 import ora from "ora";

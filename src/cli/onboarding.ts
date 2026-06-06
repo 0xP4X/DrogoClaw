@@ -3,8 +3,12 @@ import chalk from "chalk";
 import boxen from "boxen";
 import ora from "ora";
 import os from "os";
+import dns from "node:dns";
 import crypto from "crypto";
 import { exec } from "child_process";
+
+// Fix for WSL IPv6 blackhole causing "TypeError: fetch failed"
+dns.setDefaultResultOrder("ipv4first");
 import { createClient } from "@supabase/supabase-js";
 import { ConfigManager, DrogonConfig } from "../core/config-manager.js";
 
