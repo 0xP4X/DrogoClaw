@@ -62,6 +62,19 @@ async function fetchOllamaModels(baseUrl: string): Promise<string[] | null> {
 }
 
 export async function runOnboarding(): Promise<void> {
+  try {
+    await _runOnboarding();
+  } catch (error: any) {
+    if (error.name === "ExitPromptError") {
+      console.log(chalk.red("\n  [!] Setup cancelled. Stay dangerous.\n"));
+      process.exit(0);
+    }
+    console.log(chalk.red(`\n  [x] Error: ${error.message}`));
+    process.exit(1);
+  }
+}
+
+async function _runOnboarding(): Promise<void> {
   console.log(chalk.red("[*] DrogonClaw — I speak fluent bash, mild sarcasm, and aggressive tab-completion energy.\n"));
   
   console.log(chalk.red.bold("                  ⢀⣤⣤⣤"));
