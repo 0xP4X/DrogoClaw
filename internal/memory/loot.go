@@ -1,0 +1,164 @@
+package memory
+
+import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"database/sql"
+	"encoding/base64"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+
+	_ "github.com/mattn/go-sqlite3"
+)
+
+// LootDB manages the structured storage of discovered assets and encrypted credentials.
+type LootDB struct {
+	mu  sync.Mutex
+	db  *sql.DB
+	key []byte // AES-256 encryption key
+}
+
+// NewLootDB creates or opens the SQLite database and initializes encryption.
+func NewLootDB() (*LootDB, error) {
+	dataDir := filepath.Join("data")
+	_ = os.MkdirAll(dataDir, 0755)
+
+	dbPath := filepath.Join(dataDir, "drogonclaw_loot.db")
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open loot db: %w", err)
+	}
+
+	key, err := loadOrGenerateKey(dataDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize encryption key: %w", err)
+	}
+
+	loot := &LootDB{db: db, key: key}
+	if err := loot.initSchema(); err != nil {
+		return nil, err
+	}
+
+	return loot, nil
+}
+
+func loadOrGenerateKey(dataDir string) ([]byte, error) {
+	keyPath := filepath.Join(dataDir, ".loot_key")
+	if _, err := os.Stat(keyPath); os.IsNotExist(err) {
+		key := make([]byte, 32) // AES-256
+		if _, err := io.ReadFull(rand.Reader, key); err != nil {
+			return nil, err
+		}
+		// Secure permissions: owner read/write only
+		if err := os.WriteFile(keyPath, key, 0600); err != nil {
+			return nil, err
+		}
+		return key, nil
+	}
+	return os.ReadFile(keyPath)
+}
+
+func encryptData(key []byte, plaintext string) (string, error) {
+	if plaintext == "" {
+		return "", nil
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", err
+	}
+	ciphertext := gcm.Seal(nonce, nonce, []byte(plaintext), nil)
+	return base64.StdEncoding.EncodeToString(ciphertext), nil
+}
+
+func (l *LootDB) initSchema() error {
+	queries := []string{
+		`CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);`,
+		`CREATE TABLE IF NOT EXISTS ports (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			ip TEXT NOT NULL,
+			port INTEGER NOT NULL,
+			service TEXT,
+			version TEXT,
+			discovered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(ip, port)
+		);`,
+		`CREATE TABLE IF NOT EXISTS credentials (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			target TEXT NOT NULL,
+			username TEXT,
+			password_enc TEXT,
+			hash_enc TEXT,
+			discovered_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);`,
+		`CREATE TABLE IF NOT EXISTS vulnerabilities (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			target TEXT NOT NULL,
+			cve TEXT,
+			description TEXT,
+			severity TEXT,
+			discovered_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);`,
+	}
+
+	for _, query := range queries {
+		if _, err := l.db.Exec(query); err != nil {
+			return fmt.Errorf("schema init failed: %w", err)
+		}
+	}
+	return nil
+}
+
+// InsertPort adds a discovered port to the loot database.
+func (l *LootDB) InsertPort(ip string, port int, service, version string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	_, err := l.db.Exec(`INSERT OR IGNORE INTO ports (ip, port, service, version, discovered_at) VALUES (?, ?, ?, ?, ?)`, ip, port, service, version, time.Now())
+	return err
+}
+
+// InsertCredential adds a discovered password or hash to the loot database.
+// The password and hash are AES-GCM encrypted before storage.
+func (l *LootDB) InsertCredential(target, username, password, hash string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	encPassword, err := encryptData(l.key, password)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt password: %w", err)
+	}
+
+	encHash, err := encryptData(l.key, hash)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt hash: %w", err)
+	}
+
+	_, err = l.db.Exec(`INSERT INTO credentials (target, username, password_enc, hash_enc, discovered_at) VALUES (?, ?, ?, ?, ?)`, 
+		target, username, encPassword, encHash, time.Now())
+	return err
+}
+
+// InsertVulnerability adds a CVE or vulnerability to the loot database.
+func (l *LootDB) InsertVulnerability(target, cve, description, severity string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	_, err := l.db.Exec(`INSERT INTO vulnerabilities (target, cve, description, severity, discovered_at) VALUES (?, ?, ?, ?, ?)`, target, cve, description, severity, time.Now())
+	return err
+}
+
+// Close gracefully closes the database.
+func (l *LootDB) Close() error {
+	return l.db.Close()
+}

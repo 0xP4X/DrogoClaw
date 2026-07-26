@@ -1,0 +1,11 @@
+# Ignore everything
+*
+
+# Allow only these
+!dist/**
+!package.json
+!README.md
+!LICENSE
+
+# But ignore test files in dist if they exist
+dist/**/*.test.*

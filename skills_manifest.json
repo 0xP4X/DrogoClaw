@@ -1,0 +1,1169 @@
+[
+  {
+    "name": "autonomous_ad_exploiter",
+    "description": "An autonomous Active Directory lateral movement and exploitation engine.",
+    "parameters": {
+      "targetDcIp": {
+        "type": "string",
+        "description": "The IP address of the Target Domain Controller",
+        "required": true
+      },
+      "domain": {
+        "type": "string",
+        "description": "The FQDN of the Active Directory domain (e.g., corp.local)",
+        "required": true
+      },
+      "username": {
+        "type": "string",
+        "description": "The compromised username (if any)",
+        "required": true
+      },
+      "password": {
+        "type": "string",
+        "description": "The compromised password or NTLM hash (if any)",
+        "required": true
+      },
+      "hashAuth": {
+        "type": "boolean",
+        "description": "The hashAuth parameter",
+        "required": true
+      },
+      "attackType": {
+        "type": "string",
+        "description": "The specific lateral movement/exploitation technique to execute",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "dynamic_payload_compiler",
+    "description": "Autonomously compiles heavily obfuscated, EDR/AV-evasive malware droppers.",
+    "parameters": {
+      "shellcodePath": {
+        "type": "string",
+        "description": "Path to the raw binary shellcode (e.g. msfvenom output) in the sandbox workspace",
+        "required": true
+      },
+      "language": {
+        "type": "string",
+        "description": "The programming language for the memory loader",
+        "required": true
+      },
+      "architecture": {
+        "type": "string",
+        "description": "Target architecture",
+        "required": true
+      },
+      "outputName": {
+        "type": "string",
+        "description": "The outputName parameter",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "swarm_pivot_orchestrator",
+    "description": "Autonomously establishes a deep lateral network pivot.",
+    "parameters": {
+      "compromisedIp": {
+        "type": "string",
+        "description": "The IP of the machine we already compromised",
+        "required": true
+      },
+      "internalSubnet": {
+        "type": "string",
+        "description": "The internalSubnet parameter",
+        "required": true
+      },
+      "pivotTool": {
+        "type": "string",
+        "description": "The tunneling protocol to use",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "advanced_web_exploiter",
+    "description": "Advanced web attack engine handling SSTI (Server-Side Template Injection) via tplmap and JWT forging via PyJWT. Choose the attack mode and provide necessary parameters.",
+    "parameters": {
+      "command": {
+        "type": "string",
+        "description": "The shell command or arguments to execute",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "binwalk",
+    "description": "Tool for searching a given binary image for embedded files and executable code inside the sandbox.",
+    "parameters": {
+      "file": {
+        "type": "string",
+        "description": "The file inside /workspace to analyze",
+        "required": true
+      },
+      "extract": {
+        "type": "boolean",
+        "description": "Whether to extract discovered files",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "headless_browser_automation",
+    "description": "Controls a headless Chromium browser to interact with Web UIs visually.",
+    "parameters": {
+      "url": {
+        "type": "string",
+        "description": "The target URL to navigate to",
+        "required": true
+      },
+      "action": {
+        "type": "string",
+        "description": "The action to perform on the page",
+        "required": true
+      },
+      "username": {
+        "type": "string",
+        "description": "The username parameter",
+        "required": true
+      },
+      "password": {
+        "type": "string",
+        "description": "The password parameter",
+        "required": true
+      },
+      "userSelector": {
+        "type": "string",
+        "description": "CSS selector for username field. Leave empty if none.",
+        "required": true
+      },
+      "passSelector": {
+        "type": "string",
+        "description": "CSS selector for password field. Leave empty if none.",
+        "required": true
+      },
+      "submitSelector": {
+        "type": "string",
+        "description": "CSS selector for submit button. Leave empty if none.",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "brute_force",
+    "description": "Peform network service brute-forcing using Hydra. Supports SSH, FTP, HTTP, SMB, etc.",
+    "parameters": {
+      "target": {
+        "type": "string",
+        "description": "The target IP or hostname",
+        "required": true
+      },
+      "service": {
+        "type": "string",
+        "description": "The service parameter",
+        "required": true
+      },
+      "username": {
+        "type": "string",
+        "description": "A single username to test",
+        "required": true
+      },
+      "userlist": {
+        "type": "string",
+        "description": "Path to a file containing usernames",
+        "required": true
+      },
+      "password": {
+        "type": "string",
+        "description": "A single password to test",
+        "required": true
+      },
+      "passlist": {
+        "type": "string",
+        "description": "The passlist parameter",
+        "required": true
+      },
+      "threads": {
+        "type": "integer",
+        "description": "Number of parallel threads",
+        "required": true
+      },
+      "additional_args": {
+        "type": "string",
+        "description": "Additional Hydra arguments",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "c2_listener_orchestrator",
+    "description": "Command & Control (C2) Orchestration Engine. Use this to spawn background listeners (e.g., Netcat) to catch reverse shells after firing an exploit.",
+    "parameters": {
+      "action": {
+        "type": "string",
+        "description": "Action to perform: start a new listener, stop an existing one, or check status",
+        "required": true
+      },
+      "port": {
+        "type": "integer",
+        "description": "The local port to listen on or check",
+        "required": true
+      },
+      "protocol": {
+        "type": "string",
+        "description": "Protocol for the listener (tcp or udp)",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "cloud_enum_tool",
+    "description": "Execute ScoutSuite inside the sandbox to perform automated multi-cloud architecture and IAM enumeration. Requires valid cloud credentials mapped into the sandbox.",
+    "parameters": {
+      "provider": {
+        "type": "string",
+        "description": "The cloud provider to scan",
+        "required": true
+      },
+      "profile": {
+        "type": "string",
+        "description": "The profile parameter",
+        "required": true
+      },
+      "reportPath": {
+        "type": "string",
+        "description": "The absolute path within /workspace to output the ScoutSuite report",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "crypto_math_engine",
+    "description": "A flexible execution engine that runs custom Python 3 cryptography scripts. Utilizes pycryptodome, sympy, and z3-solver natively inside the sandbox. Write your custom logic to solve RSA factorizations, AES cracking, or lattice calculations.",
+    "parameters": {
+      "pythonScript": {
+        "type": "string",
+        "description": "The pythonScript parameter",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "smart_data_exfiltration",
+    "description": "An autonomous data hunter and exfiltration engine. Searches for high-value targets (SSH keys, AWS credentials, env files)",
+    "parameters": {
+      "searchTarget": {
+        "type": "string",
+        "description": "The searchTarget parameter",
+        "required": true
+      },
+      "channel": {
+        "type": "string",
+        "description": "The covert channel to use for exfiltration",
+        "required": true
+      },
+      "startListener": {
+        "type": "boolean",
+        "description": "If true, starts a Python listener in the background to catch the data and prove the exploit works",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "deep_web_enum",
+    "description": "An advanced composite macro skill for deep web enumeration.",
+    "parameters": {
+      "url": {
+        "type": "string",
+        "description": "The target URL (e.g. http://10.10.10.5)",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "exploit_search",
+    "description": "Search the local Exploit-Database (searchsploit) for known exploits based on service names, versions, or CVEs in the Kali Sandbox.",
+    "parameters": {
+      "query": {
+        "type": "string",
+        "description": "The query parameter",
+        "required": true
+      },
+      "examine_exploit_id": {
+        "type": "string",
+        "description": "If provided, will show the full content of the exploit with this ID (path)",
+        "required": false
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "autonomous_exploit_writer",
+    "description": "Autonomous Exploit Generation Engine. Generates payloads via MSFVenom and weaponizes custom exploit templates directly in the sandbox.",
+    "parameters": {
+      "filename": {
+        "type": "string",
+        "description": "The filename parameter",
+        "required": true
+      },
+      "language": {
+        "type": "string",
+        "description": "The programming language for the exploit",
+        "required": true
+      },
+      "exploitCodeTemplate": {
+        "type": "string",
+        "description": "The exploitCodeTemplate parameter",
+        "required": true
+      },
+      "payload": {
+        "type": "string",
+        "description": "The payload parameter",
+        "required": true
+      },
+      "lhost": {
+        "type": "string",
+        "description": "LHOST",
+        "required": true
+      },
+      "lport": {
+        "type": "string",
+        "description": "LPORT",
+        "required": true
+      },
+      "format": {
+        "type": "string",
+        "description": "Output format",
+        "required": true
+      },
+      "badChars": {
+        "type": "string",
+        "description": "The badChars parameter",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "read_file",
+    "description": "Read the contents of a file from the local filesystem.",
+    "parameters": {
+      "file_path": {
+        "type": "string",
+        "description": "Absolute or relative path to the file to read",
+        "required": true
+      },
+      "max_lines": {
+        "type": "integer",
+        "description": "Maximum number of lines to read.",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "volatility",
+    "description": "Advanced memory forensics framework inside the Kali Sandbox.",
+    "parameters": {
+      "file": {
+        "type": "string",
+        "description": "Path to the memory dump image inside /workspace",
+        "required": true
+      },
+      "plugin": {
+        "type": "string",
+        "description": "The plugin parameter",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "gobuster_scan",
+    "description": "Execute Gobuster inside the Kali sandbox to find hidden directories, DNS subdomains, or vhosts.",
+    "parameters": {
+      "url": {
+        "type": "string",
+        "description": "The target URL or domain",
+        "required": true
+      },
+      "mode": {
+        "type": "string",
+        "description": "Scan mode",
+        "required": true
+      },
+      "wordlist": {
+        "type": "string",
+        "description": "Path to wordlist (e.g., /usr/share/wordlists/dirb/common.txt)",
+        "required": true
+      },
+      "additional_args": {
+        "type": "string",
+        "description": "Additional arguments",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "ducky_script_compiler",
+    "description": "Generates Hak5 Rubber Ducky scripts for physical hardware attacks.",
+    "parameters": {
+      "os": {
+        "type": "string",
+        "description": "The target operating system",
+        "required": true
+      },
+      "objective": {
+        "type": "string",
+        "description": "The objective parameter",
+        "required": true
+      },
+      "payloadUrl": {
+        "type": "string",
+        "description": "URL to download a secondary payload from. Leave empty string if none.",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "nmap",
+    "description": "Run a REAL system diagnostic. Checks which security tools are installed, verifies the AI provider connection, and reports actual system readiness. Use when the operator asks for health, status, or diagnostics.",
+    "parameters": {
+      "command": {
+        "type": "string",
+        "description": "The shell command or arguments to execute",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "heuristic_analysis",
+    "description": "Perform heuristic analysis on a binary file or source code artifact.",
+    "parameters": {
+      "filePath": {
+        "type": "string",
+        "description": "The absolute path to the binary in the /workspace sandbox directory",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "http_request",
+    "description": "Make a full HTTP request with complete control over method, headers, body, and cookies.",
+    "parameters": {
+      "command": {
+        "type": "string",
+        "description": "The shell command or arguments to execute",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "ask_human_approval",
+    "description": "Pauses your autonomous execution and sends a question to the human operator (via Telegram or CLI).",
+    "parameters": {
+      "question": {
+        "type": "string",
+        "description": "The question or approval request to send to the operator",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "generate_implant",
+    "description": "Generates a stealthy, standalone Go-based reverse shell implant for post-exploitation with anti-analysis features.",
+    "parameters": {
+      "lhost": {
+        "type": "string",
+        "description": "The listener IP address (your C2 IP)",
+        "required": true
+      },
+      "lport": {
+        "type": "string",
+        "description": "The listener port",
+        "required": true
+      },
+      "os": {
+        "type": "string",
+        "description": "Target operating system",
+        "required": true
+      },
+      "arch": {
+        "type": "string",
+        "description": "Target architecture",
+        "required": true
+      },
+      "obfuscation_level": {
+        "type": "string",
+        "description": "Level of anti-analysis and obfuscation to apply",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "deserialization_payload_generator",
+    "description": "Autonomously downloads and executes ysoserial inside the sandbox to generate weaponized Java deserialization payloads. Specify the gadget chain and the command to execute.",
+    "parameters": {
+      "gadgetChain": {
+        "type": "string",
+        "description": "The gadgetChain parameter",
+        "required": true
+      },
+      "commandToExecute": {
+        "type": "string",
+        "description": "The shell command the gadget should execute upon deserialization",
+        "required": true
+      },
+      "encoding": {
+        "type": "string",
+        "description": "How the serialized payload should be encoded in the output",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "store_loot",
+    "description": "Store mass reconnaissance data (ports, credentials, vulnerabilities) into the SQLite Loot DB instead of keeping it in your context window.",
+    "parameters": {
+      "type": {
+        "type": "string",
+        "description": "The type parameter",
+        "required": true
+      },
+      "target": {
+        "type": "string",
+        "description": "The IP address or domain name",
+        "required": true
+      },
+      "port": {
+        "type": "integer",
+        "description": "The port parameter",
+        "required": true
+      },
+      "service": {
+        "type": "string",
+        "description": "The service parameter",
+        "required": true
+      },
+      "version": {
+        "type": "string",
+        "description": "The version parameter",
+        "required": true
+      },
+      "username": {
+        "type": "string",
+        "description": "The username parameter",
+        "required": true
+      },
+      "password": {
+        "type": "string",
+        "description": "The password parameter",
+        "required": true
+      },
+      "hash": {
+        "type": "string",
+        "description": "The hash parameter",
+        "required": true
+      },
+      "cve": {
+        "type": "string",
+        "description": "The cve parameter",
+        "required": true
+      },
+      "description": {
+        "type": "string",
+        "description": "The description parameter",
+        "required": true
+      },
+      "severity": {
+        "type": "string",
+        "description": "The severity parameter",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "memory_read",
+    "description": "Read the current state of the Intelligence Graph. Use this to remember discovered assets, open ports, and confirmed vulnerabilities from previous steps.",
+    "parameters": {
+      "assetId": {
+        "type": "string",
+        "description": "The assetId parameter",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "metasploit_execute",
+    "description": "Execute Metasploit commands or modules inside the Kali sandbox. Useful for exploitation, post-exploitation, and payload generation.",
+    "parameters": {
+      "module": {
+        "type": "string",
+        "description": "The module parameter",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "apk_static_analyzer",
+    "description": "Perform static analysis on an Android APK file located in the sandbox /workspace. Decompiles the APK using apktool and extracts hardcoded secrets and manifest configurations.",
+    "parameters": {
+      "apkPath": {
+        "type": "string",
+        "description": "The absolute path to the APK file within /workspace",
+        "required": true
+      },
+      "outputDir": {
+        "type": "string",
+        "description": "The absolute path within /workspace to extract the decompiled source",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "update_neural_memory",
+    "description": "Allows you to permanently commit facts about your operator (name, skill level, preferences) into your neural graph.",
+    "parameters": {
+      "name": {
+        "type": "string",
+        "description": "The name parameter",
+        "required": true
+      },
+      "skillLevel": {
+        "type": "string",
+        "description": "The skillLevel parameter",
+        "required": true
+      },
+      "preferences": {
+        "type": "string",
+        "description": "Any specific rules or preferences the operator has requested. Provide empty string if none.",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "nmap_scan",
+    "description": "Execute an Nmap scan against a target. Useful for network reconnaissance, finding open ports, and identifying services.",
+    "parameters": {
+      "target": {
+        "type": "string",
+        "description": "The IP address or hostname to scan",
+        "required": true
+      },
+      "scan_type": {
+        "type": "string",
+        "description": "Scan type (e.g., -sV for version detection, -sC for scripts)",
+        "required": true
+      },
+      "ports": {
+        "type": "string",
+        "description": "Comma-separated list of ports or port ranges",
+        "required": true
+      },
+      "additional_args": {
+        "type": "string",
+        "description": "Additional Nmap arguments",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "nuclei_scan",
+    "description": "Execute Nuclei vulnerability scanner inside the Kali sandbox to find CVEs and misconfigurations.",
+    "parameters": {
+      "target": {
+        "type": "string",
+        "description": "The target URL or IP",
+        "required": true
+      },
+      "severity": {
+        "type": "string",
+        "description": "Severity filter (critical,high,medium,low,info)",
+        "required": true
+      },
+      "tags": {
+        "type": "string",
+        "description": "Tags filter (e.g., cve,rce,lfi)",
+        "required": true
+      },
+      "additional_args": {
+        "type": "string",
+        "description": "Additional Nuclei arguments",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "intelligent_smart_scan",
+    "description": "A reconnaissance planner that verifies target reachability via ping and generates a prioritized strategy for which scanning tools to run next. It does NOT execute the scans itself — use the recommended tools (nmap, nuclei, gobuster, etc.) to execute the plan.",
+    "parameters": {
+      "target": {
+        "type": "string",
+        "description": "The target domain or IP range",
+        "required": true
+      },
+      "depth": {
+        "type": "string",
+        "description": "The thoroughness of the scan",
+        "required": true
+      },
+      "stealth": {
+        "type": "boolean",
+        "description": "Whether to use stealthy techniques to avoid detection",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "osint_recon_workflow",
+    "description": "Open-Source Intelligence (OSINT) and Reconnaissance engine. Use this to perform reconnaissance on a target domain, organization, or IP.",
+    "parameters": {
+      "target": {
+        "type": "string",
+        "description": "The target parameter",
+        "required": true
+      },
+      "methods": {
+        "type": "string",
+        "description": "The methods parameter",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "the_harvester",
+    "description": "Gather emails, subdomains, hosts, employee names, open ports and banners from different public sources like search engines, PGP key servers and SHODAN database.",
+    "parameters": {
+      "domain": {
+        "type": "string",
+        "description": "The domain to search for",
+        "required": true
+      },
+      "source": {
+        "type": "string",
+        "description": "The source parameter",
+        "required": true
+      },
+      "limit": {
+        "type": "integer",
+        "description": "Limit the number of results",
+        "required": true
+      },
+      "additional_args": {
+        "type": "string",
+        "description": "Additional args for theHarvester",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "setup_pivot",
+    "description": "Setup a network pivot using Chisel or SSH tunneling. Allows the agent to reach internal network segments.",
+    "parameters": {
+      "type": {
+        "type": "string",
+        "description": "Type of pivot/tunnel to setup",
+        "required": true
+      },
+      "local_port": {
+        "type": "integer",
+        "description": "Local port to bind to",
+        "required": true
+      },
+      "remote_address": {
+        "type": "string",
+        "description": "Remote address (for client/ssh)",
+        "required": true
+      },
+      "remote_port": {
+        "type": "integer",
+        "description": "Remote port (for client/ssh)",
+        "required": true
+      },
+      "additional_args": {
+        "type": "string",
+        "description": "Additional arguments for the tool",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "privilege_escalation_audit",
+    "description": "Run scripts and tools to identify privilege escalation paths on a compromised system (Linux/Windows).",
+    "parameters": {
+      "os": {
+        "type": "string",
+        "description": "The operating system of the target",
+        "required": true
+      },
+      "local_path": {
+        "type": "string",
+        "description": "The local_path parameter",
+        "required": true
+      },
+      "auto_download": {
+        "type": "boolean",
+        "description": "Whether to automatically download and run standard audit scripts (linpeas.sh / winPEAS.exe)",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "dynamic_pwntools_engine",
+    "description": "A flexible execution engine that runs custom Python 3 binary exploitation scripts leveraging the",
+    "parameters": {
+      "pythonScript": {
+        "type": "string",
+        "description": "The pythonScript parameter",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "python_execute",
+    "description": "Write and execute a Python3 script inside the isolated Kali sandbox.",
+    "parameters": {
+      "script": {
+        "type": "string",
+        "description": "The Python3 script content to execute",
+        "required": true
+      },
+      "args": {
+        "type": "string",
+        "description": "Command-line arguments to pass to the script",
+        "required": true
+      },
+      "timeout_seconds": {
+        "type": "integer",
+        "description": "Timeout in seconds. Default 60s.",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "async_race_condition_engine",
+    "description": "A high-performance Python asyncio engine to exploit TOCTOU (Time-Of-Check to Time-Of-Use) and race conditions. Blasts an endpoint with dozens of concurrent requests in the exact same millisecond.",
+    "parameters": {
+      "command": {
+        "type": "string",
+        "description": "The shell command or arguments to execute",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "automated_r2_analysis",
+    "description": "Execute an automated Python-based Radare2 (r2pipe) analysis script against a target binary. This extracts functions, strings, and performs a basic disassembly of the main entrypoint.",
+    "parameters": {
+      "binaryPath": {
+        "type": "string",
+        "description": "The absolute path to the target binary within /workspace",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "dynamic_skill_synthesizer",
+    "description": "Autonomous Self-Modification Engine. Allows you to write and compile new TypeScript capabilities dynamically into your own core structure.",
+    "parameters": {
+      "filename": {
+        "type": "string",
+        "description": "The filename parameter",
+        "required": true
+      },
+      "toolName": {
+        "type": "string",
+        "description": "The toolName parameter",
+        "required": true
+      },
+      "code": {
+        "type": "string",
+        "description": "The complete TypeScript code for the tool using @langchain/core/tools DynamicStructuredTool",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "shell_execute",
+    "description": "DIRECT ACCESS TO THE KALI LINUX TERMINAL. Use this for ANY manual command a human hacker would run.",
+    "parameters": {
+      "command": {
+        "type": "string",
+        "description": "The command parameter",
+        "required": true
+      },
+      "timeout_seconds": {
+        "type": "integer",
+        "description": "Timeout in seconds. Use higher values (e.g. 300) for slow scans.",
+        "required": true
+      },
+      "cleanupCommand": {
+        "type": "string",
+        "description": "The cleanupCommand parameter",
+        "required": true
+      },
+      "cleanupDescription": {
+        "type": "string",
+        "description": "A brief description of what the cleanup command does.",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "spear_phishing_generator",
+    "description": "Generates highly convincing, targeted spear-phishing email templates based on provided OSINT data about the target.",
+    "parameters": {
+      "targetName": {
+        "type": "string",
+        "description": "The name of the target individual",
+        "required": true
+      },
+      "targetRole": {
+        "type": "string",
+        "description": "The targetRole parameter",
+        "required": true
+      },
+      "osintContext": {
+        "type": "string",
+        "description": "Background information (e.g., recent tweets, company news, hobbies) to make the email convincing",
+        "required": true
+      },
+      "pretext": {
+        "type": "string",
+        "description": "The pretext parameter",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "sqlmap_scan",
+    "description": "Execute SQLMap inside the Kali sandbox to detect and exploit SQL injection vulnerabilities.",
+    "parameters": {
+      "url": {
+        "type": "string",
+        "description": "The target URL",
+        "required": true
+      },
+      "data": {
+        "type": "string",
+        "description": "The data parameter",
+        "required": true
+      },
+      "cookie": {
+        "type": "string",
+        "description": "HTTP Cookie",
+        "required": true
+      },
+      "risk": {
+        "type": "integer",
+        "description": "Risk (1-3)",
+        "required": true
+      },
+      "level": {
+        "type": "integer",
+        "description": "Level (1-5)",
+        "required": true
+      },
+      "batch": {
+        "type": "boolean",
+        "description": "Use --batch for no user input",
+        "required": true
+      },
+      "additional_args": {
+        "type": "string",
+        "description": "The additional_args parameter",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "source_code_vuln_scanner",
+    "description": "Deep Source Code Static Analyzer. Run this in the Kali Sandbox to find zero-day vulnerabilities in source code.",
+    "parameters": {
+      "targetDirectory": {
+        "type": "string",
+        "description": "The path inside the /workspace container directory to analyze",
+        "required": true
+      },
+      "language": {
+        "type": "string",
+        "description": "The primary language of the codebase",
+        "required": true
+      },
+      "scanDepth": {
+        "type": "string",
+        "description": "Depth of scan.",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "stego_analysis",
+    "description": "Automated macro for visual and hidden data forensics. Blasts an image or file with exiftool, zsteg, steghide, and strings to discover hidden CTF flags.",
+    "parameters": {
+      "targetFile": {
+        "type": "string",
+        "description": "The absolute path to the target image or file within /workspace",
+        "required": true
+      },
+      "password": {
+        "type": "string",
+        "description": "Optional password to use for steghide extraction. Leave null to attempt without a password.",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "nikto",
+    "description": "Web server scanner which performs comprehensive tests against web servers for multiple items.",
+    "parameters": {
+      "target": {
+        "type": "string",
+        "description": "The target URL or host",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "web_browse",
+    "description": "Fetch and read the contents of a web page. Returns the HTML source code or rendered text.",
+    "parameters": {
+      "url": {
+        "type": "string",
+        "description": "The url parameter",
+        "required": true
+      },
+      "show_headers": {
+        "type": "boolean",
+        "description": "If true, also return HTTP response headers",
+        "required": true
+      },
+      "follow_redirects": {
+        "type": "boolean",
+        "description": "Whether to follow HTTP redirects",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "wpa2_pcap_cracker",
+    "description": "Perform headless WPA2 PSK cracking against a provided PCAP/CAP file containing captured EAPOL handshakes. Utilizes aircrack-ng inside the sandbox.",
+    "parameters": {
+      "pcapPath": {
+        "type": "string",
+        "description": "The absolute path to the captured PCAP/CAP file within /workspace",
+        "required": true
+      },
+      "wordlistPath": {
+        "type": "string",
+        "description": "The absolute path to the wordlist (e.g., /usr/share/wordlists/rockyou.txt)",
+        "required": true
+      },
+      "bssid": {
+        "type": "string",
+        "description": "The specific BSSID to target (optional, aircrack-ng will prompt otherwise, but we automate it)",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "zero_click_exploiter",
+    "description": "A lethal zero-click exploitation engine. It autonomously writes malicious client-side payloads (HTML/JS for XSS, CSRF, DOM manipulation),",
+    "parameters": {
+      "payloadType": {
+        "type": "string",
+        "description": "The type of client-side payload to generate",
+        "required": true
+      },
+      "targetObjective": {
+        "type": "string",
+        "description": "The targetObjective parameter",
+        "required": true
+      },
+      "simulateVictimClick": {
+        "type": "boolean",
+        "description": "If true, Playwright will automatically visit the generated URL to trigger the payload locally.",
+        "required": true
+      },
+      "webhookUrl": {
+        "type": "string",
+        "description": "Optional webhook URL to receive exfiltrated data. If omitted, the payload will just console.log or alert.",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  },
+  {
+    "name": "autonomous_fuzzing_engine",
+    "description": "Deploys an autonomous zero-day mutational fuzzing engine.",
+    "parameters": {
+      "targetIp": {
+        "type": "string",
+        "description": "The target IP address",
+        "required": true
+      },
+      "targetPort": {
+        "type": "integer",
+        "description": "The target port running the application",
+        "required": true
+      },
+      "protocol": {
+        "type": "string",
+        "description": "The application protocol to fuzz",
+        "required": true
+      },
+      "fuzzingDepth": {
+        "type": "integer",
+        "description": "The intensity of the fuzzing mutations (1-10)",
+        "required": true
+      }
+    },
+    "executes_via": "docker_shell"
+  }
+]

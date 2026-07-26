@@ -1,0 +1,15 @@
+{
+  "pkg": {
+    "assets": [
+      "node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+    ],
+    "scripts": [
+      "dist/.binary-build/bundle.cjs"
+    ],
+    "targets": [
+      "node22-linux-x64"
+    ],
+    "outputPath": "/mnt/c/Users/0day/desktop/drogon/bin",
+    "compress": "GZip"
+  }
+}
