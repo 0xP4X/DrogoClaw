@@ -100,6 +100,17 @@ Once built, simply run `./drogonclaw` to launch the terminal interface.
 
 *(Note: The legacy TypeScript/Node.js version is archived in the `legacy_v1/` directory for reference, but is no longer maintained.)*
 
+### Installation (npm)
+
+If you want the prebuilt Linux CLI from npm:
+
+```bash
+npm install -g drogonclaw
+drogonclaw --help
+```
+
+This package publishes the Linux x64 executable only. Non-Linux platforms are intentionally blocked at install time.
+
 ### 3. Initialization Wizard
 
 Upon the first launch of `drogonclaw`, the **DrogonClaw Configuration Wizard** will guide you through setting up your neural pathways. Designed with a sleek, premium terminal aesthetic:

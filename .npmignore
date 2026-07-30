@@ -6,6 +6,7 @@
 !package.json
 !README.md
 !LICENSE
+!drogonclaw
 
 # But ignore test files in dist if they exist
 dist/**/*.test.*

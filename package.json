@@ -1,0 +1,46 @@
+{
+  "name": "drogonclaw",
+  "version": "0.1.0",
+  "description": "Linux-only AI-driven offensive security framework written in Go.",
+  "license": "MIT",
+  "author": "0xP4X",
+  "homepage": "https://drogonclaw.xyz",
+  "keywords": [
+    "cli",
+    "go",
+    "linux",
+    "security",
+    "automation",
+    "pentest"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/0xP4X/DrogonClaw.git"
+  },
+  "bugs": {
+    "url": "https://github.com/0xP4X/DrogonClaw/issues"
+  },
+  "bin": {
+    "drogonclaw": "./drogonclaw"
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "drogonclaw",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "go test ./..."
+  }
+}
