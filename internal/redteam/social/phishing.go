@@ -100,8 +100,7 @@ python3 /tmp/send_phish.py`, targetEmail)
 
 	out, err := sb.Execute(ctx, pyScript)
 	if err != nil {
-		// It will likely fail if no local SMTP server is running, which is expected for safety.
-		return fmt.Sprintf("[!] Python script created at /tmp/send_phish.py, but execution failed: %v\nOutput: %s\n[i] Ensure an SMTP relay is configured in the script.", err, out), nil
+		return "", fmt.Errorf("failed to execute phishing script: %w\nOutput: %s", err, out)
 	}
 
 	return fmt.Sprintf("[+] Phishing email sent to %s.\nOutput: %s", targetEmail, out), nil

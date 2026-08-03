@@ -5,115 +5,119 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// DrogonClaw TUI color palette — restrained, high-contrast operator console.
-var (
-	// ── Core palette ──────────────────────────────────────────────────────────
-	ColorAccent   = lipgloss.Color("#7DD3FC") // sky — current focus
-	ColorAccent2  = lipgloss.Color("#A5B4FC") // indigo — secondary emphasis
-	ColorDim      = lipgloss.Color("#334155") // slate border
-	ColorMuted    = lipgloss.Color("#64748B") // secondary text
-	ColorDanger   = lipgloss.Color("#FB7185") // errors / alerts
-	ColorWarning  = lipgloss.Color("#FBBF24") // warnings
-	ColorSuccess  = lipgloss.Color("#86EFAC") // successful / active
-	ColorGold     = lipgloss.Color("#FDE68A") // badges
-	ColorPurple   = lipgloss.Color("#C4B5FD") // tool names
-	ColorCyan     = lipgloss.Color("#67E8F9") // highlights
-	ColorWhite    = lipgloss.Color("#F1F5F9") // primary text
-	ColorSubtle   = lipgloss.Color("#CBD5E1") // light meta text
-	ColorBg       = lipgloss.Color("#020617") // deep navy
-	ColorBgPanel  = lipgloss.Color("#0F172A") // panel bg
-	ColorBgStatus = lipgloss.Color("#0B1220") // status bar bg
-	ColorBgAccent = lipgloss.Color("#162033") // accent panel bg
+// ─────────────────────────────────────────────────────────────────────────────
+// Color Palette — Dark Security Theme
+// ─────────────────────────────────────────────────────────────────────────────
 
-	// ── Status bar ────────────────────────────────────────────────────────────
-	StatusBarStyle = lipgloss.NewStyle().
-			Background(ColorBgStatus).
-			Foreground(ColorMuted).
+var (
+	// Background tones (darkest → lightest)
+	ColorBg        = lipgloss.Color("#0a0e14")
+	ColorBgPanel   = lipgloss.Color("#0d1117")
+	ColorBgSurface = lipgloss.Color("#161b22")
+	ColorBgAccent  = lipgloss.Color("#1c2128")
+	ColorBgInput   = lipgloss.Color("#161b22")
+
+	// Text hierarchy (brightest → dimmest)
+	ColorBright = lipgloss.Color("#e6edf3")
+	ColorWhite  = lipgloss.Color("#c9d1d9")
+	ColorSubtle = lipgloss.Color("#8b949e")
+	ColorMuted  = lipgloss.Color("#8b949e")
+	ColorDim    = lipgloss.Color("#484f58")
+	ColorGhost  = lipgloss.Color("#30363d")
+
+	// Primary accent — electric blue
+	ColorAccent  = lipgloss.Color("#58a6ff")
+	ColorAccent2 = lipgloss.Color("#3fb950")
+
+	// Semantic colors
+	ColorSuccess = lipgloss.Color("#3fb950")
+	ColorDanger  = lipgloss.Color("#f85149")
+	ColorWarning = lipgloss.Color("#d29922")
+	ColorGold    = lipgloss.Color("#d29922")
+	ColorCyan    = lipgloss.Color("#79c0ff")
+	ColorPurple  = lipgloss.Color("#bc8cff")
+
+	// Output severity
+	ColorOutputInfo    = lipgloss.Color("#8b949e")
+	ColorOutputDebug   = lipgloss.Color("#484f58")
+	ColorOutputSuccess = lipgloss.Color("#3fb950")
+	ColorOutputError   = lipgloss.Color("#f85149")
+	ColorOutputWarn    = lipgloss.Color("#d29922")
+	ColorOutputSignal  = lipgloss.Color("#58a6ff")
+
+	// Border color
+	ColorBorder = lipgloss.Color("#30363d")
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Header & Status Bar
+// ─────────────────────────────────────────────────────────────────────────────
+
+var (
+	HeaderBarStyle = lipgloss.NewStyle().
+			Background(ColorBgSurface).
+			Foreground(ColorWhite).
+			Bold(true).
 			Padding(0, 1)
+
+	HeaderBarBorderStyle = lipgloss.NewStyle().
+				Border(lipgloss.NormalBorder(), false, false, true, false).
+				BorderForeground(ColorBorder).
+				Background(ColorBgSurface)
+
+	HeaderBrandStyle = lipgloss.NewStyle().
+				Foreground(ColorAccent).
+				Bold(true)
+
+	HeaderSepStyle = lipgloss.NewStyle().
+			Foreground(ColorDim)
+
+	HeaderInfoStyle = lipgloss.NewStyle().
+			Foreground(ColorSubtle)
+
+	HeaderDimStyle = lipgloss.NewStyle().
+			Foreground(ColorDim)
+
+	StatusBarStyle = lipgloss.NewStyle().
+			Background(ColorBgSurface).
+			Foreground(ColorMuted).
+			Padding(0, 0)
 
 	StatusLabelStyle = lipgloss.NewStyle().
 				Foreground(ColorMuted).
-				Background(ColorBgStatus)
+				Background(ColorBgSurface)
 
 	StatusOnStyle = lipgloss.NewStyle().
 			Foreground(ColorSuccess).
-			Background(ColorBgStatus).
 			Bold(true)
 
 	StatusOffStyle = lipgloss.NewStyle().
-			Foreground(ColorMuted).
-			Background(ColorBgStatus)
+			Foreground(ColorDim)
 
 	StatusNodeStyle = lipgloss.NewStyle().
 			Foreground(ColorAccent).
-			Background(ColorBgStatus).
 			Bold(true)
 
 	StatusAlertStyle = lipgloss.NewStyle().
 				Foreground(ColorDanger).
-				Background(ColorBgStatus).
 				Bold(true)
+)
 
-	// ── Output pane ───────────────────────────────────────────────────────────
-	OutputPaneStyle = lipgloss.NewStyle().
-			PaddingLeft(1).
-			PaddingRight(1)
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase Indicators
+// ─────────────────────────────────────────────────────────────────────────────
 
-	// ── Cards / rails ─────────────────────────────────────────────────────────
-	ControlRailStyle = lipgloss.NewStyle().
-				Background(ColorBgPanel).
-				Foreground(ColorWhite).
-				Border(lipgloss.RoundedBorder(), true).
-				BorderForeground(ColorDim).
-				Padding(0, 1)
-
-	ControlRailMutedStyle = lipgloss.NewStyle().
-				Foreground(ColorMuted)
-
-	ControlRailLabelStyle = lipgloss.NewStyle().
-				Foreground(ColorSubtle).
-				Bold(true)
-
-	ControlRailValueStyle = lipgloss.NewStyle().
-				Foreground(ColorWhite).
-				Bold(true)
-
-	ControlRailAccentStyle = lipgloss.NewStyle().
-				Foreground(ColorAccent2).
-				Bold(true)
-
-	ControlRailSuccessStyle = lipgloss.NewStyle().
-				Foreground(ColorSuccess).
-				Bold(true)
-
-	ControlRailWarningStyle = lipgloss.NewStyle().
-				Foreground(ColorWarning).
-				Bold(true)
-
-	ControlRailDangerStyle = lipgloss.NewStyle().
-				Foreground(ColorDanger).
-				Bold(true)
-
-	ActivityRailStyle = lipgloss.NewStyle().
-				Background(ColorBgPanel).
-				Foreground(ColorWhite).
-				Border(lipgloss.RoundedBorder(), true).
-				BorderForeground(ColorDim).
-				Padding(0, 1)
-
-	ActivityTitleStyle = lipgloss.NewStyle().
-				Foreground(ColorCyan).
-				Bold(true)
-
-	ActivityDimStyle = lipgloss.NewStyle().
-				Foreground(ColorMuted)
+var (
+	PhaseIdleStyle = lipgloss.NewStyle().
+			Foreground(ColorDim).
+			Bold(true)
 
 	PhasePlanningStyle = lipgloss.NewStyle().
-				Foreground(ColorAccent2).
+				Foreground(ColorCyan).
 				Bold(true)
 
 	PhaseReasoningStyle = lipgloss.NewStyle().
-				Foreground(ColorCyan).
+				Foreground(ColorPurple).
 				Bold(true)
 
 	PhaseExecutingStyle = lipgloss.NewStyle().
@@ -121,31 +125,66 @@ var (
 				Bold(true)
 
 	PhaseVerifyingStyle = lipgloss.NewStyle().
-				Foreground(ColorSuccess).
+				Foreground(ColorAccent2).
 				Bold(true)
 
 	PhaseCompleteStyle = lipgloss.NewStyle().
-				Foreground(ColorAccent).
+				Foreground(ColorSuccess).
 				Bold(true)
 
 	PhaseErrorStyle = lipgloss.NewStyle().
 			Foreground(ColorDanger).
 			Bold(true)
 
-	// ── Agent response box ────────────────────────────────────────────────────
-	AgentBoxTopStyle = lipgloss.NewStyle().
-				Foreground(ColorAccent2).
-				Bold(true)
+	PhaseHitLStyle = lipgloss.NewStyle().
+			Foreground(ColorWarning).
+			Bold(true)
+)
 
-	AgentBoxSideStyle = lipgloss.NewStyle().
+// ─────────────────────────────────────────────────────────────────────────────
+// Output Pane & Viewport
+// ─────────────────────────────────────────────────────────────────────────────
+
+var (
+	OutputPaneStyle = lipgloss.NewStyle().
+			PaddingLeft(2).
+			PaddingRight(2)
+
+	LineNumberStyle = lipgloss.NewStyle().
+			Foreground(ColorDim).
+			Italic(true)
+
+	ActivityDimStyle = lipgloss.NewStyle().
 				Foreground(ColorDim)
 
+	MainPaneStyle = lipgloss.NewStyle().
+			Padding(1, 1).
+			Background(ColorBg)
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Agent Response
+// ─────────────────────────────────────────────────────────────────────────────
+
+var (
 	AgentTextStyle = lipgloss.NewStyle().
 			Foreground(ColorWhite)
 
-	// ── Tool execution panels ─────────────────────────────────────────────────
+	AgentResponseStyle = lipgloss.NewStyle().
+				Foreground(ColorWhite).
+				PaddingLeft(1)
+
+	AgentDividerStyle = lipgloss.NewStyle().
+				Foreground(ColorBorder)
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tool Execution Styles
+// ─────────────────────────────────────────────────────────────────────────────
+
+var (
 	ToolStartStyle = lipgloss.NewStyle().
-			Foreground(ColorAccent2).
+			Foreground(ColorAccent).
 			Bold(true)
 
 	ToolDoneStyle = lipgloss.NewStyle().
@@ -155,77 +194,36 @@ var (
 			Foreground(ColorMuted).
 			Italic(true)
 
-	// ── Prompt / input area ───────────────────────────────────────────────────
-	//  ┏━ ALIAS@drogonclaw [Session: abc12345]
-	//  ┗━❯  _
-	PromptBorderStyle = lipgloss.NewStyle().
-				Foreground(ColorAccent).
-				Bold(true)
-
-	// Operator alias — glows cyan so it stands out immediately
-	PromptAliasStyle = lipgloss.NewStyle().
-				Foreground(ColorCyan).
-				Bold(true)
-
-	// Separator "@" between alias and agent name
-	PromptAtStyle = lipgloss.NewStyle().
-			Foreground(ColorMuted)
-
-	// Agent name — dimmer violet
-	PromptAgentStyle = lipgloss.NewStyle().
-				Foreground(ColorAccent2)
-
-	// Session badge
-	PromptSessionStyle = lipgloss.NewStyle().
-				Foreground(ColorMuted).
-				Italic(true)
-
-	// Submitted user text echo
-	PromptUserStyle = lipgloss.NewStyle().
-			Foreground(ColorWhite).
-			Bold(true)
-
-	// Legacy alias kept for backward compat in model.go
-	PromptGlyphStyle = PromptBorderStyle
-
-	// ── Hint / autocomplete ───────────────────────────────────────────────────
-	HintBorderStyle = lipgloss.NewStyle().
-			Foreground(ColorDim)
-
-	HintCmdStyle = lipgloss.NewStyle().
-			Foreground(ColorAccent).
-			Bold(true)
-
-	HintDescStyle = lipgloss.NewStyle().
-			Foreground(ColorMuted)
-
-	// ── Error / warning ───────────────────────────────────────────────────────
-	ErrorStyle = lipgloss.NewStyle().
+	ToolErrorStyle = lipgloss.NewStyle().
 			Foreground(ColorDanger).
 			Bold(true)
 
-	WarningStyle = lipgloss.NewStyle().
-			Foreground(ColorWarning)
+	ToolWarningStyle = lipgloss.NewStyle().
+				Foreground(ColorWarning)
 
-	// ── HitL banner ───────────────────────────────────────────────────────────
-	HitLBannerStyle = lipgloss.NewStyle().
-			Foreground(ColorDanger).
-			Bold(true)
+	ToolSuccessStyle = lipgloss.NewStyle().
+				Foreground(ColorSuccess).
+				Bold(true)
 
-	// ── Spinner ───────────────────────────────────────────────────────────────
-	SpinnerStyle = lipgloss.NewStyle().
-			Foreground(ColorAccent)
+	ToolOutputStyle = lipgloss.NewStyle().
+			Foreground(ColorOutputInfo)
 
-	// ── Divider ───────────────────────────────────────────────────────────────
-	// Gradient-like: uses braille dots for a subtle textured rule
-	DividerStyle = lipgloss.NewStyle().
-			Foreground(ColorDim)
+	ToolOutputSuccessStyle = lipgloss.NewStyle().
+				Foreground(ColorOutputSuccess)
 
-	// ── Session / meta text ───────────────────────────────────────────────────
-	SessionStyle = lipgloss.NewStyle().
-			Foreground(ColorMuted)
+	ToolOutputErrorStyle = lipgloss.NewStyle().
+				Foreground(ColorOutputError)
 
-	// ── Tool panel badges (pill labels) ──────────────────────────────────────
+	ToolTimingStyle = lipgloss.NewStyle().
+			Foreground(ColorDim).
+			Italic(true)
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tool Category Badges — Compact pills
+// ─────────────────────────────────────────────────────────────────────────────
+
+var (
 	ToolBadgeReconStyle = lipgloss.NewStyle().
 				Foreground(ColorBg).
 				Background(ColorAccent).
@@ -240,7 +238,7 @@ var (
 
 	ToolBadgeIntelStyle = lipgloss.NewStyle().
 				Foreground(ColorBg).
-				Background(ColorGold).
+				Background(ColorWarning).
 				Bold(true).
 				Padding(0, 1)
 
@@ -256,9 +254,20 @@ var (
 				Bold(true).
 				Padding(0, 1)
 
-	// ── Tool panel structure ──────────────────────────────────────────────────
+	ToolBadgeEvidenceStyle = lipgloss.NewStyle().
+				Foreground(ColorBg).
+				Background(ColorCyan).
+				Bold(true).
+				Padding(0, 1)
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tool Panel Detail Styles
+// ─────────────────────────────────────────────────────────────────────────────
+
+var (
 	ToolPanelBorderStyle = lipgloss.NewStyle().
-				Foreground(ColorDim)
+				Foreground(ColorGhost)
 
 	ToolPanelHeaderStyle = lipgloss.NewStyle().
 				Foreground(ColorCyan).
@@ -270,61 +279,276 @@ var (
 
 	ToolArgValStyle = lipgloss.NewStyle().
 			Foreground(ColorWhite)
-
-	ToolOutputStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#8892A4"))
-
-	ToolOutputSuccessStyle = lipgloss.NewStyle().
-				Foreground(ColorSuccess)
-
-	ToolOutputErrorStyle = lipgloss.NewStyle().
-				Foreground(ColorDanger)
-
-	ToolTimingStyle = lipgloss.NewStyle().
-			Foreground(ColorMuted).
-			Italic(true)
-
-	// ── Dashboard Layout ──────────────────────────────────────────────────────
-	DashboardPaneStyle = lipgloss.NewStyle().
-				Border(lipgloss.NormalBorder(), true).
-				BorderForeground(ColorDim).
-				Padding(0, 1)
-
-	HeaderStyle = lipgloss.NewStyle().
-			Background(ColorBgStatus).
-			Foreground(ColorWhite).
-			Bold(true).
-			Padding(0, 1).
-			MarginBottom(0)
-
-	SidebarTitleStyle = lipgloss.NewStyle().
-				Foreground(ColorCyan).
-				Bold(true).
-				MarginBottom(1)
 )
 
-// CustomHuhTheme builds a custom, high-tech lipgloss theme for Huh forms.
+// ─────────────────────────────────────────────────────────────────────────────
+// Prompt & Input Area
+// ─────────────────────────────────────────────────────────────────────────────
+
+var (
+	PromptBorderStyle = lipgloss.NewStyle().
+				Foreground(ColorAccent).
+				Bold(true)
+
+	PromptAliasStyle = lipgloss.NewStyle().
+				Foreground(ColorAccent).
+				Bold(true)
+
+	PromptAtStyle = lipgloss.NewStyle().
+			Foreground(ColorDim)
+
+	PromptAgentStyle = lipgloss.NewStyle().
+				Foreground(ColorAccent2)
+
+	PromptSessionStyle = lipgloss.NewStyle().
+				Foreground(ColorDim).
+				Italic(true)
+
+	PromptUserStyle = lipgloss.NewStyle().
+			Foreground(ColorBright).
+			Bold(true)
+
+	PromptGlyphStyle = lipgloss.NewStyle().
+				Foreground(ColorAccent).
+				Bold(true)
+
+	InputPaneStyle = lipgloss.NewStyle().
+			Border(lipgloss.NormalBorder(), true, false, false, false).
+			BorderForeground(ColorBorder).
+			Padding(0, 1).
+			Background(ColorBgInput)
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Command Hints & Autocomplete
+// ─────────────────────────────────────────────────────────────────────────────
+
+var (
+	HintBorderStyle = lipgloss.NewStyle().
+			Foreground(ColorDim)
+
+	HintCmdStyle = lipgloss.NewStyle().
+			Foreground(ColorAccent).
+			Bold(true)
+
+	HintDescStyle = lipgloss.NewStyle().
+			Foreground(ColorMuted)
+
+	HintSelectedStyle = lipgloss.NewStyle().
+				Foreground(ColorBright).
+				Bold(true)
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Severity & Alert Styles
+// ─────────────────────────────────────────────────────────────────────────────
+
+var (
+	ErrorStyle = lipgloss.NewStyle().
+			Foreground(ColorDanger).
+			Bold(true)
+
+	WarningStyle = lipgloss.NewStyle().
+			Foreground(ColorWarning)
+
+	InfoStyle = lipgloss.NewStyle().
+			Foreground(ColorCyan)
+
+	HitLBannerStyle = lipgloss.NewStyle().
+			Foreground(ColorDanger).
+			Bold(true)
+
+	SpinnerStyle = lipgloss.NewStyle().
+			Foreground(ColorAccent)
+
+	DividerStyle = lipgloss.NewStyle().
+			Foreground(ColorGhost)
+
+	SessionStyle = lipgloss.NewStyle().
+			Foreground(ColorDim)
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Evidence & Facts
+// ─────────────────────────────────────────────────────────────────────────────
+
+var (
+	EvidenceStyle = lipgloss.NewStyle().
+			Foreground(ColorCyan).
+			Italic(true)
+
+	FactStyle = lipgloss.NewStyle().
+			Foreground(ColorWhite)
+
+	FactKeyStyle = lipgloss.NewStyle().
+			Foreground(ColorAccent).
+			Bold(true)
+
+	FactValStyle = lipgloss.NewStyle().
+			Foreground(ColorWhite)
+
+	TruncatedStyle = lipgloss.NewStyle().
+			Foreground(ColorDim).
+			Italic(true)
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tree / Hierarchy
+// ─────────────────────────────────────────────────────────────────────────────
+
+var (
+	TreeBranchStyle = lipgloss.NewStyle().
+			Foreground(ColorGhost)
+
+	TreeItemStyle = lipgloss.NewStyle().
+			Foreground(ColorWhite)
+
+	TreeItemSelectedStyle = lipgloss.NewStyle().
+				Foreground(ColorAccent).
+				Bold(true)
+
+	TreeIndentStyle = lipgloss.NewStyle().
+			Foreground(ColorGhost)
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Welcome Screen
+// ─────────────────────────────────────────────────────────────────────────────
+
+var (
+	WelcomeTitleStyle = lipgloss.NewStyle().
+				Foreground(ColorAccent).
+				Bold(true)
+
+	WelcomeSubtitleStyle = lipgloss.NewStyle().
+				Foreground(ColorSubtle)
+
+	WelcomeHintStyle = lipgloss.NewStyle().
+				Foreground(ColorDim)
+
+	WelcomeBorderStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(ColorBorder).
+				Padding(1, 3).
+				Foreground(ColorAccent).
+				Bold(true)
+
+	WelcomeQuickStartStyle = lipgloss.NewStyle().
+				Foreground(ColorDim)
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sidebar
+// ─────────────────────────────────────────────────────────────────────────────
+
+var (
+	SidebarPaneStyle = lipgloss.NewStyle().
+				Border(lipgloss.NormalBorder(), false, false, false, true).
+				BorderForeground(ColorBorder).
+				Padding(1, 1).
+				Background(ColorBgPanel)
+
+	SidebarTitleStyle = lipgloss.NewStyle().
+				Foreground(ColorSubtle).
+				Bold(true)
+
+	SidebarLabelStyle = lipgloss.NewStyle().
+				Foreground(ColorDim)
+
+	SidebarValueStyle = lipgloss.NewStyle().
+				Foreground(ColorWhite)
+
+	SidebarRuleStyle = lipgloss.NewStyle().
+				Foreground(ColorGhost)
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Section Headers (used in /status, sidebar, help)
+// ─────────────────────────────────────────────────────────────────────────────
+
+var (
+	SectionHeaderStyle = lipgloss.NewStyle().
+				Foreground(ColorSubtle).
+				Bold(true)
+
+	SectionRuleStyle = lipgloss.NewStyle().
+				Foreground(ColorGhost)
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase Router
+// ─────────────────────────────────────────────────────────────────────────────
+
+func PhaseStyle(phase string) lipgloss.Style {
+	switch phase {
+	case "idle":
+		return PhaseIdleStyle
+	case "planning":
+		return PhasePlanningStyle
+	case "reasoning":
+		return PhaseReasoningStyle
+	case "executing":
+		return PhaseExecutingStyle
+	case "verifying":
+		return PhaseVerifyingStyle
+	case "complete":
+		return PhaseCompleteStyle
+	case "error":
+		return PhaseErrorStyle
+	default:
+		return PhaseIdleStyle
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Huh Form Theme
+// ─────────────────────────────────────────────────────────────────────────────
+
 func CustomHuhTheme() *huh.Theme {
 	t := huh.ThemeBase()
 
-	// Customize base layout and selection indicators
-	t.Focused.Base = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(ColorAccent).PaddingLeft(2)
+	t.Focused.Base = lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), false, false, false, true).
+		BorderForeground(ColorAccent).
+		PaddingLeft(2)
 	t.Blurred.Base = lipgloss.NewStyle().PaddingLeft(3)
 
-	// Style text fields
 	t.Focused.Title = lipgloss.NewStyle().Foreground(ColorAccent).Bold(true)
-	t.Blurred.Title = lipgloss.NewStyle().Foreground(ColorMuted)
+	t.Blurred.Title = lipgloss.NewStyle().Foreground(ColorDim)
 	t.Focused.Description = lipgloss.NewStyle().Foreground(ColorSubtle)
-	t.Blurred.Description = lipgloss.NewStyle().Foreground(ColorMuted)
+	t.Blurred.Description = lipgloss.NewStyle().Foreground(ColorDim)
 
-	// Selection and options styling
 	t.Focused.Option = lipgloss.NewStyle().Foreground(ColorWhite)
 	t.Focused.SelectedOption = lipgloss.NewStyle().Foreground(ColorAccent).Bold(true)
-	t.Focused.UnselectedOption = lipgloss.NewStyle().Foreground(ColorMuted)
+	t.Focused.UnselectedOption = lipgloss.NewStyle().Foreground(ColorDim)
 
-	// Input controls (text boxes)
 	t.Focused.TextInput.Cursor = lipgloss.NewStyle().Foreground(ColorAccent)
 	t.Focused.TextInput.Text = lipgloss.NewStyle().Foreground(ColorWhite)
+	t.Focused.TextInput.Placeholder = lipgloss.NewStyle().Foreground(ColorDim)
+	t.Focused.TextInput.Prompt = lipgloss.NewStyle().Foreground(ColorAccent2)
+
+	t.Focused.SelectSelector = lipgloss.NewStyle().Foreground(ColorAccent)
+	t.Focused.MultiSelectSelector = lipgloss.NewStyle().Foreground(ColorAccent)
+	t.Focused.SelectedPrefix = lipgloss.NewStyle().Foreground(ColorSuccess)
+	t.Focused.UnselectedPrefix = lipgloss.NewStyle().Foreground(ColorDim)
+
+	t.Focused.FocusedButton = lipgloss.NewStyle().
+		Foreground(ColorBg).
+		Background(ColorAccent).
+		Bold(true).
+		Padding(0, 1)
+	t.Focused.BlurredButton = lipgloss.NewStyle().
+		Foreground(ColorWhite).
+		Background(ColorBgAccent).
+		Padding(0, 1)
+
+	t.Help.Ellipsis = lipgloss.NewStyle().Foreground(ColorDim)
+	t.Help.ShortKey = lipgloss.NewStyle().Foreground(ColorSubtle)
+	t.Help.ShortDesc = lipgloss.NewStyle().Foreground(ColorDim)
+	t.Help.ShortSeparator = lipgloss.NewStyle().Foreground(ColorGhost)
+	t.Help.FullKey = lipgloss.NewStyle().Foreground(ColorSubtle)
+	t.Help.FullDesc = lipgloss.NewStyle().Foreground(ColorDim)
+	t.Help.FullSeparator = lipgloss.NewStyle().Foreground(ColorGhost)
 
 	return t
 }

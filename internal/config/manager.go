@@ -37,6 +37,9 @@ func (m *Manager) load() {
 	m.v.AutomaticEnv()
 	m.v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
+	// Defaults
+	m.v.SetDefault("WORKSPACE_ROOT", home)
+
 	_ = m.v.ReadInConfig() // OK if file missing — first run
 }
 
@@ -110,6 +113,10 @@ func (m *Manager) GetBaseURL() string {
 
 func (m *Manager) GetOperatorName() string {
 	return m.GetString("OPERATOR_NAME")
+}
+
+func (m *Manager) GetWorkspaceRoot() string {
+	return m.GetString("WORKSPACE_ROOT")
 }
 
 func (m *Manager) GetAgentName() string {

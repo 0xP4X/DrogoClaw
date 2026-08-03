@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 )
@@ -90,15 +91,42 @@ func ListSkills() []SkillEntry {
 }
 
 // ExecuteSkill runs a dynamic skill with the provided parameters.
-func ExecuteSkill(name string, params map[string]string) (string, error) {
+// It validates the rendered command against a dangerous-pattern denylist
+// and returns the command string along with whether it passed validation.
+func ExecuteSkill(name string, params map[string]string) (string, bool, error) {
 	skill, ok := GetSkill(name)
 	if !ok {
-		return "", fmt.Errorf("dynamic skill '%s' not found", name)
+		return "", false, fmt.Errorf("dynamic skill '%s' not found", name)
 	}
 
 	cmd := skill.Command
 	for k, v := range params {
 		cmd = strings.ReplaceAll(cmd, "{{"+k+"}}", v)
 	}
-	return cmd, nil // Return the rendered command for sandbox execution
+
+	// Validate the rendered command against dangerous patterns.
+	if isDangerousCommand(cmd) {
+		return cmd, false, fmt.Errorf("command blocked by safety policy: %s", name)
+	}
+
+	return cmd, true, nil
+}
+
+// dangerousPatterns is a denylist checked before dynamic skill execution.
+var dangerousPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)rm\s+-[a-z]*r[a-z]*f`),
+	regexp.MustCompile(`(?i)mkfs`),
+	regexp.MustCompile(`(?i)dd\s+if=`),
+	regexp.MustCompile(`(?i)shutdown`),
+	regexp.MustCompile(`(?i)reboot`),
+	regexp.MustCompile(`(?i)halt`),
+}
+
+func isDangerousCommand(cmd string) bool {
+	for _, p := range dangerousPatterns {
+		if p.MatchString(cmd) {
+			return true
+		}
+	}
+	return false
 }

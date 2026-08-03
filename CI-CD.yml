@@ -39,6 +39,9 @@ jobs:
     - name: Run tests
       run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./internal/...
 
+    - name: Run CTF benchmark
+      run: go test -bench=BenchmarkCTFCategories -benchtime=1s -run=^$ ./internal/ctf/
+
     - name: Upload coverage
       uses: codecov/codecov-action@v4
       with:

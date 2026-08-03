@@ -30,6 +30,55 @@ import (
 	"github.com/openai/openai-go"
 )
 
+type BuiltinFn func(ctx context.Context, args map[string]any) string
+
+// ToolResult is a structured result from tool execution.
+// It replaces the previous free-form string return with typed fields
+// that the orchestrator can use for deterministic verification.
+type ToolResult struct {
+	ToolName     string
+	ExitCode     int
+	Stdout       string
+	Stderr       string
+	Duration     time.Duration
+	Artifacts    []string
+	ParsedFacts  map[string]interface{}
+	FailureClass string // "none", "tool_missing", "bad_input", "timeout", "no_signal", "contradiction"
+	Success      bool
+}
+
+// SuccessOracle verifies that a claimed success is backed by evidence.
+// The LLM must not be able to declare success by prose alone.
+type SuccessOracle struct {
+	flagPattern *regexp.Regexp
+}
+
+func NewSuccessOracle(flagPattern string) *SuccessOracle {
+	if flagPattern == "" {
+		flagPattern = `(?i)(?:flag|ctf|picoctf|htb)\{[^\r\n{}]{1,200}\}`
+	}
+	return &SuccessOracle{
+		flagPattern: regexp.MustCompile(flagPattern),
+	}
+}
+
+// Verify checks whether the tool result contains verified evidence of success.
+// It returns true only if the result contains a flag matching the expected pattern
+// or if the result explicitly contains a verified success indicator.
+func (o *SuccessOracle) Verify(result ToolResult) (bool, string) {
+	if result.FailureClass != "none" && result.FailureClass != "" {
+		return false, fmt.Sprintf("tool execution failed with class: %s", result.FailureClass)
+	}
+	if !result.Success {
+		return false, "tool did not report success"
+	}
+	matches := o.flagPattern.FindAllString(result.Stdout, -1)
+	if len(matches) > 0 {
+		return true, fmt.Sprintf("verified flag found: %d match(es)", len(matches))
+	}
+	return false, "no verified flag or success indicator found in tool output"
+}
+
 // ToolRegistry holds all available tools and dispatches execution.
 type ToolRegistry struct {
 	manifest  *skills.Manifest
@@ -40,6 +89,7 @@ type ToolRegistry struct {
 	cfg       *config.Manager
 	graph     *memory.Graph
 	provider  *Provider
+	oracle    *SuccessOracle
 
 	// Built-in tools not in the manifest
 	builtins map[string]BuiltinFn
@@ -47,8 +97,6 @@ type ToolRegistry struct {
 	// Recent successful observations used by the evidence gate.
 	recentEvidence []toolEvidence
 }
-
-type BuiltinFn func(ctx context.Context, args map[string]any) string
 
 type toolEvidence struct {
 	Tool      string
@@ -66,10 +114,24 @@ func NewToolRegistry(manifest *skills.Manifest, sb *sandbox.Docker, val *Evidenc
 		cfg:       cfg,
 		graph:     graph,
 		provider:  provider,
+		oracle:    NewSuccessOracle(""),
 		builtins:  make(map[string]BuiltinFn),
 	}
 	r.registerBuiltins()
 	return r
+}
+
+// VerifySuccess checks whether a tool result contains verified evidence of success.
+func (r *ToolRegistry) VerifySuccess(name string, result string) (bool, string) {
+	if r.oracle == nil {
+		return false, "no success oracle configured"
+	}
+	tr := ToolResult{
+		ToolName: name,
+		Stdout:   result,
+		Success:  true,
+	}
+	return r.oracle.Verify(tr)
 }
 
 // Definitions returns the OpenAI-format tool definitions for the LLM.
@@ -826,11 +888,11 @@ func (r *ToolRegistry) registerBuiltins() {
 			return "[Error] id and label are required"
 		}
 
-		// Use the evidence validator to verify the finding
-		// We'll pass empty rawOutput for now since memory update might not carry the raw shell output context,
-		// but ideally we'd pass the recent sandbox log.
-		if r.validator != nil {
-			valRes, err := r.validator.Validate(ctx, "update_neural_memory", "Context implied by recent shell commands", data)
+		// Use the evidence validator to verify the finding against
+		// the most recent observation, not a generic context string.
+		if r.validator != nil && len(r.recentEvidence) > 0 {
+			latest := r.recentEvidence[len(r.recentEvidence)-1]
+			valRes, err := r.validator.Validate(ctx, latest.Tool, latest.Summary, data)
 			if err == nil && !valRes.IsValid {
 				return fmt.Sprintf("[Rejected] The Evidence Validator rejected this finding: %s. Please re-verify.", valRes.Reasoning)
 			}
@@ -1361,18 +1423,15 @@ OUTPUT ONLY THE SOURCE CODE. NO EXPLANATIONS. NO MARKDOWN.`, url, action)
 
 		case "status", "check":
 			sessionIDs := r.shells.List()
-			for _, id := range sessionIDs {
-				s, _ := r.shells.Get(id)
-				// We don't have direct access to the port it's listening on easily from the struct without modifying it,
-				// but we can list all active shells.
-				_ = id
-				_ = s
-			}
 			return fmt.Sprintf("[C2 Status]\nActive Sessions: %d", len(sessionIDs))
 
 		case "stop", "kill":
-			// We'd need a specific ID to kill, or kill all. The struct currently supports Listen and Send.
-			return "[C2 Note] Stopping listeners is not explicitly supported by the current Shell manager without session IDs."
+			sessionID, _ := args["session_id"].(string)
+			if sessionID == "" {
+				return "[C2 Error] session_id is required to stop a listener"
+			}
+			r.shells.Remove(sessionID)
+			return fmt.Sprintf("[C2] Listener %s stopped successfully", sessionID)
 
 		default:
 			return fmt.Sprintf("[Error] Unknown action: %s", action)
@@ -1473,7 +1532,6 @@ OUTPUT ONLY THE SOURCE CODE. NO EXPLANATIONS. NO MARKDOWN.`, url, action)
 	r.builtins["zero_click_exploiter"] = func(ctx context.Context, args map[string]any) string {
 		payloadType, _ := args["payloadType"].(string)
 		targetObjective, _ := args["targetObjective"].(string)
-		simulateVictimClick, _ := args["simulateVictimClick"].(bool)
 		webhookUrl, _ := args["webhookUrl"].(string)
 
 		if payloadType == "" || targetObjective == "" {
@@ -1524,33 +1582,7 @@ OUTPUT ONLY THE HTML OR JS CODE. NO EXPLANATIONS. NO MARKDOWN.`, payloadType, ta
 			return fmt.Sprintf("[Zero Click Error] Failed to start hosting server: %v", err)
 		}
 
-		result := fmt.Sprintf("[ZERO CLICK PAYLOAD GENERATED]\nObjective: %s\nPayload hosted at: http://%s:8081/exploit%s\n\n", targetObjective, r.sandbox.GetContainerIP(ctx), ext)
-
-		if simulateVictimClick {
-			// Trigger a headless browser request to localhost to simulate the click locally
-			simCmd := fmt.Sprintf(`
-			(command -v node &> /dev/null || (curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs)) > /dev/null 2>&1
-			(npm list -g puppeteer &> /dev/null || npm install -g puppeteer) > /dev/null 2>&1
-			cat << 'EOF' > /tmp/sim.js
-const puppeteer = require('puppeteer');
-(async () => {
-  const browser = await puppeteer.launch({args: ['--no-sandbox', '--disable-setuid-sandbox']});
-  const page = await browser.newPage();
-  console.log("Simulating victim click...");
-  await page.goto('http://127.0.0.1:8081/exploit%s');
-  await new Promise(r => setTimeout(r, 2000));
-  await browser.close();
-  console.log("Click simulation finished.");
-})();
-EOF
-			NODE_PATH=$(npm root -g) node /tmp/sim.js
-			`, ext)
-
-			simOut, _ := r.sandbox.Execute(ctx, simCmd)
-			result += fmt.Sprintf("Simulation Output:\n%s\n", simOut)
-		}
-
-		return result
+		return fmt.Sprintf("[ZERO CLICK PAYLOAD GENERATED]\nObjective: %s\nPayload hosted at: http://%s:8081/exploit%s\n\nWARNING: Click simulation is disabled. Deliver the payload URL to the target operator for manual testing.", targetObjective, r.sandbox.GetContainerIP(ctx), ext)
 	}
 
 	r.builtins["async_race_condition_engine"] = func(ctx context.Context, args map[string]any) string {

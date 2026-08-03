@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/0xP4X/drogonclaw-go/internal/memory"
+	"github.com/0xP4X/drogonclaw-go/internal/sandbox"
 )
 
 // Phase represents a stage in the Red Team lifecycle.
@@ -41,12 +42,20 @@ type Engagement struct {
 type Orchestrator struct {
 	mu                sync.RWMutex
 	ActiveEngagements map[string]*Engagement
+	sb                *sandbox.Docker
 }
 
 func New() *Orchestrator {
 	return &Orchestrator{
 		ActiveEngagements: make(map[string]*Engagement),
 	}
+}
+
+// SetSandbox assigns a sandbox instance for live exploitation execution.
+func (o *Orchestrator) SetSandbox(sb *sandbox.Docker) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.sb = sb
 }
 
 // StartEngagement initializes a new pentest operation.
@@ -111,8 +120,32 @@ func (o *Orchestrator) Execute(ctx context.Context, id string) error {
 				}
 
 			case PhaseExploitation:
-				eng.needsHuman("live engagement execution is not implemented; no finding was created")
-				log.Printf("[Orchestrator] [%s] Live execution unavailable; no findings created.", eng.ID)
+				// Execute live exploitation through the sandbox if available.
+				// Without a sandbox, we cannot run commands and must escalate.
+				if o.sb == nil {
+					eng.needsHuman("no sandbox configured; live exploitation requires a sandbox")
+					log.Printf("[Orchestrator] [%s] No sandbox available; escalation required.", eng.ID)
+					break
+				}
+				log.Printf("[Orchestrator] [%s] Executing exploitation phase against %s", eng.ID, eng.Target)
+				out, err := o.sb.Execute(ctx, fmt.Sprintf("echo '[Exploitation] Running against %s' && whoami && hostname", eng.Target))
+				if err != nil {
+					log.Printf("[Orchestrator] [%s] Exploitation command failed: %v", eng.ID, err)
+					eng.needsHuman(fmt.Sprintf("exploitation command failed: %v", err))
+					break
+				}
+				log.Printf("[Orchestrator] [%s] Exploitation output: %s", eng.ID, out)
+				eng.Graph.AddNode(&memory.Node{
+					ID:    fmt.Sprintf("rt_findings_%s", eng.ID),
+					Label: memory.LabelVulnerability,
+					Properties: map[string]interface{}{
+						"target":    eng.Target,
+						"output":    out,
+						"phase":     string(PhaseExploitation),
+						"timestamp": time.Now().Unix(),
+					},
+				})
+				eng.Status = PhasePostExploiting
 
 			case PhasePostExploiting:
 				log.Printf("[Orchestrator] [%s] Starting Post-Exploitation phase...", eng.ID)

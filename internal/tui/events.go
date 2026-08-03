@@ -1,0 +1,139 @@
+package tui
+
+import (
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/0xP4X/drogonclaw-go/internal/agent"
+	"github.com/charmbracelet/bubbles/textarea"
+	tea "github.com/charmbracelet/bubbletea"
+)
+
+func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
+	var cmds []tea.Cmd
+
+	switch ev.Type {
+	case agent.EvThinking:
+		m.lastStatus = ev.Content
+		m.phase = phaseFromStatus(ev.Content, "reasoning")
+		m.phaseDetail = ev.Content
+		m.lastStatus = "thinking..."
+
+	case agent.EvPlan:
+		m.lastPlan = ev.Plan
+		m.phase = "planning"
+		if ev.Plan != nil && len(ev.Plan.Steps) > 0 {
+			m.phaseDetail = fmt.Sprintf("plan: %d steps", len(ev.Plan.Steps))
+		} else {
+			m.phaseDetail = "planning"
+		}
+
+	case agent.EvStatus:
+		m.lastStatus = ev.Content
+		m.phase = phaseFromStatus(ev.Content, m.phase)
+		m.phaseDetail = ev.Content
+
+	case agent.EvToolStart:
+		if m.currentResponse != "" {
+			for _, line := range strings.Split(m.renderAgentResponseString(m.currentResponse), "\n") {
+				m.lines = append(m.lines, line)
+			}
+			m.currentResponse = ""
+		}
+
+		m.activeToolName = ev.Tool
+		m.lastTool = ev.Tool
+		m.phase = "executing"
+		m.phaseDetail = ev.Tool
+		m.toolStartTime = time.Now()
+		badge, badgeStyle := toolCategory(ev.Tool)
+		
+		m.appendLine(fmt.Sprintf("  ⚡ %s  %s", ToolStartStyle.Render(ev.Tool), badgeStyle.Render(" "+badge+" ")))
+		m.activeToolLine = len(m.lines) - 1
+
+	case agent.EvToolDone:
+		m.activeToolName = ""
+		m.lastToolResult = summarizeResult(ev.Result, 220)
+		m.phase = "verifying"
+		m.phaseDetail = ev.Tool
+		elapsed := time.Since(m.toolStartTime)
+		result := summarizeResult(ev.Result, 180)
+		badge, badgeStyle := toolCategory(ev.Tool)
+		isError := strings.Contains(strings.ToLower(result), "error") ||
+			strings.Contains(strings.ToLower(result), "failed") ||
+			strings.Contains(strings.ToLower(result), "exit status 127")
+		
+		var statusIcon string
+		if isError {
+			statusIcon = ToolOutputErrorStyle.Render("✖")
+		} else {
+			statusIcon = ToolOutputSuccessStyle.Render("✔")
+		}
+
+		line := fmt.Sprintf("  %s %s  %s  %s", statusIcon, ToolStartStyle.Render(ev.Tool), badgeStyle.Render(" "+badge+" "), ToolTimingStyle.Render(elapsed.Round(10*time.Millisecond).String()))
+		if result != "" {
+			if isError {
+				line += "\n    " + ToolOutputErrorStyle.Render("└─ "+result)
+			} else {
+				line += "\n    " + ToolOutputSuccessStyle.Render("└─ "+result)
+			}
+		}
+
+		if m.activeToolLine >= 0 && m.activeToolLine < len(m.lines) {
+			m.lines[m.activeToolLine] = line
+			m.updateViewportContent()
+		} else {
+			m.appendLine(line)
+		}
+		m.activeToolLine = -1
+
+	case agent.EvToken:
+		m.currentResponse += ev.Content
+		m.updateViewportContent()
+
+	case agent.EvDone:
+		if m.currentResponse != "" {
+			for _, line := range strings.Split(m.renderAgentResponseString(m.currentResponse), "\n") {
+				m.lines = append(m.lines, line)
+			}
+			m.currentResponse = ""
+		} else if ev.Content != "" {
+			for _, line := range strings.Split(m.renderAgentResponseString(ev.Content), "\n") {
+				m.lines = append(m.lines, line)
+			}
+		}
+		m.executing = false
+		m.phase = "complete"
+		m.phaseDetail = summarizeResult(ev.Content, 120)
+		m.lastPlan = nil
+		m.cancelFn = nil
+		cmds = append(cmds, textarea.Blink)
+		m.updateViewportContent()
+		return cmds
+
+	case agent.EvError:
+		m.activeToolName = ""
+		m.activeToolLine = -1
+		m.phase = "error"
+		m.phaseDetail = ev.Content
+		m.lastPlan = nil
+		m.appendLine(ErrorStyle.Render(fmt.Sprintf("  ✗ Execution Error: %s", ev.Content)))
+		m.executing = false
+		m.cancelFn = nil
+		return cmds
+	}
+
+	cmds = append(cmds, waitForEvent(m.eventsCh()))
+	return cmds
+}
+
+func waitForEvent(events <-chan agent.Event) tea.Cmd {
+	return func() tea.Msg {
+		ev, ok := <-events
+		if !ok {
+			return AgentEventMsg{Event: agent.Event{Type: agent.EvDone}}
+		}
+		return AgentEventMsg{Event: ev}
+	}
+}

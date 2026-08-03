@@ -44,3 +44,29 @@ type SandboxToggleResultMsg struct {
 	Enabled bool
 	Err     error
 }
+
+// ToolResultMsg wraps a structured tool result for display.
+type ToolResultMsg struct {
+	ToolName  string
+	Severity  string
+	Output    string
+	Duration  string
+	Success   bool
+}
+
+// ProgressMsg reports execution progress.
+type ProgressMsg struct {
+	Phase       string
+	Step        int
+	Total       int
+	Elapsed     string
+	CurrentTool string
+}
+
+// EvidenceMsg wraps a verified finding for display.
+type EvidenceMsg struct {
+	ObservationID string
+	Source        string
+	Fact          string
+	Confidence    int
+}

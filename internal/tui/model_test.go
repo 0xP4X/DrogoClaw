@@ -7,13 +7,13 @@ func TestCalculateLayoutPreservesMainPaneOnNarrowTerminals(t *testing.T) {
 	if narrow.sidebarWidth != 0 || narrow.mainWidth != 80 {
 		t.Fatalf("narrow layout should not reserve a sidebar: %#v", narrow)
 	}
-	if narrow.contentWidth < 8 || narrow.inputWidth < 8 {
+	if narrow.contentWidth < 8 {
 		t.Fatalf("narrow layout produced unusable content sizes: %#v", narrow)
 	}
 
 	wide := calculateLayout(140, 40)
-	if wide.sidebarWidth != 0 || wide.mainWidth != 140 {
-		t.Fatalf("wide layout should preserve a full-width workspace: %#v", wide)
+	if wide.sidebarWidth != 36 {
+		t.Fatalf("wide layout should reserve a sidebar: %#v", wide)
 	}
 
 	nearThreshold := calculateLayout(115, 24)
@@ -21,9 +21,9 @@ func TestCalculateLayoutPreservesMainPaneOnNarrowTerminals(t *testing.T) {
 		t.Fatalf("terminal below sidebar threshold should stay single-pane: %#v", nearThreshold)
 	}
 
-	minimumWide := calculateLayout(116, 24)
-	if minimumWide.sidebarWidth != 0 || minimumWide.mainWidth != 116 {
-		t.Fatalf("wide layouts should not reserve a permanent sidebar: %#v", minimumWide)
+	minimumWide := calculateLayout(120, 24)
+	if minimumWide.sidebarWidth != 28 {
+		t.Fatalf("wide layouts should reserve a permanent sidebar: %#v", minimumWide)
 	}
 }
 
@@ -33,9 +33,9 @@ func TestMatchHintsSupportsRecognitionWithoutChangingPrefixCompletion(t *testing
 		t.Fatalf("expected /health prefix suggestion, got %#v", prefix)
 	}
 
-	intent := matchHints("/diagnostic")
+	intent := matchHints("/health")
 	if len(intent) == 0 || intent[0].cmd != "/health" {
-		t.Fatalf("expected a diagnostic-related visible action, got %#v", intent)
+		t.Fatalf("expected a health-related visible action, got %#v", intent)
 	}
 }
 

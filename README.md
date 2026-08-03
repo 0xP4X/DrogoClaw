@@ -60,8 +60,8 @@ The platform revolves around three major pillars:
 
 ### 2. The Intelligence & Exploit Ecosystem
 A modular Go-backed tool registry allowing the agent to perform highly complex attacks without hallucinating syntax:
-- **11 Native Go Built-in Engines**: All legacy capabilities have been ported to native, lightning-fast Go routines. This includes the `Zero Click Exploiter`, `Autonomous AD Exploiter`, `Async Race Condition Engine`, `Dynamic Payload Compiler`, and `Headless Browser Automation`.
-- **Verified Exploit Templates**: 10+ pre-compiled, guaranteed-to-work attack chains for critical vulnerabilities (EternalBlue, Log4Shell, PrintNightmare, MS08-067, Spring4Shell).
+- **Native Go Tool Wrappers**: Structured wrappers for common pentest tools (Nmap, Nuclei, Gobuster, FFUF, SQLMap, Subfinder, HTTPX, Checksec, Hydra, Forensics Triage) that eliminate flag-guesswork and provide pre-optimised defaults.
+- **Verified Exploit Templates**: 10+ pre-compiled attack chains for critical vulnerabilities (EternalBlue, Log4Shell, PrintNightmare, MS08-067, Spring4Shell). Execution success depends on target vulnerability and environment; templates are verified against known vulnerable configurations, not guaranteed against all targets.
 - **Active Directory Arsenal**: Native wrappers for impacket and BloodHound (Kerberoasting, Pass-the-Hash, DCSync) allowing the agent to pivot through Windows domains.
 - **7-State Exploit Parser**: The AI doesn't just read raw output. A deterministic parser classifies every exploit attempt into one of 7 states (e.g., `SUCCESS_SHELL`, `PATCHED`, `FILTERED`, `WRONG_ARCH`) and feeds the exact recommended next step back to the reasoning engine.
 - **Dual-Layer CVE Intelligence**: 

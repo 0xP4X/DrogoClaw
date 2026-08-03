@@ -51,6 +51,8 @@ explicit TLS server entrypoint and a deliberate host binding for any remote
 deployment.
 *   **Port**: `18789`
 *   **Docs**: See `internal/api/server.go` for available endpoints.
+*   **Authentication**: Static Bearer token via `DROGONCLAW_API_KEY` environment variable.
+*   **Limitations**: No JWT, no RBAC, no TLS by default. The API binds to loopback only unless `StartServerAt` or `StartTLSServerAt` is used with an explicit host.
 
 ### TUI Operational Commands
 *   `/health` runs real toolkit diagnostics against the active sandbox runtime and reports installed/missing tooling.

@@ -21,8 +21,9 @@ import (
 // LocalTask describes a user-supplied local challenge. It intentionally
 // performs offline triage only: no network access and no external commands.
 type LocalTask struct {
-	Path        string
-	FlagPattern string
+	Path          string
+	FlagPattern   string
+	ChallengeType string // "forensics", "crypto", "web", "binary", "auto"
 }
 
 type Artifact struct {
@@ -141,6 +142,11 @@ func RunLocalTriage(ctx context.Context, task LocalTask) (Result, error) {
 		digest := sha256.Sum256(contents)
 		result.Artifacts = append(result.Artifacts, Artifact{Path: path, Size: fileInfo.Size(), SHA256: fmt.Sprintf("%x", digest)})
 		result.Scanned++
+		challengeType := classifyChallenge(path, contents)
+		if challengeType == "binary" {
+			binaryObs := validateBinary(path, contents)
+			result.Observations = append(result.Observations, binaryObs...)
+		}
 		scanObservation(&result, seen, flagRE, "file", path, contents)
 		inspectArchive(ctx, &result, seen, flagRE, path, contents)
 	}
@@ -155,6 +161,82 @@ func RunLocalTriage(ctx context.Context, task LocalTask) (Result, error) {
 		result.Summary = fmt.Sprintf("No verified flag found in %d local artifact(s); use the artifact inventory to choose the next analysis step.", result.Scanned)
 	}
 	return result, nil
+}
+
+// classifyChallenge determines the challenge type based on file extensions
+// and content inspection.
+func classifyChallenge(path string, contents []byte) string {
+	lower := strings.ToLower(path)
+	binaryExts := []string{".elf", ".exe", ".bin", ".so", ".dll", ".o", ".out", ".ko"}
+	for _, ext := range binaryExts {
+		if strings.HasSuffix(lower, ext) {
+			return "binary"
+		}
+	}
+	cryptoExts := []string{".enc", ".cipher", ".encrypted", ".key", ".pem", ".cer", ".crt"}
+	for _, ext := range cryptoExts {
+		if strings.HasSuffix(lower, ext) {
+			return "crypto"
+		}
+	}
+	webExts := []string{".html", ".php", ".js", ".jsp", ".asp", ".aspx", ".py", ".rb"}
+	for _, ext := range webExts {
+		if strings.HasSuffix(lower, ext) {
+			return "web"
+		}
+	}
+	forensicsExts := []string{".pcap", ".pcapng", ".mem", ".vmem", ".img", ".iso", ".jpg", ".png", ".wav", ".mp3", ".zip", ".tar", ".gz", ".rar", ".7z"}
+	for _, ext := range forensicsExts {
+		if strings.HasSuffix(lower, ext) {
+			return "forensics"
+		}
+	}
+	// Inspect content for binary signatures
+	if len(contents) >= 4 {
+		if bytes.HasPrefix(contents, []byte{0x7f, 'E', 'L', 'F'}) {
+			return "binary"
+		}
+		if bytes.HasPrefix(contents, []byte{'M', 'Z'}) {
+			return "binary"
+		}
+	}
+	return "forensics"
+}
+
+// validateBinary performs basic binary analysis on the artifact contents.
+// It checks for common exploitation primitives and reports findings.
+func validateBinary(path string, contents []byte) []Observation {
+	var obs []Observation
+	digest := sha256.Sum256(contents)
+	id := fmt.Sprintf("obs-binary-%d", len(obs)+1)
+	observation := Observation{ID: id, Kind: "binary_analysis", Source: path, SHA256: fmt.Sprintf("%x", digest)}
+
+	// Check for common binary exploitation indicators
+	content := string(contents)
+	indicators := []struct {
+		name  string
+		pattern string
+	}{
+		{"NX disabled (executable stack)", "execstack"},
+		{"PIE disabled", "No PIE"},
+		{"CANARY disabled", "No canary"},
+		{"RELRO disabled", "No RELRO"},
+		{"Fortify source disabled", "FORTIFY_SOURCE"},
+	}
+	for _, ind := range indicators {
+		if strings.Contains(content, ind.pattern) {
+			observation.Findings++
+		}
+	}
+
+	// Check for embedded files (common in binary CTF challenges)
+	if strings.Contains(content, "FLAG") || strings.Contains(content, "flag{") {
+		observation.Findings++
+	}
+
+	observation.Error = ""
+	obs = append(obs, observation)
+	return obs
 }
 
 func scanObservation(result *Result, seen map[string]struct{}, flagRE *regexp.Regexp, kind, source string, contents []byte) {

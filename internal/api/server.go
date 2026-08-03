@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/0xP4X/drogonclaw-go/internal/redteam/orchestrator"
+	"github.com/0xP4X/drogonclaw-go/internal/sandbox"
 )
 
 // ═══════════════════════════════════════════════════════════
@@ -28,6 +29,12 @@ var globalOrchestrator *orchestrator.Orchestrator
 
 func init() {
 	globalOrchestrator = orchestrator.New()
+	sb, err := sandbox.New()
+	if err != nil {
+		log.Printf("[API] Sandbox unavailable, engagement execution will require manual sandbox setup: %v", err)
+		return
+	}
+	globalOrchestrator.SetSandbox(sb)
 }
 
 func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {

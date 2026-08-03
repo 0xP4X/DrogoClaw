@@ -236,6 +236,12 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 				o.actions.ToolFinished(tc.Function.Name, result)
 			}
 
+			// Verify tool result against the success oracle before feeding it back.
+			// A tool claiming success must have verified evidence in its output.
+			if verified, reason := o.tools.VerifySuccess(tc.Function.Name, result); !verified {
+				events <- Event{Type: EvStatus, Content: fmt.Sprintf("Evidence gate: %s", reason)}
+			}
+
 			events <- Event{Type: EvToolDone, Tool: tc.Function.Name, Result: result}
 			messages = append(messages, openai.ToolMessage(tc.ID, result))
 

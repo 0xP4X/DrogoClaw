@@ -11,18 +11,61 @@ import (
 	"github.com/openai/openai-go"
 )
 
+// StepStatus represents the execution state of a mission step.
+type StepStatus string
+
+const (
+	StepPending   StepStatus = "PENDING"
+	StepRunning   StepStatus = "RUNNING"
+	StepCompleted StepStatus = "COMPLETED"
+	StepFailed    StepStatus = "FAILED"
+	StepSkipped   StepStatus = "SKIPPED"
+)
+
 type MissionStep struct {
-	ID              string `json:"id"`
-	Action          string `json:"action"`
-	TargetAssetID   string `json:"targetAssetId"`
-	ExpectedOutcome string `json:"expectedOutcome"`
-	Status          string `json:"status"`
+	ID              string     `json:"id"`
+	Action          string     `json:"action"`
+	TargetAssetID   string     `json:"targetAssetId"`
+	ExpectedOutcome string     `json:"expectedOutcome"`
+	Status          StepStatus `json:"status"`
+	Error           string     `json:"error,omitempty"`
 }
 
 type MissionPlan struct {
 	IsValidMission bool          `json:"isValidMission"`
 	Objective      string        `json:"objective"`
 	Steps          []MissionStep `json:"steps"`
+}
+
+// NextPending returns the first step with PENDING status, or nil if all are done.
+func (p *MissionPlan) NextPending() *MissionStep {
+	for i := range p.Steps {
+		if p.Steps[i].Status == StepPending {
+			return &p.Steps[i]
+		}
+	}
+	return nil
+}
+
+// AllCompleted returns true if every step is in a terminal state.
+func (p *MissionPlan) AllCompleted() bool {
+	for _, s := range p.Steps {
+		if s.Status != StepCompleted && s.Status != StepFailed && s.Status != StepSkipped {
+			return false
+		}
+	}
+	return true
+}
+
+// CompletedCount returns the number of steps in COMPLETED status.
+func (p *MissionPlan) CompletedCount() int {
+	n := 0
+	for _, s := range p.Steps {
+		if s.Status == StepCompleted {
+			n++
+		}
+	}
+	return n
 }
 
 type LLMProvider interface {
@@ -78,7 +121,7 @@ func (m *MissionPlanner) GeneratePlan(ctx context.Context, objective string) (*M
 	}
 
 	sysPrompt := strings.ReplaceAll(plannerPromptTemplate, "{{OPERATOR_NAME}}", opName)
-	
+
 	// Compress graph (using JSON for now)
 	graphState := m.graph.GetFullJSON()
 	if len(graphState) > 2000 {
@@ -121,7 +164,7 @@ func (m *MissionPlanner) fallbackPlan(objective string) *MissionPlan {
 				Action:          "Execute manual agent evaluation",
 				TargetAssetID:   "unknown",
 				ExpectedOutcome: "Evaluate the target manually",
-				Status:          "PENDING",
+				Status:          StepPending,
 			},
 		},
 	}
