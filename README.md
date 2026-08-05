@@ -90,8 +90,8 @@ DrogonClaw operates through multiple interconnected modules. You can run it loca
 DrogonClaw operates outside of centralized registries to prevent censorship. It must be cloned directly from GitHub:
 
 ```bash
-git clone https://github.com/0xP4X/DrogoClaw.git
-cd DrogoClaw
+git clone https://github.com/0xP4X/drogonclaw.git
+cd drogonclaw
 go mod tidy
 go build -o drogonclaw ./cmd/drogonclaw/
 ```
@@ -165,7 +165,7 @@ DrogonClaw is designed for **authorized security testing only**. Always ensure y
 
 ## 📄 License
 
-MIT
+GNU AGPL v3
 
 ## 🌟 Star History
 
