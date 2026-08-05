@@ -2,9 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
 
 jobs:
   test:
@@ -117,7 +117,11 @@ jobs:
 
           ### Installation
           ```bash
-          curl -fsSL https://drogonclaw.xyz/install.sh | bash
+          git clone https://github.com/0xP4X/drogonclaw.git
+          cd drogonclaw
+          go mod tidy
+          go build -o drogonclaw ./cmd/drogonclaw/
+          sudo mv drogonclaw /usr/local/bin/
           ```
 
           ### Manual Download

@@ -2,7 +2,7 @@
   "name": "drogonclaw",
   "version": "1.0.3",
   "description": "Linux-only AI-driven offensive security framework written in Go.",
-  "license": "MIT",
+  "license": "AGPL-3.0",
   "author": "0xP4X",
   "homepage": "https://drogonclaw.xyz",
   "keywords": [
@@ -15,10 +15,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/0xP4X/DrogonClaw.git"
+    "url": "git+https://github.com/0xP4X/drogonclaw.git"
   },
   "bugs": {
-    "url": "https://github.com/0xP4X/DrogonClaw/issues"
+    "url": "https://github.com/0xP4X/drogonclaw/issues"
   },
   "bin": {
     "drogonclaw": "drogonclaw"
