@@ -3,7 +3,7 @@
   "version": "1.0.3",
   "description": "Linux-only AI-driven offensive security framework written in Go.",
   "license": "AGPL-3.0",
-  "author": "0xP4X",
+  "author": "0xP4X (Prince Ofori) <princeofori1470@gmail.com>",
   "homepage": "https://drogonclaw.xyz",
   "keywords": [
     "cli",

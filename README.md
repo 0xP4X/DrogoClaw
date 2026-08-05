@@ -6,7 +6,7 @@
 
 > **AI-Driven Offensive Security Framework**
 > *Developed by 0xP4X*
-> 🌐 **Official Website**: [drogonclaw.xyz](https://drogonclaw.xyz)
+> 🌐 **Official Website**: [drogonclaw.xyz](https://drogonclaw.xyz) | [Portfolio](https://0xp4x.github.io/princeofori/)
 
 DrogonClaw is a next-generation cyber operations platform. Rather than acting as a simple wrapper for Kali tools, DrogonClaw operates as a **Command-and-Control (C2) Brain**. It understands objectives, plans attack workflows, adapts to new discoveries, and orchestrates a swarm of specialized autonomous agents through a unified intelligence core.
 
@@ -156,8 +156,11 @@ DrogonClaw is designed to scale into collaborative agent swarms. You can inject 
 
 ## 👨‍💻 Author
 
-**0xP4X**
-- GitHub: [@0xP4X](https://github.com/0xP4X)
+**0xP4X** (Prince Ofori)
+- 🌐 Portfolio: [0xp4x.github.io/princeofori](https://0xp4x.github.io/princeofori/)
+- 🐙 GitHub: [@0xP4X](https://github.com/0xP4X)
+- 💼 LinkedIn: [linkedin.com/in/prince-ofori-40a1062aa](https://linkedin.com/in/prince-ofori-40a1062aa)
+- 📧 Email: princeofori1470@gmail.com
 
 ## ⚠️ Disclaimer
 
@@ -169,4 +172,4 @@ GNU AGPL v3
 
 ## 🌟 Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=0xP4X/DrogonClaw&type=Date)](https://star-history.com/#0xP4X/DrogonClaw&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=0xP4X/drogonclaw&type=Date)](https://star-history.com/#0xP4X/drogonclaw&Date)
