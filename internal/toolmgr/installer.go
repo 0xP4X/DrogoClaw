@@ -8,6 +8,10 @@ import (
 	"github.com/0xP4X/drogonclaw-go/internal/sandbox"
 )
 
+func shellQuote(s string) string {
+	return strings.ReplaceAll(s, "'", "'\\''")
+}
+
 // InstallMethod represents the strategy used to install a tool.
 type InstallMethod string
 
@@ -68,11 +72,11 @@ func install(ctx context.Context, sb *sandbox.Docker, method InstallMethod, pkg,
 	var cmd string
 	switch method {
 	case MethodApt:
-		cmd = fmt.Sprintf("apt-get update -qq && apt-get install -y %s 2>&1", pkg)
+		cmd = fmt.Sprintf("apt-get update -qq && apt-get install -y %s 2>&1", shellQuote(pkg))
 	case MethodGo:
-		cmd = fmt.Sprintf("go install %s 2>&1 && echo '[OK] %s installed via go'", pkg, toolName)
+		cmd = fmt.Sprintf("go install %s 2>&1 && echo '[OK] %s installed via go'", shellQuote(pkg), shellQuote(toolName))
 	case MethodPip:
-		cmd = fmt.Sprintf("pip3 install --quiet %s 2>&1 && echo '[OK] %s installed via pip'", pkg, toolName)
+		cmd = fmt.Sprintf("pip3 install --quiet %s 2>&1 && echo '[OK] %s installed via pip'", shellQuote(pkg), shellQuote(toolName))
 	default:
 		return "", fmt.Errorf("unknown install method: %s", method)
 	}
@@ -82,8 +86,7 @@ func install(ctx context.Context, sb *sandbox.Docker, method InstallMethod, pkg,
 		return "", fmt.Errorf("install command failed: %w\nOutput: %s", err, out)
 	}
 
-	// Verify the tool is now available
-	checkOut, _ := sb.Execute(ctx, fmt.Sprintf("which %s 2>/dev/null || command -v %s 2>/dev/null", toolName, toolName))
+	checkOut, _ := sb.Execute(ctx, fmt.Sprintf("which %s 2>/dev/null || command -v %s 2>/dev/null", shellQuote(toolName), shellQuote(toolName)))
 	if strings.TrimSpace(checkOut) == "" {
 		return out, fmt.Errorf("installation ran but '%s' is still not found in PATH", toolName)
 	}
@@ -93,6 +96,6 @@ func install(ctx context.Context, sb *sandbox.Docker, method InstallMethod, pkg,
 
 // IsInstalled checks whether a tool is available in the sandbox.
 func IsInstalled(ctx context.Context, toolName string, sb *sandbox.Docker) bool {
-	out, err := sb.Execute(ctx, fmt.Sprintf("which %s 2>/dev/null", toolName))
+	out, err := sb.Execute(ctx, fmt.Sprintf("which %s 2>/dev/null", shellQuote(toolName)))
 	return err == nil && strings.TrimSpace(out) != "" && !strings.Contains(out, "not found")
 }

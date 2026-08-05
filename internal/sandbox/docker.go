@@ -347,6 +347,10 @@ func isDangerous(cmd string) bool {
 	return false
 }
 
+func shellQuote(s string) string {
+	return strings.ReplaceAll(s, "'", "'\\''")
+}
+
 // WriteFile writes string content directly to a file inside the sandbox container
 // by echoing a base64 encoded string and decoding it inside the container.
 func (d *Docker) WriteFile(ctx context.Context, remoteDest, content string) error {
@@ -362,11 +366,14 @@ func (d *Docker) WriteFile(ctx context.Context, remoteDest, content string) erro
 		return fmt.Errorf("sandbox not initialized")
 	}
 
-	// Base64 encode the content to avoid quoting/escaping hell
+	remoteDest = filepath.Clean(remoteDest)
+	if strings.Contains(remoteDest, "..") {
+		return fmt.Errorf("invalid destination path: path traversal detected")
+	}
+
 	b64 := base64.StdEncoding.EncodeToString([]byte(content))
 
-	// Create parent directories if they don't exist, then write the file
-	cmd := fmt.Sprintf("mkdir -p \"$(dirname '%s')\" && echo '%s' | base64 -d > '%s'", remoteDest, b64, remoteDest)
+	cmd := fmt.Sprintf("mkdir -p \"$(dirname '%s')\" && echo '%s' | base64 -d > '%s'", shellQuote(remoteDest), shellQuote(b64), shellQuote(remoteDest))
 
 	out, err := d.executeDocker(ctx, cmd)
 	if err != nil {

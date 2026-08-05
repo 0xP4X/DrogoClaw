@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/0xP4X/drogonclaw-go/internal/redteam/orchestrator"
 	"github.com/0xP4X/drogonclaw-go/internal/sandbox"
@@ -63,12 +64,20 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 func sendJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("X-XSS-Protection", "1; mode=block")
+	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(APIResponse{Success: true, Data: data})
 }
 
 func sendError(w http.ResponseWriter, status int, err string) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("X-XSS-Protection", "1; mode=block")
+	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(APIResponse{Success: false, Error: err})
 }
@@ -93,6 +102,7 @@ func handleGetScans(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleStartScan(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MB limit
 	var req struct {
 		Target string `json:"target"`
 		Type   string `json:"type"`
@@ -100,6 +110,11 @@ func handleStartScan(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		sendError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.Target == "" || len(req.Target) > 2048 {
+		sendError(w, http.StatusBadRequest, "Target must be non-empty and <= 2048 characters")
 		return
 	}
 
@@ -122,8 +137,11 @@ func StartServer(port string) error {
 func StartServerAt(host, port string) error {
 	mux := setupRoutes()
 	server := &http.Server{
-		Addr:    host + ":" + port,
-		Handler: mux,
+		Addr:         host + ":" + port,
+		Handler:      mux,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
 	log.Printf("Starting Local API (HTTP) on %s", server.Addr)
@@ -138,8 +156,11 @@ func StartTLSServer(port, certFile, keyFile string) error {
 func StartTLSServerAt(host, port, certFile, keyFile string) error {
 	mux := setupRoutes()
 	server := &http.Server{
-		Addr:    host + ":" + port,
-		Handler: mux,
+		Addr:         host + ":" + port,
+		Handler:      mux,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
 	log.Printf("Starting Local API (HTTPS) on %s", server.Addr)
@@ -149,17 +170,23 @@ func StartTLSServerAt(host, port, certFile, keyFile string) error {
 func setupRoutes() *http.ServeMux {
 	mux := http.NewServeMux()
 
-	// Public routes
-	mux.HandleFunc("/health", handleHealth)
+	securityHeaders := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("X-Content-Type-Options", "nosniff")
+			w.Header().Set("X-Frame-Options", "DENY")
+			w.Header().Set("X-XSS-Protection", "1; mode=block")
+			w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+			w.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+			next.ServeHTTP(w, r)
+		})
+	}
 
-	// Protected routes
-	mux.HandleFunc("/api/v1/scans", AuthMiddleware(handleGetScans))
-	mux.HandleFunc("/api/v1/scans/start", AuthMiddleware(handleStartScan))
-
-	// Red Team API Endpoints
-	mux.HandleFunc("/api/v1/engagements/start", AuthMiddleware(handleStartEngagement))
-	mux.HandleFunc("/api/v1/engagements/status", AuthMiddleware(handleGetEngagementStatus))
-	mux.HandleFunc("/api/v1/engagements/approve", AuthMiddleware(handleApproveEngagement))
+	mux.Handle("/health", securityHeaders(http.HandlerFunc(handleHealth)))
+	mux.Handle("/api/v1/scans", securityHeaders(http.HandlerFunc(AuthMiddleware(handleGetScans))))
+	mux.Handle("/api/v1/scans/start", securityHeaders(http.HandlerFunc(AuthMiddleware(handleStartScan))))
+	mux.Handle("/api/v1/engagements/start", securityHeaders(http.HandlerFunc(AuthMiddleware(handleStartEngagement))))
+	mux.Handle("/api/v1/engagements/status", securityHeaders(http.HandlerFunc(AuthMiddleware(handleGetEngagementStatus))))
+	mux.Handle("/api/v1/engagements/approve", securityHeaders(http.HandlerFunc(AuthMiddleware(handleApproveEngagement))))
 
 	return mux
 }
@@ -167,6 +194,7 @@ func setupRoutes() *http.ServeMux {
 // --- Red Team Handlers ---
 
 func handleStartEngagement(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var req struct {
 		Target string `json:"target"`
 		Mode   string `json:"mode"`
@@ -174,6 +202,11 @@ func handleStartEngagement(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		sendError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.Target == "" || len(req.Target) > 2048 {
+		sendError(w, http.StatusBadRequest, "Target must be non-empty and <= 2048 characters")
 		return
 	}
 

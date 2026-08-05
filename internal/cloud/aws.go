@@ -15,12 +15,12 @@ func ensureAWSCLI(ctx context.Context, accessKey, secretKey string, sb *sandbox.
 		return fmt.Errorf("failed to install aws-cli: %v", err)
 	}
 
-	configCmd := fmt.Sprintf(`mkdir -p ~/.aws && cat << EOF > ~/.aws/credentials
+	configCmd := fmt.Sprintf(`mkdir -p ~/.aws && cat << 'EOF' > ~/.aws/credentials
 [default]
 aws_access_key_id = %s
 aws_secret_access_key = %s
 EOF
-cat << EOF > ~/.aws/config
+cat << 'EOF' > ~/.aws/config
 [default]
 region = us-east-1
 output = json
