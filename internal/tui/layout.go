@@ -26,7 +26,7 @@ type tuiLayout struct {
 	isCompact     bool
 }
 
-func calculateLayout(width, height int) tuiLayout {
+func calculateLayout(width, height, inputHeight int) tuiLayout {
 	width = max(1, width)
 	height = max(1, height)
 
@@ -37,7 +37,7 @@ func calculateLayout(width, height int) tuiLayout {
 		isCompact:    width < 80,
 		headerHeight: headerHeight,
 		footerHeight: footerHeight,
-		inputHeight:  inputMinHeight,
+		inputHeight:  inputHeight,
 	}
 
 	if l.hasSidebar {

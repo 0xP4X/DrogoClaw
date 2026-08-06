@@ -52,6 +52,10 @@ func (m *Manager) Set(key, value string) {
 	m.save()
 }
 
+func (m *Manager) Reload() {
+	_ = m.v.ReadInConfig()
+}
+
 func (m *Manager) save() {
 	home, _ := os.UserHomeDir()
 	_ = m.v.WriteConfigAs(filepath.Join(home, ".drogonclaw", "config.json"))
@@ -158,6 +162,10 @@ func (m *Manager) GetVirusTotalAPIKey() string {
 
 func (m *Manager) GetHunterAPIKey() string {
 	return firstNonEmpty(m.GetString("HUNTER_IO_API_KEY"), os.Getenv("HUNTER_IO_API_KEY"))
+}
+
+func (m *Manager) GetGitHubToken() string {
+	return firstNonEmpty(m.GetString("GITHUB_TOKEN"), os.Getenv("GITHUB_TOKEN"))
 }
 
 func (m *Manager) IsVerified() bool {

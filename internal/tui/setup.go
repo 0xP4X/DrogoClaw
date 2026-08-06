@@ -102,13 +102,7 @@ func RunSetup(cfg *config.Manager) {
 
 	switch provider {
 	case "openrouter":
-		modelOptions = []huh.Option[string]{
-			huh.NewOption("Meta: Llama 3.1 405B Instruct", "meta-llama/llama-3.1-405b-instruct"),
-			huh.NewOption("Meta: Llama 3.1 70B Instruct", "meta-llama/llama-3.1-70b-instruct"),
-			huh.NewOption("Mistral: Mixtral 8x22B Instruct", "mistralai/mixtral-8x22b-instruct"),
-			huh.NewOption("OpenAI: GPT-4o", "openai/gpt-4o"),
-			huh.NewOption("Google: Gemini 2.5 Pro", "google/gemini-2.5-pro"),
-		}
+		modelOptions = openRouterModelOptions()
 	case "nvidia":
 		modelOptions = []huh.Option[string]{
 			huh.NewOption("Nemotron 3 Ultra 550B", "nvidia/nemotron-3-ultra-550b-a55b"),
@@ -238,4 +232,32 @@ func RunSetup(cfg *config.Manager) {
 	fmt.Println(muted("  Configuration saved successfully."))
 	fmt.Println(muted("  Launch workspace with:  ./drogonclaw"))
 	fmt.Println()
+}
+
+// openRouterModelOptions builds the model picker from the live OpenRouter
+// catalog. On any failure (offline / API down) it falls back to a small curated
+// list so setup is never blocked.
+func openRouterModelOptions() []huh.Option[string] {
+	fallback := []huh.Option[string]{
+		huh.NewOption("Meta: Llama 3.1 405B Instruct", "meta-llama/llama-3.1-405b-instruct"),
+		huh.NewOption("Meta: Llama 3.1 70B Instruct", "meta-llama/llama-3.1-70b-instruct"),
+		huh.NewOption("Mistral: Mixtral 8x22B Instruct", "mistralai/mixtral-8x22b-instruct"),
+		huh.NewOption("OpenAI: GPT-4o", "openai/gpt-4o"),
+		huh.NewOption("Google: Gemini 2.5 Pro", "google/gemini-2.5-pro"),
+	}
+
+	ids, err := config.OpenRouterModels()
+	if err != nil || len(ids) == 0 {
+		return fallback
+	}
+
+	const maxOptions = 300
+	if len(ids) > maxOptions {
+		ids = ids[:maxOptions]
+	}
+	opts := make([]huh.Option[string], 0, len(ids))
+	for _, id := range ids {
+		opts = append(opts, huh.NewOption(id, id))
+	}
+	return opts
 }

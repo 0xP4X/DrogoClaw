@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"time"
 )
 
 // OSINTResult holds results from any OSINT lookup.
@@ -456,61 +457,134 @@ func parseVCard(vcardArray interface{}) map[string]string {
 
 // ── Certificate Transparency ──────────────────────────────────────────────────
 
-// CertTransparencyLookup finds subdomains via certificate transparency logs (crt.sh).
+// CertTransparencyLookup finds subdomains via certificate transparency logs.
+// It queries crt.sh (with retry, since that endpoint is frequently flaky /
+// rate-limited / intermittently 404s) and falls back to Cert Spotter (SSLMate),
+// a free no-key CT source, so subdomain enumeration still works when crt.sh is
+// unavailable.
 func CertTransparencyLookup(domain string) (*OSINTResult, error) {
+	domain = strings.ToLower(strings.TrimSpace(domain))
+	if domain == "" {
+		return nil, fmt.Errorf("domain is required")
+	}
+
+	if res, err := certTransparencyCRTSh(domain); err == nil && res != nil {
+		return res, nil
+	}
+	if res, err := certTransparencyCertSpotter(domain); err == nil && res != nil {
+		return res, nil
+	}
+	return nil, fmt.Errorf("certificate transparency lookup failed for %s (crt.sh and certspotter both unavailable)", domain)
+}
+
+func certTransparencyCRTSh(domain string) (*OSINTResult, error) {
 	endpoint := fmt.Sprintf("https://crt.sh/?q=%%.%s&output=json", url.QueryEscape(domain))
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			time.Sleep(time.Duration(attempt) * 500 * time.Millisecond)
+		}
+		resp, err := httpClient.Do(mustGET(endpoint))
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			lastErr = fmt.Errorf("crt.sh error %d", resp.StatusCode)
+			continue
+		}
+		var certs []struct {
+			NameValue string `json:"name_value"`
+		}
+		if err := json.Unmarshal(body, &certs); err != nil {
+			lastErr = err
+			continue
+		}
+		subs := extractCTSubdomains(certs, domain)
+		if len(subs) == 0 {
+			lastErr = fmt.Errorf("no certificates returned")
+			continue
+		}
+		return buildCTResult(domain, subs, "crt.sh"), nil
+	}
+	return nil, lastErr
+}
+
+func certTransparencyCertSpotter(domain string) (*OSINTResult, error) {
+	endpoint := fmt.Sprintf("https://api.certspotter.com/v1/issuances?domain=%s&include_subdomains=true&expand=dns_names",
+		url.QueryEscape(domain))
 
 	resp, err := httpClient.Do(mustGET(endpoint))
 	if err != nil {
-		return nil, fmt.Errorf("crt.sh request failed: %w", err)
+		return nil, fmt.Errorf("certspotter request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("crt.sh error %d", resp.StatusCode)
+		return nil, fmt.Errorf("certspotter error %d", resp.StatusCode)
 	}
 
-	var certs []struct {
-		NameValue string `json:"name_value"`
-		IssuerCN  string `json:"issuer_ca_id"`
-		NotBefore string `json:"not_before"`
+	var issuances []struct {
+		DNSNames []string `json:"dns_names"`
 	}
-	if err := json.Unmarshal(body, &certs); err != nil {
-		return nil, fmt.Errorf("crt.sh decode error: %w", err)
+	if err := json.Unmarshal(body, &issuances); err != nil {
+		return nil, fmt.Errorf("certspotter decode error: %w", err)
 	}
 
-	// Deduplicate and sort subdomains
 	seen := make(map[string]bool)
-	var subdomains []string
-	for _, c := range certs {
-		for _, sub := range strings.Split(c.NameValue, "\n") {
-			sub = strings.TrimSpace(strings.ToLower(sub))
-			// Filter wildcard duplicates — keep the non-wildcard version
-			sub = strings.TrimPrefix(sub, "*.")
-			if sub != "" && !seen[sub] && strings.HasSuffix(sub, domain) {
-				seen[sub] = true
-				subdomains = append(subdomains, sub)
+	var subs []string
+	for _, it := range issuances {
+		for _, n := range it.DNSNames {
+			n = strings.ToLower(strings.TrimSpace(n))
+			n = strings.TrimPrefix(n, "*.")
+			if n != "" && !seen[n] && strings.HasSuffix(n, domain) {
+				seen[n] = true
+				subs = append(subs, n)
 			}
 		}
 	}
-	sort.Strings(subdomains)
+	if len(subs) == 0 {
+		return nil, fmt.Errorf("no certificates returned")
+	}
+	sort.Strings(subs)
+	return buildCTResult(domain, subs, "certspotter"), nil
+}
 
+func extractCTSubdomains(certs []struct {
+	NameValue string `json:"name_value"`
+}, domain string) []string {
+	seen := make(map[string]bool)
+	var subs []string
+	for _, c := range certs {
+		for _, sub := range strings.Split(c.NameValue, "\n") {
+			sub = strings.TrimSpace(strings.ToLower(sub))
+			sub = strings.TrimPrefix(sub, "*.")
+			if sub != "" && !seen[sub] && strings.HasSuffix(sub, domain) {
+				seen[sub] = true
+				subs = append(subs, sub)
+			}
+		}
+	}
+	sort.Strings(subs)
+	return subs
+}
+
+func buildCTResult(domain string, subs []string, source string) *OSINTResult {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("=== Certificate Transparency: %s ===\n\n", domain))
-	sb.WriteString(fmt.Sprintf("[+] Subdomains discovered (%d unique):\n", len(subdomains)))
-	for _, s := range subdomains {
+	sb.WriteString(fmt.Sprintf("[+] Subdomains discovered (%d unique):\n", len(subs)))
+	for _, s := range subs {
 		sb.WriteString(fmt.Sprintf("  %s\n", s))
 	}
-
-	data := map[string]interface{}{"subdomains": subdomains, "count": len(subdomains)}
-
 	return &OSINTResult{
-		Source:  "crt.sh",
+		Source:  source,
 		Target:  domain,
-		Data:    data,
+		Data:    map[string]interface{}{"subdomains": subs, "count": len(subs)},
 		Summary: sb.String(),
-	}, nil
+	}
 }
 
 // ── Email Harvesting ──────────────────────────────────────────────────────────
@@ -658,9 +732,10 @@ func extractEmailsFromText(text, domain string) []string {
 
 // ── GitHub Dorking ────────────────────────────────────────────────────────────
 
-// GitHubDork searches GitHub for exposed secrets, credentials, and code leaks
-// related to a target organization or domain.
-func GitHubDork(target string) (*OSINTResult, error) {
+// githubDorkPassive searches GitHub for exposed secrets, credentials, and code
+// leaks related to a target via passive search-engine dorking. It is the
+// no-token fallback used by GitHubDork when no GITHUB_TOKEN is configured.
+func githubDorkPassive(target string) (*OSINTResult, error) {
 	dorks := []struct {
 		label string
 		query string
@@ -672,9 +747,8 @@ func GitHubDork(target string) (*OSINTResult, error) {
 		{"Private Keys", fmt.Sprintf("%s BEGIN RSA PRIVATE KEY OR BEGIN OPENSSH PRIVATE KEY", target)},
 	}
 
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("=== GitHub Credential Dork: %s ===\n\n", target))
-	sb.WriteString("[~] Passive search via web — for authenticated GitHub search use GitHub's search API directly.\n\n")
+	r := NewReport(fmt.Sprintf("GitHub Credential Dork (passive): %s", target))
+	r.Note("Passive web search - for authenticated GitHub search, set GITHUB_TOKEN.")
 
 	var allHits []map[string]interface{}
 
@@ -685,29 +759,28 @@ func GitHubDork(target string) (*OSINTResult, error) {
 			continue
 		}
 		if len(results) > 0 {
-			sb.WriteString(fmt.Sprintf("[+] %s — %d hits:\n", dork.label, len(results)))
-			for _, r := range results {
-				sb.WriteString(fmt.Sprintf("  ▶ %s\n    %s\n", r.Title, r.URL))
+			r.Section(fmt.Sprintf("%s - %d hits", dork.label, len(results)))
+			for _, rr := range results {
+				r.Bullet(fmt.Sprintf("%s - %s", rr.Title, rr.URL))
 				allHits = append(allHits, map[string]interface{}{
 					"label": dork.label,
-					"title": r.Title,
-					"url":   r.URL,
+					"title": rr.Title,
+					"url":   rr.URL,
 				})
 			}
-			sb.WriteString("\n")
 		}
 	}
 
 	if len(allHits) == 0 {
-		sb.WriteString("[~] No public GitHub leaks found. Try authenticated search via GitHub API.\n")
+		r.Note("No public GitHub leaks found. Try authenticated search via the GitHub API (set GITHUB_TOKEN).")
 	}
 
 	data := map[string]interface{}{"hits": allHits, "target": target}
 	return &OSINTResult{
-		Source:  "GitHubDork",
+		Source:  "GitHubDorkPassive",
 		Target:  target,
 		Data:    data,
-		Summary: sb.String(),
+		Summary: r.String(),
 	}, nil
 }
 

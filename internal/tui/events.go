@@ -58,12 +58,11 @@ func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 		m.phase = "verifying"
 		m.phaseDetail = ev.Tool
 		elapsed := time.Since(m.toolStartTime)
-		result := summarizeResult(ev.Result, 180)
 		badge, badgeStyle := toolCategory(ev.Tool)
-		isError := strings.Contains(strings.ToLower(result), "error") ||
-			strings.Contains(strings.ToLower(result), "failed") ||
-			strings.Contains(strings.ToLower(result), "exit status 127")
-		
+		isError := strings.Contains(strings.ToLower(ev.Result), "error") ||
+			strings.Contains(strings.ToLower(ev.Result), "failed") ||
+			strings.Contains(strings.ToLower(ev.Result), "exit status 127")
+
 		var statusIcon string
 		if isError {
 			statusIcon = ToolOutputErrorStyle.Render("✖")
@@ -71,22 +70,25 @@ func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 			statusIcon = ToolOutputSuccessStyle.Render("✔")
 		}
 
-		line := fmt.Sprintf("  %s %s  %s  %s", statusIcon, ToolStartStyle.Render(ev.Tool), badgeStyle.Render(" "+badge+" "), ToolTimingStyle.Render(elapsed.Round(10*time.Millisecond).String()))
-		if result != "" {
-			if isError {
-				line += "\n    " + ToolOutputErrorStyle.Render("└─ "+result)
-			} else {
-				line += "\n    " + ToolOutputSuccessStyle.Render("└─ "+result)
-			}
-		}
+		statusLine := fmt.Sprintf("  %s %s  %s  %s", statusIcon, ToolStartStyle.Render(ev.Tool), badgeStyle.Render(" "+badge+" "), ToolTimingStyle.Render(elapsed.Round(10*time.Millisecond).String()))
 
 		if m.activeToolLine >= 0 && m.activeToolLine < len(m.lines) {
-			m.lines[m.activeToolLine] = line
-			m.updateViewportContent()
+			m.lines[m.activeToolLine] = statusLine
 		} else {
-			m.appendLine(line)
+			m.lines = append(m.lines, statusLine)
 		}
+
+		outputLines := strings.Split(ev.Result, "\n")
+		for i, line := range outputLines {
+			prefix := "    "
+			if i < len(outputLines)-1 || strings.TrimSpace(line) != "" {
+				prefix = "    │ "
+			}
+			m.lines = append(m.lines, truncateLine(prefix+line))
+		}
+
 		m.activeToolLine = -1
+		m.updateViewportContent()
 
 	case agent.EvToken:
 		m.currentResponse += ev.Content

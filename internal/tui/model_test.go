@@ -3,7 +3,7 @@ package tui
 import "testing"
 
 func TestCalculateLayoutPreservesMainPaneOnNarrowTerminals(t *testing.T) {
-	narrow := calculateLayout(80, 24)
+	narrow := calculateLayout(80, 24, inputMinHeight)
 	if narrow.sidebarWidth != 0 || narrow.mainWidth != 80 {
 		t.Fatalf("narrow layout should not reserve a sidebar: %#v", narrow)
 	}
@@ -11,17 +11,17 @@ func TestCalculateLayoutPreservesMainPaneOnNarrowTerminals(t *testing.T) {
 		t.Fatalf("narrow layout produced unusable content sizes: %#v", narrow)
 	}
 
-	wide := calculateLayout(140, 40)
+	wide := calculateLayout(140, 40, inputMinHeight)
 	if wide.sidebarWidth != 36 {
 		t.Fatalf("wide layout should reserve a sidebar: %#v", wide)
 	}
 
-	nearThreshold := calculateLayout(115, 24)
+	nearThreshold := calculateLayout(115, 24, inputMinHeight)
 	if nearThreshold.sidebarWidth != 0 || nearThreshold.mainWidth != 115 {
 		t.Fatalf("terminal below sidebar threshold should stay single-pane: %#v", nearThreshold)
 	}
 
-	minimumWide := calculateLayout(120, 24)
+	minimumWide := calculateLayout(120, 24, inputMinHeight)
 	if minimumWide.sidebarWidth != 28 {
 		t.Fatalf("wide layouts should reserve a permanent sidebar: %#v", minimumWide)
 	}

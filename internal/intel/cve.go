@@ -214,8 +214,15 @@ func LookupCVE(productVersion string) string {
 		}
 	}
 
-	// 2. Search NVD Cache
+	// 2. Search NVD Cache (load lazily on first use so lookup_cve works
+	// without a prior explicit load).
 	db := globalCVEDB
+	if db == nil {
+		if loaded, err := LoadCVEDatabase(); err == nil {
+			db = loaded
+			globalCVEDB = loaded
+		}
+	}
 	if db == nil {
 		if len(staticMatches) == 0 {
 			return "[CVE DB] NVD Database not loaded yet, and no static matches found."

@@ -11,10 +11,34 @@ package agent
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/openai/openai-go"
 )
+
+// resolveHttpx returns the path to projectdiscovery/httpx. The bare name
+// "httpx" often resolves to the Python httpx CLI on many systems, which does
+// not understand projectdiscovery flags (e.g. -silent, -tech-detect) and fails
+// with cryptic "No such option" errors. We therefore probe candidates and
+// verify the binary is actually projectdiscovery's.
+func resolveHttpx() (string, error) {
+	home, _ := os.UserHomeDir()
+	candidates := []string{"httpx", filepath.Join(home, "go", "bin", "httpx"), "/usr/local/bin/httpx"}
+	for _, c := range candidates {
+		path, err := exec.LookPath(c)
+		if err != nil {
+			continue
+		}
+		out, err := exec.Command(path, "-version").CombinedOutput()
+		if err == nil && (strings.Contains(string(out), "projectdiscovery") || strings.Contains(string(out), "Current Version")) {
+			return path, nil
+		}
+	}
+	return "", fmt.Errorf("projectdiscovery/httpx not found (the 'httpx' on PATH is the Python client). Install it with: go install github.com/projectdiscovery/httpx/cmd/httpx@latest — and ensure ~/go/bin precedes /usr/bin on PATH, or run inside the sandbox")
+}
 
 // registerToolWrappers adds all structured tool wrappers to the registry.
 // Called from registerBuiltins().
@@ -190,6 +214,9 @@ func (r *ToolRegistry) registerToolWrappers() {
 		cmd += " 2>&1"
 		out, err := r.sandbox.Execute(ctx, cmd)
 		if err != nil {
+			if strings.Contains(out, "command not found") || strings.Contains(out, "not found") {
+				return "[subfinder Error] subfinder is not installed. Install it with: go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest (or run inside the sandbox which provisions it)."
+			}
 			return fmt.Sprintf("[subfinder Error] %v\nOutput: %s", err, out)
 		}
 		lines := strings.Split(strings.TrimSpace(out), "\n")
@@ -202,8 +229,12 @@ func (r *ToolRegistry) registerToolWrappers() {
 		if target == "" {
 			return "[Error] target is required"
 		}
-		cmd := fmt.Sprintf("echo %s | httpx -silent -tech-detect -status-code -title -server -content-length -follow-redirects -timeout 10 2>&1",
-			target)
+		bin, err := resolveHttpx()
+		if err != nil {
+			return fmt.Sprintf("[httpx Error] %v", err)
+		}
+		cmd := fmt.Sprintf("echo %s | %s -silent -tech-detect -status-code -title -server -content-length -follow-redirects -timeout 10 2>&1",
+			target, bin)
 		out, err := r.sandbox.Execute(ctx, cmd)
 		if err != nil {
 			return fmt.Sprintf("[httpx Error] %v\nOutput: %s", err, out)

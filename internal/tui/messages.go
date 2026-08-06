@@ -45,6 +45,11 @@ type SandboxToggleResultMsg struct {
 	Err     error
 }
 
+// SetupResultMsg reports the result of the external setup wizard.
+type SetupResultMsg struct {
+	Err error
+}
+
 // ToolResultMsg wraps a structured tool result for display.
 type ToolResultMsg struct {
 	ToolName  string

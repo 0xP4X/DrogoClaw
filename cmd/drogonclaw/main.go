@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"os"
 	"strings"
 	"time"
@@ -70,6 +71,7 @@ func runStartup(cfg *config.Manager) (*agent.Provider, *sandbox.Docker, *skills.
 
 func main() {
 	cfg := config.Get()
+	rand.Seed(time.Now().UnixNano())
 
 	core.InitCleanupHandler()
 	defer core.PerformCleanup()
@@ -105,8 +107,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	sessionID := fmt.Sprintf("session_%d", time.Now().Unix())
-	graph := memory.NewGraph("default")
+	sessionID := fmt.Sprintf("ss%010d", rand.Intn(9000000000)+1000000000)
+	graph := memory.NewGraph(sessionID)
 
 	if len(os.Args) > 1 && os.Args[1] == "health" {
 		out := health.RunDiagnostics(context.Background(), sb)
@@ -132,7 +134,7 @@ func main() {
 
 	opsecMgr := opsec.NewManager()
 	sysPrompt := agent.BuildSystemPrompt(graph, opsecMgr, "")
-	orch := agent.NewOrchestratorWithJournal(provider, tools, sysPrompt, sessionID, graph, memory.NewActionJournal("default"))
+	orch := agent.NewOrchestratorWithJournal(provider, tools, sysPrompt, sessionID, graph, memory.NewActionJournal(sessionID))
 
 	tgGateway, err := gateway.NewTelegramGateway(cfg, orch, graph, opsecMgr)
 	if err == nil && tgGateway != nil {

@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -37,7 +38,6 @@ type Model struct {
 
 	executing       bool
 	autopilot       bool
-	noisy           bool
 	personaOverride string
 	sessionID       string
 	phase           string
@@ -99,6 +99,7 @@ func New(
 	ta := textarea.New()
 	ta.Placeholder = "Enter mission objective or /help..."
 	ta.Focus()
+	ta.SetValue("")
 	ta.CharLimit = 4096
 	ta.SetHeight(1)
 	ta.ShowLineNumbers = false
@@ -157,7 +158,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		layout := calculateLayout(msg.Width, msg.Height)
+		inputHeight := lipgloss.Height(m.renderInputArea())
+		layout := calculateLayout(msg.Width, msg.Height, inputHeight)
 		m.input.SetWidth(layout.contentWidth)
 
 	case showBannerMsg:
@@ -393,6 +395,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		cmds = append(cmds, textarea.Blink)
 
+	case SetupResultMsg:
+		m.executing = false
+		m.activeToolName = ""
+		if msg.Err != nil {
+			m.appendLine(ErrorStyle.Render(fmt.Sprintf("  [x] Setup wizard failed: %v", msg.Err)))
+		} else {
+			m.cfg.Reload()
+			m.appendLine(ToolDoneStyle.Render("  [OK] Setup complete. Configuration reloaded."))
+		}
+		cmds = append(cmds, textarea.Blink)
+
 	case tea.QuitMsg:
 		return m, tea.Quit
 	}
@@ -432,7 +445,7 @@ func (m *Model) handleInput(raw string) (Model, tea.Cmd) {
 		sid = sid[:18]
 	}
 
-	promptLine := PromptGlyphStyle.Render("┗━❯ ") + PromptUserStyle.Render(raw)
+	promptLine := PromptGlyphStyle.Render("❯ ") + PromptUserStyle.Render(raw)
 	_ = opName
 	_ = agName
 	m.appendLine(promptLine)
@@ -675,4 +688,95 @@ func formatToolResult(toolName, output string, duration time.Duration, success b
 		sb.WriteString("  " + line + "\n")
 	}
 	return sb.String()
+}
+
+func (m Model) renderSections() string {
+	dataDir := "data"
+	_ = os.MkdirAll(dataDir, 0755)
+	entries, err := os.ReadDir(dataDir)
+	if err != nil {
+		return ErrorStyle.Render(fmt.Sprintf("  [✗] Failed to read sections: %v", err))
+	}
+
+	var sections []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if strings.HasPrefix(name, "graph_") && strings.HasSuffix(name, ".json") {
+			id := strings.TrimSuffix(strings.TrimPrefix(name, "graph_"), ".json")
+			info, statErr := entry.Info()
+			size := int64(0)
+			modified := ""
+			if statErr == nil {
+				size = info.Size()
+				modified = info.ModTime().Format("2006-01-02 15:04")
+			}
+			marker := "  "
+			if id == m.sessionID {
+				marker = "▶ "
+			}
+			sections = append(sections, fmt.Sprintf("%s%s  %s  %d bytes", marker, HeaderInfoStyle.Render(id), modified, size))
+		}
+	}
+
+	if len(sections) == 0 {
+		return HintDescStyle.Render("  No previous sections found.")
+	}
+
+	var sb strings.Builder
+	sb.WriteString(SectionHeaderStyle.Render("  PREVIOUS SECTIONS:"))
+	sb.WriteString("\n")
+	for _, s := range sections {
+		sb.WriteString(s)
+		sb.WriteString("\n")
+	}
+	sb.WriteString(HintDescStyle.Render("  Use /section <id> to switch"))
+	return sb.String()
+}
+
+func (m *Model) switchSection(sectionID string) {
+	target := strings.TrimSpace(sectionID)
+	if target == "" {
+		m.appendLine(ErrorStyle.Render("  [✗] Section ID cannot be empty."))
+		return
+	}
+
+	if target == m.sessionID {
+		m.appendLine(WarningStyle.Render("  [!] Already in section " + target))
+		return
+	}
+
+	newGraph := memory.NewGraph(target)
+	newJournal := memory.NewActionJournal(target)
+	sysPrompt := agent.BuildSystemPrompt(newGraph, m.opsecMgr, "")
+	newOrch := agent.NewOrchestratorWithJournal(
+		m.orch.GetProvider(),
+		m.orch.GetTools(),
+		sysPrompt,
+		target,
+		newGraph,
+		newJournal,
+	)
+
+	m.orch = newOrch
+	m.graph = newGraph
+	m.sessionID = target
+	if m.promptRefresher != nil {
+		m.SetPromptRefresher(func() string {
+			return agent.BuildSystemPrompt(m.graph, m.opsecMgr, "")
+		})
+	}
+	m.lines = nil
+	m.viewport.SetContent("")
+	m.lastTool = ""
+	m.activeToolName = ""
+	m.phase = "idle"
+	m.phaseDetail = ""
+	m.lastPlan = nil
+	m.lastObjective = ""
+	m.bannerShown = false
+	m.appendBanner()
+	m.appendLine(InfoStyle.Render(fmt.Sprintf("  [§] Switched to section %s", target)))
 }

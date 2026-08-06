@@ -17,7 +17,7 @@ func (m Model) View() string {
 		return "Loading DrogonClaw..."
 	}
 
-	layout := calculateLayout(m.width, m.height)
+	layout := calculateLayout(m.width, m.height, lipgloss.Height(m.renderInputArea()))
 	mainWidth := layout.mainWidth
 	inputArea := m.renderInputArea()
 	_, vpHeight := m.viewportDimensions()
@@ -68,7 +68,7 @@ func (m Model) View() string {
 func (m Model) renderWelcome() string {
 	var sb strings.Builder
 	
-	title := HeaderBrandStyle.Render("   ██████╗  ██████╗  ██████╗  ██████╗  ██████╗ ███╗   ██╗ ██████╗██╗      ██╗██╗  ██╗\n   ██╔══██╗██╔══██╗██╔═══██╗██╔════╝ ██╔═══██╗████╗  ██║██╔════╝██║      ██║██║  ██║\n   ██║  ██║██████╔╝██║   ██║██║  ███╗██║   ██║██╔██╗ ██║██║     ██║  ██╗ ██║██║  ██║\n   ██║  ██║██╔══██╗██║   ██║██║   ██║██║   ██║██║╚██╗██║██║     ██║  ██║██║██║  ██║\n   ██████╔╝██║  ██║╚██████╔╝╚██████╔╝╚██████╔╝██║ ╚████║╚██████╗╚█████╔╝██║╚█████╔╝\n   ╚═════╝ ╚═╝  ╚═╝ ╚═════╝  ╚═════╝  ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝ ╚════╝ ╚═╝ ╚════╝ ")
+	title := HeaderBrandStyle.Render("DrogonClaw v2")
 	subtitle := WelcomeSubtitleStyle.Render("Offensive Security & Red Team Operations Framework")
 
 	sb.WriteString("\n")
@@ -93,9 +93,8 @@ func (m Model) renderWelcome() string {
 }
 
 func (m Model) viewportDimensions() (width, height int) {
-	layout := calculateLayout(m.width, m.height)
-	inputHeight := lipgloss.Height(m.renderInputArea())
-	return layout.contentWidth, max(3, m.height-inputHeight-2)
+	layout := calculateLayout(m.width, m.height, lipgloss.Height(m.renderInputArea()))
+	return layout.contentWidth, layout.contentHeight
 }
 
 func (m Model) renderHeader(width int) string {
@@ -113,8 +112,8 @@ func (m Model) renderHeader(width int) string {
 		agName = strings.ToLower(ag.Name)
 	}
 	sid := m.sessionID
-	if len(sid) > 10 {
-		sid = sid[:10]
+	if len(sid) > 18 {
+		sid = sid[:18]
 	}
 	provider := m.cfg.GetProvider()
 	model := m.cfg.GetModel()
@@ -125,7 +124,7 @@ func (m Model) renderHeader(width int) string {
 	parts := []string{
 		HeaderBrandStyle.Render("DROGONCLAW"),
 		HeaderInfoStyle.Render(fmt.Sprintf("%s@%s", opName, agName)),
-		HeaderDimStyle.Render(fmt.Sprintf("sess:%s", sid)),
+		HeaderDimStyle.Render(fmt.Sprintf("section:%s", sid)),
 	}
 
 	if provider != "" {
@@ -216,6 +215,7 @@ func (m Model) renderSidebar(width, height int) string {
 	if !m.execStartTime.IsZero() && m.executing {
 		elapsed = time.Since(m.execStartTime).Round(time.Second).String()
 	}
+	row("Section", HeaderInfoStyle.Render(m.sessionID))
 	row("Mode", SidebarValueStyle.Render(truncate(activeMode, max(1, width-14))))
 	row("Runtime", lipgloss.NewStyle().Foreground(ColorWarning).Render(elapsed))
 	row("Phase", renderSidebarPhase(m.phase))
@@ -296,15 +296,14 @@ func (m Model) renderStatusReport() string {
 	sb.WriteString("\n  " + HeaderBrandStyle.Render("WORKSPACE STATUS REPORT") + "\n")
 	sb.WriteString(rule + "\n\n")
 	sb.WriteString("  " + heading("SESSION CONTEXT") + "\n")
-	sb.WriteString(row("Session ID", value(m.sessionID)) + "\n")
+	sb.WriteString(row("Section", value(m.sessionID)) + "\n")
 	sb.WriteString(row("Active Phase", phase) + "\n")
 	sb.WriteString(row("Attack Mode", value(mode)) + "\n")
 	sb.WriteString(row("Elapsed Time", value(elapsed)) + "\n")
 	sb.WriteString(row("Current Tool", value(tool)) + "\n\n")
 	sb.WriteString("  " + heading("OPERATIONAL CONTROLS") + "\n")
 	sb.WriteString(row("Stealth Policy", onOff(m.opsecMgr.IsActive(), "ACTIVE")) + "\n")
-	sb.WriteString(row("Autopilot", onOff(m.autopilot, "ENABLED")) + "\n")
-	sb.WriteString(row("Verbose Logs", onOff(m.noisy, "ENABLED")) + "\n\n")
+	sb.WriteString(row("Autopilot", onOff(m.autopilot, "ENABLED")) + "\n\n")
 	sb.WriteString("  " + heading("ENVIRONMENT") + "\n")
 	sb.WriteString(row("Execution Engine", value(runtimeLabel(m.sandbox))) + "\n")
 	sb.WriteString(row("Telegram Gateway", onOff(telegramReady, "READY")) + "\n\n")
@@ -399,16 +398,18 @@ func (m *Model) appendBanner() {
 }
 
 func (m *Model) updateViewportContent() {
-	layout := calculateLayout(m.width, m.height)
+	inputHeight := lipgloss.Height(m.renderInputArea())
+	layout := calculateLayout(m.width, m.height, inputHeight)
 	base := strings.Join(m.lines, "\n")
 	if m.executing && m.currentResponse != "" {
 		base += "\n" + m.renderAgentResponseString(m.currentResponse)
 	}
+	m.viewport.Width = layout.contentWidth
+	m.viewport.Height = layout.contentHeight
 	m.viewport.SetContent(base)
 	if !m.userScrolledUp {
 		m.viewport.GotoBottom()
 	}
-	_ = layout
 }
 
 func (m *Model) appendLine(line string) {
@@ -422,23 +423,10 @@ func (m *Model) appendLine(line string) {
 
 func (m Model) renderAgentResponseString(content string) string {
 	var lines []string
-	lines = append(lines, "")
-	lines = append(lines, HeaderBrandStyle.Render("🤖 DROGONCLAW"))
-	lines = append(lines, AgentDividerStyle.Render("──────────────────────────────────────────────────"))
-
-	rendered := content
-	if m.mdRenderer != nil {
-		if md, err := m.mdRenderer.Render(content); err == nil {
-			rendered = md
-		}
-	}
-
-	for _, line := range strings.Split(strings.TrimRight(rendered, "\n"), "\n") {
+	for _, line := range strings.Split(strings.TrimRight(content, "\n"), "\n") {
 		line = truncateLine(line)
 		lines = append(lines, line)
 	}
-
-	lines = append(lines, "")
 	return strings.Join(lines, "\n")
 }
 
@@ -575,7 +563,6 @@ var allHints = []cmdHint{
 	{"/status", "Display current session and workspace details"},
 	{"/stealth", "Toggle evasive timing policy"},
 	{"/auto", "Toggle autonomous execution mode"},
-	{"/noisy", "Toggle verbose event telemetry"},
 	{"/profile", "Build passive target profile"},
 	{"/ctf", "Run local CTF artifact triage"},
 	{"/report", "Generate structured pentest report"},
@@ -638,15 +625,18 @@ func renderHelp() string {
 		"CONTROLS": {
 			{"/stealth", "Toggle evasive timing policy"},
 			{"/auto", "Toggle autonomous execution mode"},
-			{"/noisy", "Toggle verbose event telemetry"},
 			{"/sandbox", "Toggle container sandbox execution"},
 			{"/persona", "Inject custom agent persona prompt"},
 		},
 		"SESSION": {
 			{"/status", "Display current session and workspace details"},
+			{"/sections", "List all previous sections"},
+			{"/section <id>", "Switch to a previous section"},
+			{"/setup", "Run interactive configuration wizard"},
 			{"/new", "Clear session memory and start clean"},
 			{"/resume", "Resume interrupted execution checkpoint"},
 			{"/clear", "Clear terminal output screen"},
+			{"/help", "Show command reference"},
 			{"/exit", "Terminate session gracefully"},
 		},
 	}

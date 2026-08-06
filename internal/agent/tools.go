@@ -315,7 +315,7 @@ func (r *ToolRegistry) Definitions() []openai.ChatCompletionToolParam {
 		}, "required": []string{"domain"}},
 	}})
 	defs = append(defs, openai.ChatCompletionToolParam{Type: "function", Function: openai.FunctionDefinitionParam{
-		Name: "osint_github_dork", Description: openai.String("Search GitHub for leaked credentials, API keys, .env files, connection strings, and private keys related to a target org or domain. No API key required."),
+		Name: "osint_github_dork", Description: openai.String("Search GitHub for leaked credentials, API keys, .env files, connection strings, and private keys related to a target org or domain. Uses GITHUB_TOKEN when set for authenticated code/repo search; falls back to passive dorking otherwise."),
 		Parameters: openai.FunctionParameters{"type": "object", "properties": map[string]interface{}{
 			"target": map[string]interface{}{"type": "string", "description": "Target org name, domain, or keyword (e.g. 'acme-corp' or 'acme.com')"},
 		}, "required": []string{"target"}},
@@ -331,6 +331,11 @@ func (r *ToolRegistry) Definitions() []openai.ChatCompletionToolParam {
 		Parameters: openai.FunctionParameters{"type": "object", "properties": map[string]interface{}{
 			"query": map[string]interface{}{"type": "string", "description": "Product name/version (e.g. 'Apache 2.4.49')"},
 		}, "required": []string{"query"}},
+	}})
+
+	defs = append(defs, openai.ChatCompletionToolParam{Type: "function", Function: openai.FunctionDefinitionParam{
+		Name: "refresh_cve_feeds", Description: openai.String("Poll CISA KEV and security-advisory RSS/Atom feeds, ingest newly published/exploited CVEs into the local CVE database, and report what was added. Call before lookup_cve on a fresh engagement."),
+		Parameters: openai.FunctionParameters{"type": "object", "properties": map[string]interface{}{}},
 	}})
 
 	// ── SELF-REPROGRAMMING ──────────────────────────────────────────────────
@@ -1903,12 +1908,27 @@ OUTPUT ONLY THE SOURCE CODE. NO EXPLANATIONS. NO MARKDOWN.`, command)
 		return intel.LookupCVE(query)
 	}
 
+	r.builtins["refresh_cve_feeds"] = func(ctx context.Context, args map[string]any) string {
+		report, err := intel.RefreshAdvisoryFeeds(ctx)
+		if err != nil {
+			return fmt.Sprintf("[CVE Feed Refresh Error] %v", err)
+		}
+		var sb strings.Builder
+		sb.WriteString(fmt.Sprintf("=== CVE Feed Refresh ===\n\nChecked: %d | OK: %d | New CVEs ingested: %d\n\n",
+			report.Checked, report.OK, report.NewCVEs))
+		for _, fs := range report.PerFeed {
+			sb.WriteString(fmt.Sprintf("[%s] %s — %s (items:%d, new CVEs:%d)\n",
+				strings.ToUpper(fs.Status), fs.Name, fs.Detail, fs.Items, fs.CVEs))
+		}
+		return sb.String()
+	}
+
 	r.builtins["osint_github_dork"] = func(ctx context.Context, args map[string]any) string {
 		target, _ := args["target"].(string)
 		if target == "" {
 			return "[Error] target is required"
 		}
-		res, err := intel.GitHubDork(target)
+		res, err := intel.GitHubDork(target, r.cfg.GetGitHubToken())
 		if err != nil {
 			return fmt.Sprintf("[GitHub Dork Error] %v", err)
 		}

@@ -3,6 +3,8 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -52,14 +54,6 @@ func (m *Model) handleSlashCommand(raw string) (Model, tea.Cmd) {
 		go func() { _ = m.orch.Resume(ctx, events) }()
 		m.recovery = nil
 
-	case "/noisy":
-		m.noisy = !m.noisy
-		state := StatusOffStyle.Render("DISABLED")
-		if m.noisy {
-			state = StatusOnStyle.Render("ENABLED")
-		}
-		m.appendLine(SpinnerStyle.Render(fmt.Sprintf("  [⚡] Verbose Telemetry: %s", state)))
-
 	case "/stealth":
 		on := m.opsecMgr.Toggle()
 		if on {
@@ -92,7 +86,15 @@ func (m *Model) handleSlashCommand(raw string) (Model, tea.Cmd) {
 		}
 
 	case "/setup":
-		m.appendLine(WarningStyle.Render("  [!] Exit session and run './drogonclaw setup' to configure settings."))
+		m.appendLine(SpinnerStyle.Render("  [*] Launching setup wizard..."))
+		return *m, func() tea.Msg {
+			cmd := exec.Command(os.Args[0], "setup")
+			cmd.Stdin = os.Stdin
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			err := cmd.Run()
+			return SetupResultMsg{Err: err}
+		}
 
 	case "/report":
 		m.phase = "planning"
@@ -241,6 +243,16 @@ func (m *Model) handleSlashCommand(raw string) (Model, tea.Cmd) {
 	case "/skills":
 		m.appendLine(renderSkills(m.manifest, args))
 
+	case "/sections":
+		m.appendLine(m.renderSections())
+
+	case "/section":
+		if args == "" {
+			m.appendLine(ErrorStyle.Render("  [✗] Usage: /section <id> — switch to a previous section"))
+			break
+		}
+		m.switchSection(args)
+
 	case "/help":
 		m.appendLine(renderHelp())
 
@@ -292,4 +304,8 @@ func (m *Model) handleModeCommand(args string) {
 			m.appendLine(HintDescStyle.Render(fmt.Sprintf("      [%02d] %-18s %s", step.Priority, step.Tool, step.Description)))
 		}
 	}
+}
+
+func currentSessionID() string {
+	return ""
 }
