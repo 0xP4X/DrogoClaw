@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="360" viewBox="0 0 800 360" font-family="sans-serif">
+  <rect width="800" height="360" fill="#fff"/>
+  <text x="400" y="20" text-anchor="middle" font-size="16" font-weight="bold" fill="#333">Star History — 0xP4X/drogonclaw</text>
+  <line x1="56" y1="24" x2="56" y2="320" stroke="#333" stroke-width="1"/>
+  <line x1="56" y1="320" x2="776" y2="320" stroke="#333" stroke-width="1"/>
+  <line x1="56" y1="320.0" x2="776" y2="320.0" stroke="#eee" stroke-width="1"/><text x="48" y="324.0" text-anchor="end" font-size="12" fill="#666">0</text><line x1="56" y1="172.0" x2="776" y2="172.0" stroke="#eee" stroke-width="1"/><text x="48" y="176.0" text-anchor="end" font-size="12" fill="#666">2</text><line x1="56" y1="24.0" x2="776" y2="24.0" stroke="#eee" stroke-width="1"/><text x="48" y="28.0" text-anchor="end" font-size="12" fill="#666">4</text>
+  <polyline fill="none" stroke="#f1c40f" stroke-width="2.5" points="56.0,246.0 62.1,172.0 408.2,98.0 776.0,24.0"/>
+  <circle cx="776.0" cy="24.0" r="3.5" fill="#f1c40f"/>
+  <text x="56" y="344" font-size="12" fill="#666">2026-08-04</text>
+  <text x="776" y="344" text-anchor="end" font-size="12" fill="#666">2026-08-07</text>
+  <text x="776" y="20" text-anchor="end" font-size="12" fill="#999">4 ⭐</text>
+</svg>

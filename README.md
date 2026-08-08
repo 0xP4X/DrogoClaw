@@ -172,10 +172,14 @@ GNU AGPL v3
 
 ## 🌟 Star History
 
-> **Note:** GitHub restricted access to star data on 2026-06-30, so the live chart
-> below only renders when a read token is supplied (Star History encrypts it, safe
-> for a public README). The repo owner must generate a token with `read:repo` (or a
-> fine-grained token with read access to this repo) and paste it into the `token`
-> query parameter below. See <https://star-history.com/blog/github-stargazer-api-restriction>.
+> **Note:** GitHub restricted access to star data on 2026-06-30, so the live
+> star-history.com embed no longer renders. This chart is a **static SVG** generated
+> from the repo owner's star timestamps (no public token). Regenerate it with:
+>
+> ```bash
+> GITHUB_REPO=0xP4X/drogonclaw python3 scripts/star_history.py assets/star-history.svg
+> ```
+>
+> See <https://star-history.com/blog/github-stargazer-api-restriction>.
 
-[![Star History Chart](https://api.star-history.com/svg?repos=0xP4X/drogonclaw&type=Date&token=YOUR_GITHUB_READ_TOKEN)](https://star-history.com/#0xP4X/drogonclaw&Date)
+![Star History](./assets/star-history.svg)
