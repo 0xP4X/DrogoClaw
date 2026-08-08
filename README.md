@@ -137,8 +137,9 @@ flowchart TD
 
     subgraph Core ["DrogonClaw Engine (Go)"]
         Orchestrator["Custom Go ReAct Orchestrator"]
+        Graph[("Intelligence Graph (JSON)")]
         LootDB[("LootDB (SQLite3)")]
-        OPSEC["OPSEC Cleanup Registry"]
+        OPSEC["OPSEC Stealth Manager"]
         Swarm["Swarm Commander (Goroutines)"]
     end
 
@@ -150,14 +151,13 @@ flowchart TD
     Target((("Target Network")))
 
     UI -->|Natural Language Instructions| Orchestrator
-    Orchestrator <-->|Decoupled Memory| LootDB
+    Orchestrator <-->|Decoupled Memory| Graph
     Orchestrator -->|Delegates Parallel Missions| Swarm
-    Orchestrator -->|Registers Processes| OPSEC
+    Orchestrator -->|Stealth Policy| OPSEC
     Orchestrator -->|Deploys Payloads| Docker
+    Tools -->|Stores Loot & Credentials| LootDB
     Docker --- Tools
     Tools -->|Exploits & Recon| Target
-
-    OPSEC -.->|LIFO Kill Signal| Execution
 ```
 
 The platform revolves around five major pillars:
