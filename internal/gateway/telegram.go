@@ -161,9 +161,9 @@ func (tg *TelegramGateway) executeMission(c tele.Context, mission string) error 
 		case agent.EvToolStart:
 			_ = tg.editMessage(msg, fmt.Sprintf("🛠 *Executing Tool:* `%s`\n\n```json\n%s\n```", ev.Tool, ev.Args))
 		case agent.EvStatus:
-			// Catch HitL
-			if strings.Contains(ev.Content, "Awaiting human approval") {
-				_ = tg.editMessage(msg, "⚠️ *AGENT REQUIRES APPROVAL*\n\nThe agent has suspended execution and requires human input. Please reply directly to this message to continue.")
+			// Catch HitL / duration-approval prompts
+			if strings.Contains(strings.ToLower(ev.Content), "awaiting") {
+				_ = tg.editMessage(msg, "⚠️ *AGENT REQUIRES APPROVAL*\n\nThe agent has suspended execution and requires human input. Reply `y` to accept or `n` to skip, otherwise your message is taken as approval.")
 			} else {
 				if time.Since(lastUpdate) > 2*time.Second {
 					_ = tg.editMessage(msg, fmt.Sprintf("⚡ %s", ev.Content))

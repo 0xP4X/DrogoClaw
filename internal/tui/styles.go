@@ -10,43 +10,43 @@ import (
 // ─────────────────────────────────────────────────────────────────────────────
 
 var (
-	// Background tones (darkest → lightest)
-	ColorBg        = lipgloss.Color("#0a0e14")
-	ColorBgPanel   = lipgloss.Color("#0d1117")
-	ColorBgSurface = lipgloss.Color("#161b22")
-	ColorBgAccent  = lipgloss.Color("#1c2128")
-	ColorBgInput   = lipgloss.Color("#161b22")
+	// Background tones
+	ColorBg        = lipgloss.Color("#101010")
+	ColorBgPanel   = lipgloss.Color("#171717")
+	ColorBgSurface = lipgloss.Color("#202124")
+	ColorBgAccent  = lipgloss.Color("#2a2b2e")
+	ColorBgInput   = lipgloss.Color("#161616")
 
-	// Text hierarchy (brightest → dimmest)
-	ColorBright = lipgloss.Color("#e6edf3")
-	ColorWhite  = lipgloss.Color("#c9d1d9")
-	ColorSubtle = lipgloss.Color("#8b949e")
-	ColorMuted  = lipgloss.Color("#8b949e")
-	ColorDim    = lipgloss.Color("#484f58")
-	ColorGhost  = lipgloss.Color("#30363d")
+	// Text hierarchy
+	ColorBright = lipgloss.Color("#f1f3f4")
+	ColorWhite  = lipgloss.Color("#d7dadc")
+	ColorSubtle = lipgloss.Color("#a6adb4")
+	ColorMuted  = lipgloss.Color("#858b91")
+	ColorDim    = lipgloss.Color("#62686f")
+	ColorGhost  = lipgloss.Color("#3a3f44")
 
-	// Primary accent — electric blue
-	ColorAccent  = lipgloss.Color("#58a6ff")
-	ColorAccent2 = lipgloss.Color("#3fb950")
+	// Primary accents
+	ColorAccent  = lipgloss.Color("#2dd4bf")
+	ColorAccent2 = lipgloss.Color("#22c55e")
 
 	// Semantic colors
 	ColorSuccess = lipgloss.Color("#3fb950")
 	ColorDanger  = lipgloss.Color("#f85149")
-	ColorWarning = lipgloss.Color("#d29922")
-	ColorGold    = lipgloss.Color("#d29922")
-	ColorCyan    = lipgloss.Color("#79c0ff")
-	ColorPurple  = lipgloss.Color("#bc8cff")
+	ColorWarning = lipgloss.Color("#f59e0b")
+	ColorGold    = lipgloss.Color("#f59e0b")
+	ColorCyan    = lipgloss.Color("#38bdf8")
+	ColorPurple  = lipgloss.Color("#c084fc")
 
 	// Output severity
-	ColorOutputInfo    = lipgloss.Color("#8b949e")
-	ColorOutputDebug   = lipgloss.Color("#484f58")
+	ColorOutputInfo    = lipgloss.Color("#a6adb4")
+	ColorOutputDebug   = lipgloss.Color("#62686f")
 	ColorOutputSuccess = lipgloss.Color("#3fb950")
 	ColorOutputError   = lipgloss.Color("#f85149")
-	ColorOutputWarn    = lipgloss.Color("#d29922")
-	ColorOutputSignal  = lipgloss.Color("#58a6ff")
+	ColorOutputWarn    = lipgloss.Color("#f59e0b")
+	ColorOutputSignal  = lipgloss.Color("#2dd4bf")
 
 	// Border color
-	ColorBorder = lipgloss.Color("#30363d")
+	ColorBorder = lipgloss.Color("#3a3f44")
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -360,6 +360,41 @@ var (
 
 	SpinnerStyle = lipgloss.NewStyle().
 			Foreground(ColorAccent)
+
+	// ── Approval / Duration Gate ──────────────────────────────────────────
+	ApprovalBoxStyle = lipgloss.NewStyle().
+				Foreground(ColorWarning).
+				Border(lipgloss.RoundedBorder(), true).
+				BorderForeground(ColorWarning).
+				Padding(0, 1).
+				Bold(true)
+
+	ApprovalClockStyle = lipgloss.NewStyle().
+				Foreground(ColorGold)
+
+	ApprovalHintStyle = lipgloss.NewStyle().
+				Foreground(ColorSubtle)
+
+	// ── Prompt Queue ─────────────────────────────────────────────────────
+	QueueStyle = lipgloss.NewStyle().
+			Foreground(ColorPurple).
+			Bold(true)
+
+	QueueItemStyle = lipgloss.NewStyle().
+			Foreground(ColorSubtle)
+
+	// ── Status / Thinking stream lines ───────────────────────────────────
+	StatusLineStyle = lipgloss.NewStyle().
+			Foreground(ColorSubtle).
+			Italic(true)
+
+	ThinkingLineStyle = lipgloss.NewStyle().
+				Foreground(ColorPurple).
+				Italic(true)
+
+	SignalLineStyle = lipgloss.NewStyle().
+			Foreground(ColorAccent).
+			Bold(true)
 
 	DividerStyle = lipgloss.NewStyle().
 			Foreground(ColorGhost)

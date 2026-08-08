@@ -243,6 +243,17 @@ func (m *Model) handleSlashCommand(raw string) (Model, tea.Cmd) {
 	case "/skills":
 		m.appendLine(renderSkills(m.manifest, args))
 
+	case "/queue":
+		if len(m.promptQueue) == 0 {
+			m.appendLine(QueueStyle.Render("  [⏳] Prompt queue is empty."))
+		} else {
+			m.appendLine(QueueStyle.Render(fmt.Sprintf("  [⏳] PROMPT QUEUE (%d pending):", len(m.promptQueue))))
+			for i, q := range m.promptQueue {
+				m.appendLine(QueueItemStyle.Render(fmt.Sprintf("      %d. %s", i+1, q)))
+			}
+			m.appendLine(HintDescStyle.Render("      Queued prompts run automatically after the current task finishes."))
+		}
+
 	case "/sections":
 		m.appendLine(m.renderSections())
 

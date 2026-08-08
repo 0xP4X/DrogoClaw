@@ -1,13 +1,14 @@
 package tui
 
 const (
-	sidebarMinWidth   = 28
-	sidebarMaxWidth   = 36
+	sidebarMinWidth   = 30
+	sidebarMaxWidth   = 34
+	sidebarBreakpoint = 132
 	contentPadding    = 2
 	headerHeight      = 1
 	footerHeight      = 1
 	inputMinHeight    = 3
-	spacerMinHeight   = 1
+	spacerMinHeight   = 0
 )
 
 type tuiLayout struct {
@@ -33,7 +34,7 @@ func calculateLayout(width, height, inputHeight int) tuiLayout {
 	l := tuiLayout{
 		width:        width,
 		height:       height,
-		hasSidebar:   width >= 120,
+		hasSidebar:   width >= sidebarBreakpoint,
 		isCompact:    width < 80,
 		headerHeight: headerHeight,
 		footerHeight: footerHeight,
@@ -41,11 +42,7 @@ func calculateLayout(width, height, inputHeight int) tuiLayout {
 	}
 
 	if l.hasSidebar {
-		if width >= 140 {
-			l.sidebarWidth = sidebarMaxWidth
-		} else {
-			l.sidebarWidth = sidebarMinWidth
-		}
+		l.sidebarWidth = clamp(width/4, sidebarMinWidth, sidebarMaxWidth)
 		l.mainWidth = width - l.sidebarWidth - 1
 	} else {
 		l.mainWidth = width
@@ -57,6 +54,16 @@ func calculateLayout(width, height, inputHeight int) tuiLayout {
 	l.contentHeight = max(3, l.mainHeight)
 
 	return l
+}
+
+func clamp(value, minValue, maxValue int) int {
+	if value < minValue {
+		return minValue
+	}
+	if value > maxValue {
+		return maxValue
+	}
+	return value
 }
 
 func (l tuiLayout) mainPaneBounds() (width, height int) {

@@ -26,6 +26,9 @@ const (
 	EvDone      EventType = "done"
 	EvError     EventType = "error"
 	EvStatus    EventType = "status"
+	// EvApproval is emitted before a long-running, low-risk tool executes in
+	// manual mode so the operator can accept or skip it.
+	EvApproval EventType = "approval"
 )
 
 // Event is emitted to the TUI during agent execution.
@@ -58,6 +61,36 @@ type Orchestrator struct {
 }
 
 const maxHistoryMessages = 24
+
+// longRunningTools maps low-risk but time-consuming tool names to an estimated
+// runtime. When not in autopilot, the orchestrator pauses before running one of
+// these and asks the operator to accept or skip it (see EvApproval).
+var longRunningTools = map[string]time.Duration{
+	"run_gobuster":       45 * time.Minute,
+	"run_ffuf":           45 * time.Minute,
+	"run_nuclei":         30 * time.Minute,
+	"run_nmap":           30 * time.Minute,
+	"fuzz_endpoint":      40 * time.Minute,
+	"run_subfinder":      15 * time.Minute,
+	"run_httpx":          15 * time.Minute,
+	"refresh_cve_feeds":  20 * time.Minute,
+	"deep_research":      20 * time.Minute,
+	"osint_certs":        15 * time.Minute,
+	"run_forensics_triage": 30 * time.Minute,
+}
+
+// isLongRunningTool reports whether a tool is expected to run a long time and,
+// if so, returns the estimated duration.
+func isLongRunningTool(name string) (time.Duration, bool) {
+	if d, ok := longRunningTools[name]; ok {
+		return d, true
+	}
+	// Tool names built dynamically as run_<binary> use the same prefix rules.
+	if strings.HasPrefix(name, "run_") {
+		return 30 * time.Minute, true
+	}
+	return 0, false
+}
 
 // NewOrchestrator creates the agent core.
 func NewOrchestrator(provider *Provider, tools *ToolRegistry, sysPrompt, sessionID string, graph *memory.Graph) *Orchestrator {
@@ -226,6 +259,36 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 		// Execute each tool call
 		for _, tc := range resp.ToolCalls {
 			prettyArgs := formatArgs(tc.Function.Arguments)
+
+			// Optional acceptance gate for long-running, low-risk tools.
+			// In autopilot the operator has already delegated authority, so we
+			// skip the prompt entirely. Otherwise we surface an approval event
+			// with an estimated runtime and block until the operator responds.
+			if est, long := isLongRunningTool(tc.Function.Name); long && !o.Autopilot {
+				events <- Event{
+					Type:    EvApproval,
+					Tool:    tc.Function.Name,
+					Args:    prettyArgs,
+					Content: est.Round(time.Minute).String(),
+				}
+				events <- Event{Type: EvStatus, Content: fmt.Sprintf("Awaiting operator acceptance to run %s (est. %s)...", tc.Function.Name, est.Round(time.Minute))}
+				core.GlobalHitL.RequestApprovalWithDetail(core.ApprovalDuration, est.Round(time.Minute).String())
+				if err := core.GlobalHitL.Wait(ctx); err != nil {
+					if o.actions != nil {
+						o.actions.Finish("interrupted", err.Error())
+					}
+					return err
+				}
+				if !core.GlobalHitL.ConsumeApproved() {
+					skipMsg := fmt.Sprintf("[Skipped] Operator declined to run %s (long-running tool).", tc.Function.Name)
+					events <- Event{Type: EvToolDone, Tool: tc.Function.Name, Result: skipMsg}
+					if o.actions != nil {
+						o.actions.ToolFinished(tc.Function.Name, skipMsg)
+					}
+					continue
+				}
+			}
+
 			events <- Event{Type: EvToolStart, Tool: tc.Function.Name, Args: prettyArgs}
 			if o.actions != nil {
 				o.actions.ToolStarted(tc.Function.Name, prettyArgs)

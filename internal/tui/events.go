@@ -19,6 +19,7 @@ func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 		m.phase = phaseFromStatus(ev.Content, "reasoning")
 		m.phaseDetail = ev.Content
 		m.lastStatus = "thinking..."
+		m.appendLine(ThinkingLineStyle.Render(fmt.Sprintf("  ⟳ %s", ev.Content)))
 
 	case agent.EvPlan:
 		m.lastPlan = ev.Plan
@@ -26,13 +27,30 @@ func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 		if ev.Plan != nil && len(ev.Plan.Steps) > 0 {
 			m.phaseDetail = fmt.Sprintf("plan: %d steps", len(ev.Plan.Steps))
 		} else {
-			m.phaseDetail = "planning"
+			phaseDetail := "planning"
+			m.phaseDetail = phaseDetail
 		}
 
 	case agent.EvStatus:
 		m.lastStatus = ev.Content
 		m.phase = phaseFromStatus(ev.Content, m.phase)
 		m.phaseDetail = ev.Content
+		// Render a clean, dim status line so the operator can follow progress
+		// without it being confused with tool output or final answers.
+		m.appendLine(StatusLineStyle.Render(fmt.Sprintf("  » %s", ev.Content)))
+
+	case agent.EvApproval:
+		est := ev.Content
+		if est == "" {
+			est = "a while"
+		}
+		m.pendingApprovalTool = ev.Tool
+		m.pendingApprovalEst = est
+		banner := fmt.Sprintf("  ⏱ %s  may take ~%s", ev.Tool, ApprovalClockStyle.Render(est))
+		m.appendLine(ApprovalBoxStyle.Render(banner))
+		m.appendLine(ApprovalHintStyle.Render(fmt.Sprintf("    Approve running this tool? [y/n]  (Enter = run, n/skip = decline)")))
+		m.phase = "waiting"
+		m.phaseDetail = fmt.Sprintf("approval: %s", ev.Tool)
 
 	case agent.EvToolStart:
 		if m.currentResponse != "" {
@@ -48,7 +66,7 @@ func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 		m.phaseDetail = ev.Tool
 		m.toolStartTime = time.Now()
 		badge, badgeStyle := toolCategory(ev.Tool)
-		
+
 		m.appendLine(fmt.Sprintf("  ⚡ %s  %s", ToolStartStyle.Render(ev.Tool), badgeStyle.Render(" "+badge+" ")))
 		m.activeToolLine = len(m.lines) - 1
 
@@ -84,7 +102,7 @@ func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 			if i < len(outputLines)-1 || strings.TrimSpace(line) != "" {
 				prefix = "    │ "
 			}
-			m.lines = append(m.lines, truncateLine(prefix+line))
+			m.lines = append(m.lines, colorizeOutputLine(truncateLine(prefix+line)))
 		}
 
 		m.activeToolLine = -1
@@ -112,6 +130,7 @@ func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 		m.cancelFn = nil
 		cmds = append(cmds, textarea.Blink)
 		m.updateViewportContent()
+		m.processQueue(&cmds)
 		return cmds
 
 	case agent.EvError:
@@ -123,11 +142,58 @@ func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 		m.appendLine(ErrorStyle.Render(fmt.Sprintf("  ✗ Execution Error: %s", ev.Content)))
 		m.executing = false
 		m.cancelFn = nil
+		m.processQueue(&cmds)
 		return cmds
 	}
 
 	cmds = append(cmds, waitForEvent(m.eventsCh()))
 	return cmds
+}
+
+// processQueue launches the next queued prompt (if any) once the current task
+// finishes, so the operator can stack objectives without waiting around.
+func (m *Model) processQueue(cmds *[]tea.Cmd) {
+	if len(m.promptQueue) == 0 {
+		return
+	}
+	next := m.promptQueue[0]
+	m.promptQueue = m.promptQueue[1:]
+	m.appendLine(QueueStyle.Render(fmt.Sprintf("  ▶ Running queued task (%d remaining): %s", len(m.promptQueue), next)))
+	mm, cmd := m.handleInput(next)
+	*m = mm
+	if cmd != nil {
+		*cmds = append(*cmds, cmd)
+	}
+}
+
+// colorizeOutputLine shades a tool-output line by severity so errors, warnings,
+// and successes stand out from routine scan output. The leading tree prefix is
+// preserved; the severity is judged from the inner (un-prefixed) content.
+func colorizeOutputLine(raw string) string {
+	inner := strings.TrimSpace(raw)
+	switch classifyOutputLine(inner) {
+	case SeverityError:
+		return ErrorStyle.Render(raw)
+	case SeverityWarning:
+		return WarningStyle.Render(raw)
+	case SeveritySuccess:
+		return ToolOutputSuccessStyle.Render(raw)
+	case SeveritySignal:
+		return InfoStyle.Render(raw)
+	}
+	lower := strings.ToLower(inner)
+	switch {
+	case strings.Contains(lower, "error") || strings.Contains(lower, "fail") ||
+		strings.Contains(lower, "denied") || strings.Contains(lower, "refused") ||
+		strings.Contains(lower, "not found") || strings.Contains(lower, "timeout"):
+		return ToolOutputErrorStyle.Render(raw)
+	case strings.Contains(lower, "open") || strings.Contains(lower, "found") ||
+		strings.Contains(lower, "success") || strings.Contains(lower, "complete") ||
+		strings.Contains(lower, "✔") || strings.Contains(lower, "✓"):
+		return ToolOutputSuccessStyle.Render(raw)
+	default:
+		return ToolOutputStyle.Render(raw)
+	}
 }
 
 func waitForEvent(events <-chan agent.Event) tea.Cmd {

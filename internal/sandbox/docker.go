@@ -27,6 +27,12 @@ const (
 	defaultWorkDir = "/workspace"
 )
 
+// commandTimeout caps how long a single sandboxed command may run. Long
+// reconnaissance tools (gobuster, ffuf, large nmap/nuclei sweeps) routinely need
+// far more than the old 30-minute ceiling, so it is set generously. The parent
+// context (mission timeout) still applies as an upper bound.
+const commandTimeout = 90 * time.Minute
+
 // Docker wraps the Docker SDK for sandboxed command execution.
 type Docker struct {
 	cli         *client.Client
@@ -163,7 +169,7 @@ func (d *Docker) executeDocker(ctx context.Context, command string) (string, err
 		return fmt.Sprintf("Changed directory to %s", d.currentCwd), nil
 	}
 
-	execCtx, cancel := context.WithTimeout(ctx, 30*time.Minute)
+	execCtx, cancel := context.WithTimeout(ctx, commandTimeout)
 	defer cancel()
 
 	execResp, err := d.cli.ContainerExecCreate(execCtx, d.containerID, container.ExecOptions{
@@ -220,7 +226,7 @@ func (d *Docker) executeDocker(ctx context.Context, command string) (string, err
 }
 
 func (d *Docker) executeNative(ctx context.Context, command string) (string, error) {
-	execCtx, cancel := context.WithTimeout(ctx, 30*time.Minute)
+	execCtx, cancel := context.WithTimeout(ctx, commandTimeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(execCtx, "/bin/bash", "-c", command)

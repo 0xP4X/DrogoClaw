@@ -18,9 +18,10 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
-	"github.com/charmbracelet/glamour"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 type Model struct {
@@ -57,14 +58,14 @@ type Model struct {
 	currentResponse string
 	mdRenderer      *glamour.TermRenderer
 
-	execStartTime time.Time
-	toolStartTime time.Time
-	cancelFn      context.CancelFunc
-	activeEvents  chan agent.Event
-	sandbox       *sandbox.Docker
+	execStartTime   time.Time
+	toolStartTime   time.Time
+	cancelFn        context.CancelFunc
+	activeEvents    chan agent.Event
+	sandbox         *sandbox.Docker
 	promptRefresher func() string
-	selectedHint  int
-	bannerShown   bool
+	selectedHint    int
+	bannerShown     bool
 
 	userScrolledUp bool
 	history        []string
@@ -77,6 +78,10 @@ type Model struct {
 	activeMode     string
 	activeChain    *intel.AttackChain
 	targetAnalyzer *intel.TargetAnalyzer
+
+	promptQueue         []string
+	pendingApprovalTool string
+	pendingApprovalEst  string
 }
 
 type cmdHint struct {
@@ -174,6 +179,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.executing = false
 					m.activeToolName = ""
 					m.ctrlCAt = time.Time{}
+					// Clear any suspended approval so the prompt doesn't stick.
+					if core.GlobalHitL.HasPending() {
+						core.GlobalHitL.Resolve("CANCELLED")
+					}
 				} else {
 					m.ctrlCAt = time.Now()
 					m.appendLine(WarningStyle.Render("  [!] Press Ctrl+C again within 2s to abort execution."))
@@ -295,8 +304,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			if m.executing && core.GlobalHitL.HasPending() {
-				m.appendLine(PromptUserStyle.Render(fmt.Sprintf("  [User] %s", rawInput)))
-				core.GlobalHitL.Resolve(rawInput)
+				switch core.GlobalHitL.PendingKind() {
+				case core.ApprovalDuration:
+					answer := strings.ToLower(strings.TrimSpace(rawInput))
+					tool := m.pendingApprovalTool
+					if tool == "" {
+						tool = "tool"
+					}
+					m.appendLine(PromptUserStyle.Render(fmt.Sprintf("  [User] %s", rawInput)))
+					if answer == "n" || answer == "no" || answer == "skip" ||
+						answer == "cancel" || answer == "deny" || answer == "reject" {
+						m.appendLine(WarningStyle.Render(fmt.Sprintf("  [✗] Skipped %s at operator's request.", tool)))
+						core.GlobalHitL.Resolve("REJECTED")
+					} else {
+						m.appendLine(ToolDoneStyle.Render("  [✓] Approved. Resuming execution..."))
+						core.GlobalHitL.Resolve("APPROVED")
+					}
+					m.pendingApprovalTool = ""
+					m.pendingApprovalEst = ""
+				default:
+					m.appendLine(PromptUserStyle.Render(fmt.Sprintf("  [User] %s", rawInput)))
+					core.GlobalHitL.Resolve(rawInput)
+				}
 				return m, nil
 			}
 
@@ -306,6 +335,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m.handleInput(rawInput)
 			}
+
+			// Executing and not awaiting approval: queue the prompt to run
+			// automatically once the current task completes.
+			m.promptQueue = append(m.promptQueue, rawInput)
+			m.appendLine(QueueStyle.Render(fmt.Sprintf("  [⏳] Queued (%d) — runs after current task: %s", len(m.promptQueue), rawInput)))
 			return m, nil
 		}
 
@@ -478,7 +512,7 @@ func (m *Model) handleInput(raw string) (Model, tea.Cmd) {
 
 	m.executing = true
 	m.execStartTime = time.Now()
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Minute)
 	m.cancelFn = cancel
 
 	events := make(chan agent.Event, 32)
@@ -613,8 +647,8 @@ func (m *Model) eventsCh() <-chan agent.Event {
 }
 
 const (
-	maxOutputLines  = 5000
-	maxLineLength   = 4096
+	maxOutputLines   = 5000
+	maxLineLength    = 4096
 	truncationSuffix = "…"
 )
 
@@ -646,10 +680,24 @@ func classifyOutputLine(line string) OutputSeverity {
 }
 
 func truncateLine(line string) string {
-	if len(line) <= maxLineLength {
+	if ansi.StringWidth(line) <= maxLineLength {
 		return line
 	}
-	return line[:maxLineLength-len(truncationSuffix)] + truncationSuffix
+	return ansi.Truncate(line, maxLineLength, truncationSuffix)
+}
+
+func truncateVisible(line string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	if ansi.StringWidth(line) <= width {
+		return line
+	}
+	return ansi.Truncate(line, width, truncationSuffix)
+}
+
+func truncateStyled(line string, width int) string {
+	return truncateVisible(line, width)
 }
 
 func truncateOutput(lines []string) []string {

@@ -17,21 +17,22 @@ func (m Model) View() string {
 		return "Loading DrogonClaw..."
 	}
 
-	layout := calculateLayout(m.width, m.height, lipgloss.Height(m.renderInputArea()))
-	mainWidth := layout.mainWidth
 	inputArea := m.renderInputArea()
+	layout := calculateLayout(m.width, m.height, lipgloss.Height(inputArea))
+	mainWidth := layout.mainWidth
 	_, vpHeight := m.viewportDimensions()
 	output := m.viewport
-	output.Width = max(8, mainWidth-4)
+	mainPaneContentWidth := max(8, mainWidth-MainPaneStyle.GetHorizontalFrameSize())
+	output.Width = max(8, mainPaneContentWidth-OutputPaneStyle.GetHorizontalFrameSize())
 	output.Height = vpHeight
 
 	var mainPane string
 	if m.lines == nil || len(m.lines) == 0 {
-		mainPane = MainPaneStyle.Width(max(8, mainWidth-2)).Height(vpHeight).Render(
+		mainPane = MainPaneStyle.Width(mainPaneContentWidth).Height(vpHeight).Render(
 			m.renderWelcome(),
 		)
 	} else {
-		mainPane = MainPaneStyle.Width(max(8, mainWidth-2)).Height(vpHeight).Render(output.View())
+		mainPane = MainPaneStyle.Width(mainPaneContentWidth).Height(vpHeight).Render(output.View())
 	}
 
 	var sidebar string
@@ -67,27 +68,45 @@ func (m Model) View() string {
 
 func (m Model) renderWelcome() string {
 	var sb strings.Builder
-	
-	title := HeaderBrandStyle.Render("DrogonClaw v2")
-	subtitle := WelcomeSubtitleStyle.Render("Offensive Security & Red Team Operations Framework")
+	width := max(28, m.viewport.Width)
+	if width <= 0 {
+		width = max(28, m.width-MainPaneStyle.GetHorizontalFrameSize())
+	}
 
+	provider := fallback(m.cfg.GetProvider(), "provider")
+	model := fallback(m.cfg.GetModel(), "model")
+	runtime := runtimeLabel(m.sandbox)
+	mode := m.activeMode
+	if mode == "" {
+		mode = "default"
+	}
+
+	sb.WriteString(HeaderBrandStyle.Render("DrogonClaw v2") + " ")
+	sb.WriteString(WelcomeSubtitleStyle.Render("operator workspace"))
 	sb.WriteString("\n")
-	sb.WriteString(lipgloss.PlaceHorizontal(max(10, m.width-4), lipgloss.Center, title))
+	sb.WriteString(SectionRuleStyle.Render(strings.Repeat("─", max(12, width-1))) + "\n\n")
+
+	status := []string{
+		fmt.Sprintf("%s %s", SidebarLabelStyle.Render("runtime"), SidebarValueStyle.Render(runtime)),
+		fmt.Sprintf("%s %s", SidebarLabelStyle.Render("engine"), SidebarValueStyle.Render(truncate(provider+"/"+model, max(10, width/2)))),
+		fmt.Sprintf("%s %s", SidebarLabelStyle.Render("mode"), SidebarValueStyle.Render(mode)),
+	}
+	sb.WriteString(strings.Join(status, HeaderDimStyle.Render("  │  ")))
 	sb.WriteString("\n\n")
-	sb.WriteString(lipgloss.PlaceHorizontal(max(10, m.width-4), lipgloss.Center, subtitle))
-	sb.WriteString("\n\n")
-	sb.WriteString(lipgloss.PlaceHorizontal(max(10, m.width-4), lipgloss.Center, WelcomeHintStyle.Render("Enter a mission objective or type / for commands.")))
+
+	sb.WriteString(WelcomeHintStyle.Render("Enter a concrete objective, for example: profile example.com and identify the safest next checks."))
 	sb.WriteString("\n\n")
 
 	quickStart := lipgloss.JoinVertical(lipgloss.Left,
-		WelcomeQuickStartStyle.Render("QUICK COMMANDS:"),
+		WelcomeQuickStartStyle.Render("Useful commands"),
 		fmt.Sprintf("  %-12s %s", HintCmdStyle.Render("/health"), HintDescStyle.Render("Verify runtime & dependencies")),
-		fmt.Sprintf("  %-12s %s", HintCmdStyle.Render("/mode"), HintDescStyle.Render("Select attack methodology")),
+		fmt.Sprintf("  %-12s %s", HintCmdStyle.Render("/profile"), HintDescStyle.Render("Build passive target context")),
+		fmt.Sprintf("  %-12s %s", HintCmdStyle.Render("/mode"), HintDescStyle.Render("Select workflow")),
 		fmt.Sprintf("  %-12s %s", HintCmdStyle.Render("/skills"), HintDescStyle.Render("Browse loaded attack modules")),
-		fmt.Sprintf("  %-12s %s", HintCmdStyle.Render("/status"), HintDescStyle.Render("Show session & graph metrics")),
+		fmt.Sprintf("  %-12s %s", HintCmdStyle.Render("/status"), HintDescStyle.Render("Show session metrics")),
 	)
 
-	sb.WriteString(lipgloss.PlaceHorizontal(max(10, m.width-4), lipgloss.Center, quickStart))
+	sb.WriteString(quickStart)
 
 	return sb.String()
 }
@@ -121,21 +140,23 @@ func (m Model) renderHeader(width int) string {
 
 	sep := HeaderSepStyle.Render(" │ ")
 
-	parts := []string{
-		HeaderBrandStyle.Render("DROGONCLAW"),
-		HeaderInfoStyle.Render(fmt.Sprintf("%s@%s", opName, agName)),
-		HeaderDimStyle.Render(fmt.Sprintf("section:%s", sid)),
+	parts := []string{HeaderBrandStyle.Render("DROGONCLAW")}
+
+	if width >= 56 {
+		parts = append(parts, HeaderInfoStyle.Render(fmt.Sprintf("%s@%s", opName, agName)))
+	}
+	if width >= 76 {
+		parts = append(parts, HeaderDimStyle.Render(fmt.Sprintf("session:%s", sid)))
 	}
 
-	if provider != "" {
+	if provider != "" && width >= 92 {
 		parts = append(parts, HeaderInfoStyle.Render(fmt.Sprintf("%s/%s", provider, model)))
 	}
 	parts = append(parts, HeaderInfoStyle.Render(runtime))
 
 	line := strings.Join(parts, sep)
 	if lipgloss.Width(line) > width {
-		// Fallback for tight spaces
-		line = HeaderBrandStyle.Render("DROGONCLAW") + sep + HeaderInfoStyle.Render(fmt.Sprintf("%s/%s", provider, model))
+		line = HeaderBrandStyle.Render("DROGONCLAW") + sep + HeaderInfoStyle.Render(truncateVisible(runtime, max(8, width-16)))
 	}
 
 	return HeaderBarBorderStyle.Width(width).Render(
@@ -162,13 +183,22 @@ func (m Model) renderStatusBar() string {
 	}
 
 	left := fmt.Sprintf(" %s %s ", phase, HeaderDimStyle.Render("│ "+elapsed))
-	center := fmt.Sprintf(" %s %s ", HeaderDimStyle.Render("tool:"), lipgloss.NewStyle().Foreground(ColorWhite).Render(tool))
-	
+	centerValue := lipgloss.NewStyle().Foreground(ColorWhite).Render(truncateVisible(tool, max(8, m.width/3)))
+	center := fmt.Sprintf(" %s %s ", HeaderDimStyle.Render("tool:"), centerValue)
+
 	scrollIndicator := ""
 	if m.userScrolledUp {
 		scrollIndicator = WarningStyle.Render(" ▲ SCROLLED ") + " "
 	}
-	right := scrollIndicator + HeaderDimStyle.Render("type /help")
+	queueIndicator := ""
+	if len(m.promptQueue) > 0 {
+		queueIndicator = QueueStyle.Render(fmt.Sprintf(" ⏳ QUEUE %d ", len(m.promptQueue))) + " "
+	}
+	rightHint := "type /help"
+	if m.width < 70 {
+		rightHint = "/help"
+	}
+	right := scrollIndicator + queueIndicator + HeaderDimStyle.Render(rightHint)
 
 	statusWidth := m.width
 	if statusWidth <= 0 {
@@ -196,14 +226,15 @@ func (m Model) renderSidebar(width, height int) string {
 
 	var sb strings.Builder
 	row := func(label, value string) {
-		sb.WriteString(fmt.Sprintf(" %-10s %s\n", SidebarLabelStyle.Render(label), value))
+		valueWidth := max(4, width-16)
+		sb.WriteString(fmt.Sprintf(" %-10s %s\n", SidebarLabelStyle.Render(label), truncateStyled(value, valueWidth)))
 	}
 	section := func(title string) {
 		if sb.Len() > 0 {
 			sb.WriteString("\n")
 		}
 		sb.WriteString(" " + SectionHeaderStyle.Render(title) + "\n")
-		sb.WriteString(" " + SectionRuleStyle.Render(strings.Repeat("─", width-3)) + "\n")
+		sb.WriteString(" " + SectionRuleStyle.Render(strings.Repeat("─", max(4, width-3))) + "\n")
 	}
 
 	section("SESSION")
@@ -215,8 +246,8 @@ func (m Model) renderSidebar(width, height int) string {
 	if !m.execStartTime.IsZero() && m.executing {
 		elapsed = time.Since(m.execStartTime).Round(time.Second).String()
 	}
-	row("Section", HeaderInfoStyle.Render(m.sessionID))
-	row("Mode", SidebarValueStyle.Render(truncate(activeMode, max(1, width-14))))
+	row("Session", HeaderInfoStyle.Render(truncateVisible(m.sessionID, max(4, width-14))))
+	row("Workflow", SidebarValueStyle.Render(truncate(activeMode, max(1, width-14))))
 	row("Runtime", lipgloss.NewStyle().Foreground(ColorWarning).Render(elapsed))
 	row("Phase", renderSidebarPhase(m.phase))
 	if m.lastObjective != "" {
@@ -239,23 +270,23 @@ func (m Model) renderSidebar(width, height int) string {
 	section("CONTROLS")
 	row("Sandbox", SidebarValueStyle.Render(runtimeLabel(m.sandbox)))
 	if m.autopilot {
-		row("Autopilot", StatusOnStyle.Render("● ON"))
+		row("Auto-run", StatusOnStyle.Render("● ON"))
 	} else {
-		row("Autopilot", StatusOffStyle.Render("○ OFF"))
+		row("Auto-run", StatusOffStyle.Render("○ OFF"))
 	}
 	if m.opsecMgr.IsActive() {
-		row("Stealth", StatusOnStyle.Render("● ON"))
+		row("Rate limit", StatusOnStyle.Render("● ON"))
 	} else {
-		row("Stealth", StatusOffStyle.Render("○ OFF"))
+		row("Rate limit", StatusOffStyle.Render("○ OFF"))
 	}
 
 	if m.lastPlan != nil {
-		section("TACTICAL PLAN")
+		section("EXECUTION PLAN")
 		row("Steps", SidebarValueStyle.Render(fmt.Sprintf("%d", len(m.lastPlan.Steps))))
 		row("Detail", HintDescStyle.Render(truncate(m.phaseDetail, max(1, width-14))))
 	}
 
-	return SidebarPaneStyle.Width(width).Height(height).Render(sb.String())
+	return SidebarPaneStyle.Width(max(8, width-SidebarPaneStyle.GetHorizontalFrameSize())).Height(height).Render(sb.String())
 }
 
 func (m Model) renderStatusReport() string {
@@ -298,12 +329,12 @@ func (m Model) renderStatusReport() string {
 	sb.WriteString("  " + heading("SESSION CONTEXT") + "\n")
 	sb.WriteString(row("Section", value(m.sessionID)) + "\n")
 	sb.WriteString(row("Active Phase", phase) + "\n")
-	sb.WriteString(row("Attack Mode", value(mode)) + "\n")
+	sb.WriteString(row("Workflow", value(mode)) + "\n")
 	sb.WriteString(row("Elapsed Time", value(elapsed)) + "\n")
 	sb.WriteString(row("Current Tool", value(tool)) + "\n\n")
 	sb.WriteString("  " + heading("OPERATIONAL CONTROLS") + "\n")
-	sb.WriteString(row("Stealth Policy", onOff(m.opsecMgr.IsActive(), "ACTIVE")) + "\n")
-	sb.WriteString(row("Autopilot", onOff(m.autopilot, "ENABLED")) + "\n\n")
+	sb.WriteString(row("Rate Limit", onOff(m.opsecMgr.IsActive(), "ACTIVE")) + "\n")
+	sb.WriteString(row("Auto-run", onOff(m.autopilot, "ENABLED")) + "\n\n")
 	sb.WriteString("  " + heading("ENVIRONMENT") + "\n")
 	sb.WriteString(row("Execution Engine", value(runtimeLabel(m.sandbox))) + "\n")
 	sb.WriteString(row("Telegram Gateway", onOff(telegramReady, "READY")) + "\n\n")
@@ -337,7 +368,8 @@ func (m Model) renderInputArea() string {
 			cmdStr = HintSelectedStyle.Render(h.cmd)
 		}
 		pad := strings.Repeat(" ", max(1, 14-len(h.cmd)))
-		lines = append(lines, HintBorderStyle.Render(prefix)+cmdStr+pad+HintDescStyle.Render(h.desc))
+		available := max(12, m.width-InputPaneStyle.GetHorizontalFrameSize()-18)
+		lines = append(lines, HintBorderStyle.Render(prefix)+cmdStr+pad+HintDescStyle.Render(truncateVisible(h.desc, available)))
 	}
 
 	var promptGlyph string
@@ -345,7 +377,11 @@ func (m Model) renderInputArea() string {
 	case m.pendingConfirm != "":
 		promptGlyph = WarningStyle.Render("CONFIRMATION REQUIRED > ")
 	case m.executing && core.GlobalHitL.HasPending():
-		promptGlyph = WarningStyle.Render("OPERATOR APPROVAL REQUIRED > ")
+		if core.GlobalHitL.PendingKind() == core.ApprovalDuration {
+			promptGlyph = WarningStyle.Render("TOOL APPROVAL (y/n) > ")
+		} else {
+			promptGlyph = WarningStyle.Render("OPERATOR APPROVAL REQUIRED > ")
+		}
 	case m.executing:
 		elapsed := int(time.Since(m.execStartTime).Seconds())
 		phaseStr := m.phase
@@ -365,7 +401,7 @@ func (m Model) renderInputArea() string {
 		lines = append(lines, WarningStyle.Render("Action requires exact confirmation: type "+m.confirmationPhrase()+" or Enter to cancel."))
 	}
 
-	return InputPaneStyle.Width(max(8, m.width-2)).Render(strings.Join(lines, "\n"))
+	return InputPaneStyle.Width(max(8, m.width-InputPaneStyle.GetHorizontalFrameSize())).Render(strings.Join(lines, "\n"))
 }
 
 func (m *Model) appendBanner() {
@@ -557,7 +593,7 @@ func fallback(value, def string) string {
 
 var allHints = []cmdHint{
 	{"/health", "Verify runtime environment and dependencies"},
-	{"/mode", "Select active attack methodology"},
+	{"/mode", "Select active workflow"},
 	{"/analyze", "Classify a target and determine attack path"},
 	{"/skills", "List and search available execution modules"},
 	{"/status", "Display current session and workspace details"},
@@ -566,7 +602,8 @@ var allHints = []cmdHint{
 	{"/profile", "Build passive target profile"},
 	{"/ctf", "Run local CTF artifact triage"},
 	{"/report", "Generate structured pentest report"},
-	{"/swarm", "Dispatch parallel autonomous sub-agents"},
+	{"/swarm", "Run a parallel task group"},
+	{"/queue", "Show queued prompts waiting to run"},
 	{"/sandbox", "Toggle container sandbox execution"},
 	{"/persona", "Inject custom agent persona prompt"},
 	{"/new", "Clear session memory and start clean"},
@@ -614,17 +651,18 @@ func renderHelp() string {
 	categories := map[string][]cmdHint{
 		"OPERATIONS": {
 			{"/health", "Verify runtime environment and dependencies"},
-			{"/mode", "Select active attack methodology"},
+			{"/mode", "Select active workflow"},
 			{"/analyze", "Classify a target and determine attack path"},
 			{"/skills", "List and search available execution modules"},
 			{"/profile", "Build passive target profile"},
 			{"/ctf", "Run local CTF artifact triage"},
 			{"/report", "Generate structured pentest report"},
-			{"/swarm", "Dispatch parallel autonomous sub-agents"},
+			{"/swarm", "Run a parallel task group"},
+			{"/queue", "Show queued prompts waiting to run"},
 		},
 		"CONTROLS": {
-			{"/stealth", "Toggle evasive timing policy"},
-			{"/auto", "Toggle autonomous execution mode"},
+			{"/stealth", "Toggle rate limiting policy"},
+			{"/auto", "Toggle automatic execution"},
 			{"/sandbox", "Toggle container sandbox execution"},
 			{"/persona", "Inject custom agent persona prompt"},
 		},
@@ -651,7 +689,8 @@ func renderHelp() string {
 	}
 
 	sb.WriteString("  " + SectionHeaderStyle.Render("KEYBOARD CONTROLS") + "\n")
-	sb.WriteString("  " + HintDescStyle.Render("  ↑/↓ scroll output · Alt+↑/↓ history · PgUp/PgDn page · Tab accept suggestion · Ctrl+C abort") + "\n\n")
+	sb.WriteString("  " + HintDescStyle.Render("  ↑/↓ scroll output · Alt+↑/↓ history · PgUp/PgDn page · Tab accept suggestion · Ctrl+C abort") + "\n")
+	sb.WriteString("  " + HintDescStyle.Render("  While running, type a new objective to queue it · type y/n at an approval prompt to accept/skip") + "\n\n")
 
 	return sb.String()
 }
