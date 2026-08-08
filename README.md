@@ -263,7 +263,9 @@ DrogonClaw is built for authorized security testing only. Report suspected vulne
 
 ## Contributing
 
-Contributions are welcome. For larger changes, open an issue first so the scope is clear before implementation. Ensure `make build`, `make lint`, and `make test` pass before submitting a pull request.
+Contributions are welcome. For guidelines, the development workflow, and scope
+rules, see [CONTRIBUTING.md](CONTRIBUTING.md). Ensure `make build`, `make lint`,
+and `make test` pass before submitting a pull request.
 
 ## Disclaimer
 
