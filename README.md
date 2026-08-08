@@ -6,6 +6,7 @@
 
 <div align="center">
 
+[![CI](https://github.com/0xP4X/drogonclaw/actions/workflows/CI-CD.yml/badge.svg)](https://github.com/0xP4X/drogonclaw/actions/workflows/CI-CD.yml)
 [![License](https://img.shields.io/badge/license-AGPL%20v3-000000?logo=gnu&logoColor=white)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.26.1-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![Platform](https://img.shields.io/badge/platform-Linux%20only-important)](docs/INDEX.md)
@@ -21,7 +22,7 @@ DrogonClaw is a next-generation cyber operations platform. Rather than acting as
 
 DrogonClaw focuses on **high-confidence autonomous workflows**, explainable findings, and reproducible evidence, avoiding the hallucinations common in early AI security tools.
 
-[Quick Start](#quick-start) | [Supported Providers](#supported-providers) | [Architecture](#architectural-pillars) | [Commands](#interactive-terminal--commands) | [Development](#development) | [Security](#security) | [Disclaimer](#disclaimer)
+[Quick Start](#quick-start) | [Supported Providers](#supported-providers) | [Architecture](#architectural-pillars) | [Commands](#interactive-terminal--commands) | [Development](#development) | [Setup Guide](docs/setup.md) | [Security](#security) | [Disclaimer](#disclaimer)
 
 ## Warning
 
