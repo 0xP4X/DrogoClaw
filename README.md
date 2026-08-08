@@ -4,16 +4,126 @@
   <img src="assets/logo.png" alt="DrogonClaw Logo" width="300" />
 </div>
 
-> **AI-Driven Offensive Security Framework**
+<div align="center">
+
+[![License](https://img.shields.io/badge/license-AGPL%20v3-000000?logo=gnu&logoColor=white)](LICENSE)
+[![Go](https://img.shields.io/badge/Go-1.26.1-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![Platform](https://img.shields.io/badge/platform-Linux%20only-important)](docs/INDEX.md)
+[![Docker](https://img.shields.io/badge/sandbox-Docker-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
+[![Security](https://img.shields.io/badge/security-policy-0f766e)](SECURITY.md)
+
+</div>
+
+> **AI-Driven Offensive & Defensive Security Platform**
 > **Official Website**: [drogonclaw.xyz](https://drogonclaw.xyz)
 
 DrogonClaw is a next-generation cyber operations platform. Rather than acting as a simple wrapper for Kali tools, DrogonClaw operates as a **Command-and-Control (C2) Brain**. It understands objectives, plans attack workflows, adapts to new discoveries, and orchestrates a swarm of specialized autonomous agents through a unified intelligence core.
 
 DrogonClaw focuses on **high-confidence autonomous workflows**, explainable findings, and reproducible evidence, avoiding the hallucinations common in early AI security tools.
 
+[Quick Start](#quick-start) | [Supported Providers](#supported-providers) | [Architecture](#architectural-pillars) | [Commands](#interactive-terminal--commands) | [Development](#development) | [Security](#security) | [Disclaimer](#disclaimer)
+
+## Warning
+
 > [!WARNING]
 > **Linux Only**
 > DrogonClaw is strictly designed and optimized for **Linux-based operating systems** (such as Kali Linux, Ubuntu, or Debian). It relies heavily on Linux-specific networking APIs, native filesystem permissions, and process management. It will **not** function on Windows or macOS.
+
+## What Works
+
+- **ReAct orchestration core** — a hand-rolled Go intelligence loop (no Node.js/LangChain overhead) that plans, delegates, and self-corrects.
+- **Persistent intelligence graph** — a JSON-backed memory store of typed entities (targets, assets, ports, services, vulnerabilities, credentials, flags) and their relationships.
+- **Sandboxed tool execution** — commands run in isolated, ephemeral Docker environments with a host fallback that fails closed.
+- **Structured tool wrappers** — typed wrappers for Nmap, Nuclei, Gobuster, FFUF, SQLMap, Subfinder, HTTPX, Checksec, Hydra, and forensics triage.
+- **Verified exploit templates** — pre-compiled chains for known CVEs (EternalBlue, Log4Shell, PrintNightmare, MS08-067, Spring4Shell), validated against known-vulnerable configurations.
+- **Active Directory arsenal** — impacket and BloodHound wrappers (Kerberoasting, Pass-the-Hash, DCSync) for domain pivoting.
+- **7-state exploit parser** — every exploit attempt is classified (e.g. `SUCCESS_SHELL`, `PATCHED`, `FILTERED`, `WRONG_ARCH`) and fed back to the reasoning engine.
+- **Dual-layer CVE intelligence** — a rolling 120-day NVD cache plus an offline database of common CTF/pentest CVEs.
+- **Human-in-the-Loop safety** — dangerous actions halt and require explicit operator approval.
+- **Remote C2** — an optional Telegram gateway for mobile command and a headless daemon mode.
+
+## Quick Start
+
+### Requirements
+
+- Go `1.26+`
+- Docker (daemon running, for sandbox execution)
+
+### Install (From Source)
+
+DrogonClaw operates outside of centralized registries to prevent censorship. It must be cloned directly from GitHub:
+
+```bash
+git clone https://github.com/0xP4X/drogonclaw.git
+cd drogonclaw
+go mod tidy
+go build -o drogonclaw ./cmd/drogonclaw/
+```
+
+Once built, run `./drogonclaw` to launch the terminal interface.
+
+*(Note: The legacy TypeScript/Node.js version is archived in the `legacy_v1/` directory for reference, but is no longer maintained.)*
+
+### Install (From npm)
+
+If you want the prebuilt Linux CLI from npm:
+
+```bash
+npm install -g drogonclaw
+drogonclaw --help
+```
+
+This package publishes the Linux x64 executable only. Non-Linux platforms are intentionally blocked at install time.
+
+### Configure
+
+On first launch, the **Configuration Wizard** guides you through provider selection and credential entry. Re-run it any time with `drogonclaw setup` or `/setup` inside the terminal.
+
+**Fastest OpenAI setup (Linux/macOS):**
+
+```bash
+export OPENAI_API_KEY=sk-your-key-here
+export AI_PROVIDER=openai
+export AI_MODEL=gpt-4o
+./drogonclaw
+```
+
+**Fastest local Ollama setup (Linux/macOS):**
+
+```bash
+export AI_PROVIDER=ollama
+export OLLAMA_BASE_URL=http://localhost:11434
+export AI_MODEL=llama3.1
+./drogonclaw
+```
+
+### Start
+
+```bash
+./drogonclaw
+```
+
+Run `drogonclaw setup` first if you have not configured a provider yet.
+
+### Daemon Mode (Headless)
+
+Run the agent from your phone via the Telegram gateway without the terminal UI:
+
+```bash
+./drogonclaw daemon
+```
+
+## Supported Providers
+
+| Provider | Config Key | Notes |
+| --- | --- | --- |
+| OpenRouter | `openrouter` | Flexible multi-model gateway; model list is fetched live with a curated fallback |
+| NVIDIA NIM | `nvidia` | High-performance inference (Nemotron, Qwen, DeepSeek, Llama) |
+| OpenAI | `openai` | Direct API runtime (`gpt-4o`, `gpt-4o-mini`) |
+| Google Gemini | `gemini` | Enterprise reasoning core (`gemini-2.5-pro`, `gemini-2.5-flash`) |
+| Ollama | `ollama` | Autonomous offline runtime; point `OLLAMA_BASE_URL` at your local server |
+
+Provider credentials are stored locally in `~/.drogonclaw/config.json` (owner read/write only).
 
 ## Architectural Pillars
 
@@ -94,53 +204,7 @@ DrogonClaw isolates operational risk and prevents unintended damage through:
 - **Sandboxed Tool Execution**: Running command-line tools in isolated, ephemeral Docker environments.
 - **Memory Failure Loops**: The agent tracks failed command syntax globally; if an exploit syntax fails, the agent is mathematically prevented from repeating that exact mistake, forcing it to pivot.
 
-## Quick Start & Setup Guide
-
-DrogonClaw operates through multiple interconnected modules. You can run it locally from source, or install it globally as a standalone CLI tool.
-
-### Installation (From Source)
-
-DrogonClaw operates outside of centralized registries to prevent censorship. It must be cloned directly from GitHub:
-
-```bash
-git clone https://github.com/0xP4X/drogonclaw.git
-cd drogonclaw
-go mod tidy
-go build -o drogonclaw ./cmd/drogonclaw/
-```
-
-Once built, simply run `./drogonclaw` to launch the terminal interface.
-
-*(Note: The legacy TypeScript/Node.js version is archived in the `legacy_v1/` directory for reference, but is no longer maintained.)*
-
-### Installation (From npm)
-
-If you want the prebuilt Linux CLI from npm:
-
-```bash
-npm install -g drogonclaw
-drogonclaw --help
-```
-
-This package publishes the Linux x64 executable only. Non-Linux platforms are intentionally blocked at install time.
-
-### Configuration Wizard
-
-Upon the first launch of `drogonclaw`, the **DrogonClaw Configuration Wizard** will guide you through setting up your neural pathways. Designed with a sleek, premium terminal aesthetic:
-
-- A security disclaimer is prominently displayed.
-- You will be prompted to select an AI Provider (OpenAI, Anthropic, OpenRouter, or local Ollama) using interactive radio menus.
-- You will securely enter your API keys.
-- You can optionally configure a **Telegram Gateway** for remote mobile C2 operations.
-- Graceful cancellations are supported natively — just hit `Ctrl+C` to abort setup safely.
-
-If you ever need to reconfigure your setup, run `drogonclaw setup` or type `/setup` inside the interactive terminal.
-
-### Help Menu
-
-DrogonClaw ships with a custom, stylized help menu. Run `drogonclaw --help` to view all available commands, options, and operational examples, presented alongside our custom ASCII art.
-
-### Interactive Terminal & Commands
+## Interactive Terminal & Commands
 
 Inside the `drogon>` prompt, you can converse with the AI naturally or use specific slash commands:
 
@@ -156,21 +220,50 @@ Inside the `drogon>` prompt, you can converse with the AI naturally or use speci
 
 **Graceful Action Abortion:** If DrogonClaw is running a long scan or executing an exploit and you want to steer it in a different direction, simply press `Ctrl+C`. This will instantly sever the active thread, halt all sandboxed executions, and drop you back to the prompt, preserving the session memory so you can inject new instructions.
 
-#### Telegram Gateway
+### Telegram Gateway
 
 Allows you to text instructions to your agent from your phone. It runs automatically if you set `TELEGRAM_TOKEN` and `TELEGRAM_CHAT_ID` in your configuration (`~/.drogonclaw/config.json`).
 
 *Security Note: You must provide your `TELEGRAM_CHAT_ID` to whitelist your account, otherwise the agent will reject all commands.*
 
-**Daemon Mode (Headless):** You can run the agent entirely from your phone without the terminal UI blocking your screen.
-
-```bash
-./drogonclaw daemon
-```
-
 ## Modularity & Swarm Intelligence
 
 DrogonClaw is designed to scale into collaborative agent swarms. You can inject new specialized agents (e.g., a "Web Fuzzer Agent" or an "Active Directory Hound") without modifying the core orchestrator.
+
+## Development
+
+DrogonClaw is a Go project. Use Go `1.26+` and have Docker available for sandbox execution.
+
+```bash
+make build        # build the binary for the current OS
+make test         # run all Go tests with race detection
+make lint         # run golangci-lint
+make run          # build and launch the terminal interface
+make daemon       # build and run in headless daemon mode
+make docker-compose  # start core services via Docker Compose
+```
+
+Other useful targets: `make test-cover`, `make format`, `make vet`, `make skills` (regenerate the skill manifest), `make doctor` (system diagnostics), `make clean`.
+
+### Repository Structure
+
+- `cmd/drogonclaw/` - CLI entrypoint
+- `internal/` - engine, agents, tools, TUI, sandbox, memory, and domain packages
+- `docs/` - architecture and readiness documentation
+- `scripts/` - build, manifest, and asset generation scripts
+- `skills/` - executable module definitions
+- `supabase/` - backend/schema assets
+- `assets/` - logos and generated charts
+- `tests/` - integration and fixture tests
+- `.github/` - repo automation and funding metadata
+
+## Security
+
+DrogonClaw is built for authorized security testing only. Report suspected vulnerabilities in the project via [SECURITY.md](SECURITY.md). Never deploy offensive capabilities against networks without explicit written consent.
+
+## Contributing
+
+Contributions are welcome. For larger changes, open an issue first so the scope is clear before implementation. Ensure `make build`, `make lint`, and `make test` pass before submitting a pull request.
 
 ## Disclaimer
 
