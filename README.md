@@ -5,8 +5,7 @@
 </div>
 
 > **AI-Driven Offensive Security Framework**
-> *Developed by 0xP4X*
-> 🌐 **Official Website**: [drogonclaw.xyz](https://drogonclaw.xyz) | [Portfolio](https://0xp4x.github.io/princeofori/)
+> 🌐 **Official Website**: [drogonclaw.xyz](https://drogonclaw.xyz)
 
 DrogonClaw is a next-generation cyber operations platform. Rather than acting as a simple wrapper for Kali tools, DrogonClaw operates as a **Command-and-Control (C2) Brain**. It understands objectives, plans attack workflows, adapts to new discoveries, and orchestrates a swarm of specialized autonomous agents through a unified intelligence core.
 
@@ -153,14 +152,6 @@ Allows you to text instructions to your agent from your phone. It runs automatic
 ## 🛠️ Modularity & Swarm Intelligence
 
 DrogonClaw is designed to scale into collaborative agent swarms. You can inject new specialized agents (e.g., a "Web Fuzzer Agent" or an "Active Directory Hound") without modifying the core orchestrator.
-
-## 👨‍💻 Author
-
-**0xP4X** (Prince Ofori)
-- 🌐 Portfolio: [0xp4x.github.io/princeofori](https://0xp4x.github.io/princeofori/)
-- 🐙 GitHub: [@0xP4X](https://github.com/0xP4X)
-- 💼 LinkedIn: [linkedin.com/in/prince-ofori-40a1062aa](https://linkedin.com/in/prince-ofori-40a1062aa)
-- 📧 Email: princeofori1470@gmail.com
 
 ## ⚠️ Disclaimer
 
