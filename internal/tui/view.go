@@ -458,10 +458,13 @@ func (m *Model) appendLine(line string) {
 }
 
 func (m Model) renderAgentResponseString(content string) string {
+	rendered, err := m.mdRenderer.Render(strings.TrimRight(content, "\n"))
+	if err != nil || rendered == "" {
+		rendered = strings.TrimRight(content, "\n")
+	}
 	var lines []string
-	for _, line := range strings.Split(strings.TrimRight(content, "\n"), "\n") {
-		line = truncateLine(line)
-		lines = append(lines, line)
+	for _, line := range strings.Split(rendered, "\n") {
+		lines = append(lines, truncateLine(line))
 	}
 	return strings.Join(lines, "\n")
 }
