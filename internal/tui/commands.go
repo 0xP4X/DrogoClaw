@@ -333,3 +333,62 @@ func (m *Model) handleModeCommand(args string) {
 func currentSessionID() string {
 	return ""
 }
+
+// copyConversation dumps the on-screen transcript to a file and tries to push it
+// to the system clipboard. DrogonClaw runs in the terminal's alternate screen,
+// which has no scrollback, so the only reliable way to copy real output is to
+// export it. The plain-text file is always written as a fallback.
+func (m *Model) copyConversation() string {
+	if len(m.lines) == 0 {
+		return WarningStyle.Render("  [!] Nothing to copy yet.")
+	}
+
+	plain := stripANSI(strings.Join(m.lines, "\n"))
+
+	dir, err := core.LootDir()
+	if err != nil {
+		dir = "."
+	}
+	path := filepath.Join(dir, "drogonclaw_transcript.txt")
+	if werr := os.WriteFile(path, []byte(plain+"\n"), 0600); werr != nil {
+		return ErrorStyle.Render(fmt.Sprintf("  [x] Could not write transcript: %v", werr))
+	}
+
+	if copyToClipboard(plain) {
+		return ToolOutputSuccessStyle.Render(
+			fmt.Sprintf("  [✓] Transcript (%d lines) copied to clipboard and saved to %s", len(m.lines), path))
+	}
+	return InfoStyle.Render(
+		fmt.Sprintf("  [i] Transcript (%d lines) saved to %s — open it outside DrogonClaw to copy (clipboard unavailable here).", len(m.lines), path))
+}
+
+// copyToClipboard attempts a native clipboard tool (xclip/wl-copy/pbcopy/...).
+// It returns false if none is available; the transcript file is the fallback.
+func copyToClipboard(text string) bool {
+	if runtime.GOOS == "darwin" {
+		return runClip("pbcopy", text)
+	}
+	if runtime.GOOS == "linux" {
+		if runClip("wl-copy", text) {
+			return true
+		}
+		if runClip("xclip", text, "-selection", "clipboard") {
+			return true
+		}
+		return runClip("xsel", text, "--clipboard", "--input")
+	}
+	if runtime.GOOS == "windows" {
+		return runClip("clip", text)
+	}
+	return false
+}
+
+func runClip(name string, text string, args ...string) bool {
+	path, err := exec.LookPath(name)
+	if err != nil {
+		return false
+	}
+	cmd := exec.Command(path, args...)
+	cmd.Stdin = strings.NewReader(text)
+	return cmd.Run() == nil
+}

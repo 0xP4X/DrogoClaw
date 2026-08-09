@@ -347,15 +347,6 @@ func (m Model) renderStatusReport() string {
 }
 
 func (m Model) renderInputArea() string {
-	op := m.graph.GetOperatorProfile()
-
-	opName := "operator"
-	if op != nil && op.Name != "" {
-		opName = op.Name
-	} else if m.cfg != nil && m.cfg.GetOperatorName() != "" {
-		opName = m.cfg.GetOperatorName()
-	}
-
 	agName := "drogonclaw"
 
 	var lines []string
@@ -372,7 +363,7 @@ func (m Model) renderInputArea() string {
 		lines = append(lines, HintBorderStyle.Render(prefix)+cmdStr+pad+HintDescStyle.Render(truncateVisible(h.desc, available)))
 	}
 
-	glyph, glyphWidth := m.promptGlyph(opName, agName)
+	glyph, glyphWidth := m.promptGlyph(agName)
 
 	// Size the textarea to the space actually left inside the input pane after
 	// the prompt glyph so long input wraps inside the pane instead of being
@@ -394,7 +385,7 @@ func (m Model) renderInputArea() string {
 
 // promptGlyph returns the current prompt prefix and its visible (unstyled)
 // rune width, which callers use to size the input textarea.
-func (m Model) promptGlyph(opName, agName string) (string, int) {
+func (m Model) promptGlyph(agName string) (string, int) {
 	switch {
 	case m.pendingConfirm != "":
 		g := WarningStyle.Render("CONFIRMATION REQUIRED > ")
@@ -695,6 +686,7 @@ func renderHelp() string {
 			{"/setup", "Run interactive configuration wizard"},
 			{"/new", "Clear session memory and start clean"},
 			{"/resume", "Resume interrupted execution checkpoint"},
+			{"/copy", "Copy transcript to clipboard / file"},
 			{"/clear", "Clear terminal output screen"},
 			{"/help", "Show command reference"},
 			{"/exit", "Terminate session gracefully"},
