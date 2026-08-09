@@ -196,6 +196,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		if msg.Type == tea.KeyF3 {
+			m.appendLine(m.openViewportInPager())
+			return m, nil
+		}
+
 		if m.pendingConfirm != "" {
 			if msg.Type == tea.KeyEnter {
 				answer := strings.TrimSpace(m.input.Value())

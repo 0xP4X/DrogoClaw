@@ -362,6 +362,48 @@ func (m *Model) copyConversation() string {
 		fmt.Sprintf("  [i] Transcript (%d lines) saved to %s — open it outside DrogonClaw to copy (clipboard unavailable here).", len(m.lines), path))
 }
 
+// openViewportInPager writes the current viewport content to a temp file and
+// opens it in the user's pager so they can freely select and copy any part of
+// the output without the sidebar or input area getting in the way.
+func (m *Model) openViewportInPager() string {
+	content := m.viewport.View()
+	if strings.TrimSpace(content) == "" {
+		return WarningStyle.Render("  [!] Nothing to view yet.")
+	}
+
+	plain := stripANSI(content)
+
+	tmpFile, err := os.CreateTemp("", "drogonclaw-output-*.txt")
+	if err != nil {
+		return ErrorStyle.Render(fmt.Sprintf("  [x] Could not create temp file: %v", err))
+	}
+	tmpPath := tmpFile.Name()
+	_ = tmpFile.Close()
+
+	if werr := os.WriteFile(tmpPath, []byte(plain+"\n"), 0600); werr != nil {
+		os.Remove(tmpPath)
+		return ErrorStyle.Render(fmt.Sprintf("  [x] Could not write output: %v", werr))
+	}
+
+	pager := os.Getenv("PAGER")
+	if pager == "" {
+		pager = "less -R"
+	}
+
+	cmd := exec.Command("sh", "-c", pager+" "+tmpPath)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		os.Remove(tmpPath)
+		return WarningStyle.Render(fmt.Sprintf("  [~] Pager exited: %v", err))
+	}
+
+	os.Remove(tmpPath)
+	return InfoStyle.Render("  [i] Returned to DrogonClaw.")
+}
+
 // copyToClipboard attempts a native clipboard tool (xclip/wl-copy/pbcopy/...).
 // It returns false if none is available; the transcript file is the fallback.
 func copyToClipboard(text string) bool {
