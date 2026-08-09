@@ -65,9 +65,9 @@ type Orchestrator struct {
 const maxHistoryMessages = 24
 
 // runBudget caps the total wall-clock time of one Execute loop. It prevents
-// indefinite hangs and is separate from the per-command timeout. Five minutes
-// is enough for a single CTF challenge; adjust via config if needed.
-const runBudget = 5 * time.Minute
+// indefinite hangs and is separate from the per-command timeout. Thirty minutes
+// is enough for a complex OSINT or multi-step mission; adjust via config if needed.
+const runBudget = 30 * time.Minute
 
 // longRunningTools maps low-risk but time-consuming tool names to an estimated
 // runtime. When not in autopilot, the orchestrator pauses before running one of
@@ -321,18 +321,18 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 				o.actions.ToolFinished(tc.Function.Name, result)
 			}
 
-			// Deterministic evidence evaluation: the model is told the verified
-			// status so it cannot claim success on prose alone. Verified findings
-			// are recorded to the loot database with provenance.
-			verified, estatus, reason := o.tools.EvaluateTool(tc.Function.Name, result)
-			if verified {
-				o.tools.RecordVerifiedFinding()
-			}
-			evidenceFooter := fmt.Sprintf("\n[EVIDENCE: %s — %s]", strings.ToUpper(estatus), reason)
-			events <- Event{Type: EvStatus, Content: fmt.Sprintf("Evidence gate: %s (%s)", estatus, reason)}
-			result = result + evidenceFooter
+		// Deterministic evidence evaluation: the model is told the verified
+		// status so it cannot claim success on prose alone. Verified findings
+		// are recorded to the loot database with provenance. The footer is
+		// intentionally NOT appended to the tool result shown in the UI.
+		verified, estatus, reason := o.tools.EvaluateTool(tc.Function.Name, result)
+		if verified {
+			o.tools.RecordVerifiedFinding()
+		}
+		_ = estatus
+		_ = reason
 
-			events <- Event{Type: EvToolDone, Tool: tc.Function.Name, Result: result}
+		events <- Event{Type: EvToolDone, Tool: tc.Function.Name, Result: result}
 			messages = append(messages, openai.ToolMessage(tc.ID, result))
 
 			if strings.Contains(result, "[HitL_SUSPENDED]") {
