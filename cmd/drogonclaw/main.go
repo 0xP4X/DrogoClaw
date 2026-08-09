@@ -23,7 +23,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func runStartup(cfg *config.Manager) (*agent.Provider, *sandbox.Docker, *skills.Manifest, error) {
+func runStartup(cfg *config.Manager, forceSandbox *bool) (*agent.Provider, *sandbox.Docker, *skills.Manifest, error) {
 	var manifest *skills.Manifest
 	var sb *sandbox.Docker
 	var provider *agent.Provider
@@ -51,7 +51,13 @@ func runStartup(cfg *config.Manager) (*agent.Provider, *sandbox.Docker, *skills.
 				return initErr
 			}
 			initCtx := context.Background()
-			return sb.Initialize(initCtx, !cfg.IsSandboxEnabled())
+			native := true
+			if forceSandbox != nil {
+				native = !*forceSandbox
+			} else {
+				native = !cfg.IsSandboxEnabled()
+			}
+			return sb.Initialize(initCtx, native)
 		case 2:
 			provider = agent.NewProvider(cfg)
 			pingCtx, pingCancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -77,12 +83,17 @@ func main() {
 	core.InitCleanupHandler()
 	defer core.PerformCleanup()
 
+	var forceSandbox *bool
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "sandbox":
+			t := true
+			forceSandbox = &t
 			os.Setenv("USE_SANDBOX", "true")
 			fmt.Println("  [+] Launching in SANDBOX mode (Docker/Kali)")
 		case "native":
+			t := false
+			forceSandbox = &t
 			os.Setenv("USE_SANDBOX", "false")
 			fmt.Println("  [+] Launching in NATIVE mode (host OS)")
 			if len(os.Args) > 2 {
@@ -107,7 +118,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	provider, sb, manifest, err := runStartup(cfg)
+	provider, sb, manifest, err := runStartup(cfg, forceSandbox)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "  [x] Startup failed: %v\n", err)
 		os.Exit(1)
