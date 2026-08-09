@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -20,6 +21,12 @@ import (
 type Provider struct {
 	client *openai.Client
 	model  string
+}
+
+var providerXMLTagRegex = regexp.MustCompile(`<[^>]+>`)
+
+func stripProviderXMLTags(s string) string {
+	return providerXMLTagRegex.ReplaceAllString(s, "")
 }
 
 // NewProvider constructs the LLM client, pointing to the correct provider base URL.
@@ -69,6 +76,9 @@ func (p *Provider) Complete(ctx context.Context, messages []openai.ChatCompletio
 				return nil, fmt.Errorf("LLM returned no choices")
 			}
 			choice := resp.Choices[0]
+			if choice.Message.Content != "" {
+				choice.Message.Content = stripProviderXMLTags(choice.Message.Content)
+			}
 			return &CompletionResponse{
 				Message:   choice.Message,
 				ToolCalls: choice.Message.ToolCalls,
@@ -93,7 +103,7 @@ func (p *Provider) CompleteText(ctx context.Context, messages []openai.ChatCompl
 	if err != nil {
 		return "", err
 	}
-	return resp.Message.Content, nil
+	return stripProviderXMLTags(resp.Message.Content), nil
 }
 
 // StreamFinal streams the final text response (no tools) token by token.
@@ -111,8 +121,9 @@ func (p *Provider) StreamFinal(ctx context.Context, messages []openai.ChatComple
 			if len(chunk.Choices) > 0 {
 				delta := chunk.Choices[0].Delta.Content
 				if delta != "" {
-					sb.WriteString(delta)
-					onToken(delta)
+					clean := stripProviderXMLTags(delta)
+					sb.WriteString(clean)
+					onToken(clean)
 				}
 			}
 		}

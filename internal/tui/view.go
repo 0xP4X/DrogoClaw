@@ -496,7 +496,7 @@ func (m *Model) updateViewportContent() {
 }
 
 func (m *Model) appendLine(line string) {
-	line = truncateLine(line)
+	line = truncateLine(stripXMLTags(line))
 	m.lines = append(m.lines, line)
 	if len(m.lines) > maxOutputLines {
 		m.lines = truncateOutput(m.lines)
