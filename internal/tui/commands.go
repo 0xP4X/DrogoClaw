@@ -131,13 +131,13 @@ func (m *Model) handleSlashCommand(raw string) (Model, tea.Cmd) {
 			m.activeEvents = events
 			go func() {
 				defer close(events)
-				events <- agent.Event{Type: agent.EvStatus, Content: "Scanning target directory for flag patterns and artifacts..."}
-				result, err := ctf.RunLocalTriage(ctx, ctf.LocalTask{Path: args})
-				if err != nil {
-					events <- agent.Event{Type: agent.EvError, Content: fmt.Sprintf("CTF triage failed: %v", err)}
-					return
-				}
-				events <- agent.Event{Type: agent.EvDone, Content: ctf.FormatResult(result)}
+			events <- agent.Event{Type: agent.EvStatus, Content: "Running local CTF solver (scan -> decode -> verify)..."}
+			rs, err := ctf.Solve(ctx, ctf.LocalTask{Path: args})
+			if err != nil {
+				events <- agent.Event{Type: agent.EvError, Content: fmt.Sprintf("CTF solve failed: %v", err)}
+				return
+			}
+			events <- agent.Event{Type: agent.EvDone, Content: ctf.FormatSolve(rs)}
 			}()
 		}
 

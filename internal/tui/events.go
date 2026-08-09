@@ -26,9 +26,17 @@ func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 		m.phase = "planning"
 		if ev.Plan != nil && len(ev.Plan.Steps) > 0 {
 			m.phaseDetail = fmt.Sprintf("plan: %d steps", len(ev.Plan.Steps))
+			m.appendLine(StatusLineStyle.Render(fmt.Sprintf("  📋 Mission plan (%d steps):", len(ev.Plan.Steps))))
+			for i, step := range ev.Plan.Steps {
+				target := step.TargetAssetID
+				if target == "" {
+					target = "—"
+				}
+				m.appendLine(ToolOutputStyle.Render(fmt.Sprintf("    %d. %s  →  %s", i+1, step.Action, target)))
+			}
+			m.updateViewportContent()
 		} else {
-			phaseDetail := "planning"
-			m.phaseDetail = phaseDetail
+			m.phaseDetail = "planning"
 		}
 
 	case agent.EvStatus:

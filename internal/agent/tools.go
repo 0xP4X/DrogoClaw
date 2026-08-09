@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -96,6 +97,11 @@ type ToolRegistry struct {
 
 	// Recent successful observations used by the evidence gate.
 	recentEvidence []toolEvidence
+
+	// lastResult/lastTarget capture the most recent execution outcome so the
+	// success oracle can verify real evidence instead of model prose.
+	lastResult ToolResult
+	lastTarget string
 }
 
 type toolEvidence struct {
@@ -132,6 +138,169 @@ func (r *ToolRegistry) VerifySuccess(name string, result string) (bool, string) 
 		Success:  true,
 	}
 	return r.oracle.Verify(tr)
+}
+
+// ---------------------------------------------------------------------------
+// Outcome classification & evidence evaluation (audit Phase 1)
+// ---------------------------------------------------------------------------
+
+var (
+	reStatusExit = regexp.MustCompile(`command exited with status (\d+)`)
+	reFlag       = regexp.MustCompile(`(?i)(?:flag|ctf|picoctf|htb)\{[^\r\n{}]{1,200}\}`)
+	reCVE        = regexp.MustCompile(`CVE-\d{4}-\d+`)
+)
+
+// extractFindings returns conservative, high-signal evidence that a tool
+// actually discovered something (a flag, CVE, open port, HTTP 200, or a
+// confirmed vulnerability). It deliberately ignores prose claims so the oracle
+// cannot be satisfied by the model narrating success.
+func extractFindings(name, out string) []string {
+	var f []string
+	if m := reFlag.FindString(out); m != "" {
+		f = append(f, "flag:"+m)
+	}
+	if m := reCVE.FindString(out); m != "" {
+		f = append(f, "cve:"+m)
+	}
+	low := strings.ToLower(out)
+	switch {
+	case strings.Contains(low, "is vulnerable"), regexp.MustCompile(`parameter .* is vulnerable`).MatchString(out):
+		f = append(f, "vuln:confirmed")
+	case strings.Contains(low, "status: 200"):
+		f = append(f, "http:200")
+	case regexp.MustCompile(`\d+/(open|filtered)`).MatchString(out):
+		f = append(f, "port:open")
+	case strings.Contains(low, "exploit success"), strings.Contains(low, "successfully exploited"),
+		strings.Contains(low, "authentication bypass"), strings.Contains(low, "remote code execution"):
+		f = append(f, "exploit:confirmed")
+	}
+	return f
+}
+
+func extractTarget(args map[string]any) string {
+	for _, k := range []string{"target", "url", "domain", "host", "hostname", "target_ip", "subnet", "dc_ip"} {
+		if v, ok := args[k]; ok {
+			if s, ok := v.(string); ok && strings.TrimSpace(s) != "" {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
+func truncateFindings(in []string) []string {
+	out := in
+	if len(out) > 3 {
+		out = out[:3]
+	}
+	for i, s := range out {
+		if len(s) > 80 {
+			out[i] = s[:77] + "..."
+		}
+	}
+	return out
+}
+
+// classifyOutcome converts a tool's display string + sandbox error into a typed
+// ToolResult with a real failure class and detected findings.
+func (r *ToolRegistry) classifyOutcome(name, out string, runErr error) ToolResult {
+	tr := ToolResult{ToolName: name, Stdout: out, Success: true, FailureClass: "none"}
+	if runErr != nil {
+		tr.Success = false
+		msg := runErr.Error()
+		switch {
+		case reStatusExit.MatchString(msg):
+			if m := reStatusExit.FindStringSubmatch(msg); len(m) == 2 {
+				if code, e := strconv.Atoi(m[1]); e == nil {
+					tr.ExitCode = code
+				}
+			}
+			if tr.ExitCode == 0 {
+				tr.FailureClass = "none"
+				tr.Success = true
+			} else {
+				tr.FailureClass = "no_signal"
+			}
+		case strings.Contains(msg, "not found"), strings.Contains(msg, "no such file"), strings.Contains(msg, "executable"):
+			tr.FailureClass = "tool_missing"
+		case strings.Contains(msg, "timeout"), strings.Contains(msg, "context deadline"):
+			tr.FailureClass = "timeout"
+		case strings.Contains(msg, "invalid"), strings.Contains(msg, "denied"):
+			tr.FailureClass = "bad_input"
+		default:
+			tr.FailureClass = "no_signal"
+		}
+	}
+	if tr.FailureClass == "none" {
+		low := strings.ToLower(out)
+		switch {
+		case strings.Contains(low, "[sandbox error]"), strings.Contains(low, "[tool error]"):
+			tr.FailureClass = "no_signal"
+			tr.Success = false
+		case strings.Contains(low, "command not found"):
+			tr.FailureClass = "tool_missing"
+			tr.Success = false
+		}
+	}
+	if findings := extractFindings(name, out); len(findings) > 0 {
+		tr.ParsedFacts = map[string]interface{}{"findings": findings}
+	}
+	return tr
+}
+
+// EvaluateTool returns a deterministic verdict about whether the last tool
+// execution produced verified evidence. The model is told the status so it
+// cannot claim success on prose alone.
+func (r *ToolRegistry) EvaluateTool(name, result string) (verified bool, status, reason string) {
+	tr := r.lastResult
+	if tr.ToolName == "" {
+		tr = r.classifyOutcome(name, result, nil)
+	}
+	if tr.FailureClass != "none" && tr.FailureClass != "" {
+		return false, "failed", fmt.Sprintf("execution failed (%s)", tr.FailureClass)
+	}
+	if findings, ok := tr.ParsedFacts["findings"].([]string); ok && len(findings) > 0 {
+		return true, "verified", fmt.Sprintf("evidence: %s", strings.Join(truncateFindings(findings), "; "))
+	}
+	if reFlag.MatchString(tr.Stdout) {
+		return true, "verified", "flag present in output"
+	}
+	if tr.Success {
+		return false, "clean", "execution succeeded but no finding detected"
+	}
+	return false, "failed", "no verified evidence"
+}
+
+// RecordVerifiedFinding persists a verified finding to the loot database with
+// provenance (tool + target). It is a no-op unless evaluation verified a
+// finding, keeping the evidence ledger free of unverified claims.
+func (r *ToolRegistry) RecordVerifiedFinding() {
+	tr := r.lastResult
+	if tr.ToolName == "" {
+		return
+	}
+	if findings, ok := tr.ParsedFacts["findings"].([]string); !ok || len(findings) == 0 {
+		if !reFlag.MatchString(tr.Stdout) {
+			return
+		}
+	}
+	if r.lootDb == nil {
+		return
+	}
+	desc := "verified finding via " + tr.ToolName
+	if findings, ok := tr.ParsedFacts["findings"].([]string); ok && len(findings) > 0 {
+		desc = findings[0]
+	}
+	cve := reCVE.FindString(tr.Stdout)
+	severity := "medium"
+	low := strings.ToLower(tr.Stdout)
+	switch {
+	case strings.Contains(low, "critical"):
+		severity = "critical"
+	case strings.Contains(low, "high"):
+		severity = "high"
+	}
+	_ = r.lootDb.InsertVulnerability(r.lastTarget, cve, desc, severity)
 }
 
 // Definitions returns the OpenAI-format tool definitions for the LLM.
@@ -611,6 +780,73 @@ func (r *ToolRegistry) Definitions() []openai.ChatCompletionToolParam {
 		}, "required": []string{"os_type"}},
 	}})
 
+	defs = append(defs, openai.ChatCompletionToolParam{
+		Type: "function",
+		Function: openai.FunctionDefinitionParam{
+			Name:        "run_sast",
+			Description: openai.String("Static analysis (SAST) of a local code tree for authorized code review. Scans source files for vulnerability patterns (SQLi, command injection, XSS sinks, insecure deserialization, hardcoded secrets) and returns candidates with file:line provenance."),
+			Parameters: openai.FunctionParameters{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"path":   map[string]interface{}{"type": "string", "description": "Local directory or file to scan"},
+					"target": map[string]interface{}{"type": "string", "description": "Alias for path"},
+				},
+				"required": []string{"path"},
+			},
+		},
+	})
+
+	defs = append(defs, openai.ChatCompletionToolParam{
+		Type: "function",
+		Function: openai.FunctionDefinitionParam{
+			Name:        "web_probe",
+			Description: openai.String("Lightweight DAST probe of an authorized web target: discovers input parameters, detects reflected-XSS candidates, and flags forms missing anti-CSRF tokens. Findings are candidates requiring browser validation."),
+			Parameters: openai.FunctionParameters{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"url": map[string]interface{}{"type": "string", "description": "Target URL (authorized only)"},
+				},
+				"required": []string{"url"},
+			},
+		},
+	})
+
+	defs = append(defs, openai.ChatCompletionToolParam{
+		Type: "function",
+		Function: openai.FunctionDefinitionParam{
+			Name:        "replay_request",
+			Description: openai.String("Send a crafted HTTP request to an authorized target and return the status code and body for proof-of-concept validation."),
+			Parameters: openai.FunctionParameters{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"url":     map[string]interface{}{"type": "string", "description": "Target URL"},
+					"method":  map[string]interface{}{"type": "string", "description": "HTTP method (default GET)"},
+					"headers": map[string]interface{}{"type": "string", "description": "JSON object of request headers"},
+					"body":    map[string]interface{}{"type": "string", "description": "Request body"},
+				},
+				"required": []string{"url"},
+			},
+		},
+	})
+
+	defs = append(defs, openai.ChatCompletionToolParam{
+		Type: "function",
+		Function: openai.FunctionDefinitionParam{
+			Name:        "browser_validate",
+			Description: openai.String("Browser-driven XSS confirmation using headless Chromium (Playwright) against an authorized target. Confirms a reflected-XSS candidate actually executes in a real browser. Requires Playwright/Chromium in the sandbox (install: pip install playwright && playwright install chromium, or pass autoinstall=true)."),
+			Parameters: openai.FunctionParameters{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"url":         map[string]interface{}{"type": "string", "description": "Target URL"},
+					"param":       map[string]interface{}{"type": "string", "description": "The reflected parameter to inject the payload into"},
+					"payload":     map[string]interface{}{"type": "string", "description": "Optional XSS payload (default triggers a title marker)"},
+					"autoinstall": map[string]interface{}{"type": "boolean", "description": "If true, attempt to install Playwright/Chromium in the sandbox"},
+				},
+				"required": []string{"url"},
+			},
+		},
+	})
+
 	return defs
 }
 
@@ -629,6 +865,8 @@ func (r *ToolRegistry) Execute(ctx context.Context, name string, argsJSON string
 	if fn, ok := r.builtins[name]; ok {
 		result := fn(ctx, args)
 		r.recordToolEvidence(name, result)
+		r.lastTarget = extractTarget(args)
+		r.lastResult = r.classifyOutcome(name, result, nil)
 		return result
 	}
 
@@ -641,9 +879,13 @@ func (r *ToolRegistry) Execute(ctx context.Context, name string, argsJSON string
 
 	result, err := r.sandbox.Execute(ctx, cmd)
 	if err != nil {
+		r.lastTarget = extractTarget(args)
+		r.lastResult = r.classifyOutcome(name, fmt.Sprintf("[Sandbox Error] %v", err), err)
 		return fmt.Sprintf("[Sandbox Error] %v", err)
 	}
 	r.recordToolEvidence(name, result)
+	r.lastTarget = extractTarget(args)
+	r.lastResult = r.classifyOutcome(name, result, err)
 	return result
 }
 
@@ -688,7 +930,7 @@ func classifyToolPolicy(name string) toolPolicy {
 	case strings.HasPrefix(name, "osint_") ||
 		name == "profile_target" || name == "web_search" || name == "fetch_url" ||
 		name == "deep_research" || name == "lookup_cve" || name == "binary_recon" ||
-		name == "analyze_source_code" || name == "binary_gdb_run":
+		name == "analyze_source_code" || name == "binary_gdb_run" || name == "run_sast":
 		return toolPolicyObserve
 	case name == "download_loot" || name == "shell_session_exec" || name == "deploy_pivot" ||
 		name == "route_traffic" || name == "auto_privesc" || name == "establish_persistence" ||
@@ -698,9 +940,9 @@ func classifyToolPolicy(name string) toolPolicy {
 	case name == "ad_dump_lsass" || name == "ad_pass_the_hash" || name == "aws_enum_iam" ||
 		name == "aws_escalate_privs" || name == "aws_dump_s3" || name == "send_phish":
 		return toolPolicyCredentialed
-	case name == "shell_execute" || name == "run_exploit" || name == "run_ad_template" ||
+	case 		name == "shell_execute" || name == "run_exploit" || name == "run_ad_template" ||
 		name == "auth_bypass_scan" || name == "binary_ret2libc" || name == "fuzz_endpoint" ||
-		name == "generate_fud_payload" || name == "setup_phish_domain" ||
+		name == "generate_fud_payload" || name == "setup_phish_domain" || name == "browser_validate" ||
 		name == "autonomous_fuzzing_engine" || name == "autonomous_exploit_writer" ||
 		name == "autonomous_ad_exploiter" || name == "dynamic_payload_compiler" ||
 		name == "swarm_pivot_orchestrator" || name == "advanced_web_exploiter" ||
@@ -869,6 +1111,7 @@ func truncateToolEvidence(result string, limit int) string {
 func (r *ToolRegistry) registerBuiltins() {
 	// Register all Phase 2 structured tool wrappers
 	r.registerToolWrappers()
+	r.registerWebTools()
 
 	r.builtins["shell_execute"] = func(ctx context.Context, args map[string]any) string {
 		cmd, _ := args["command"].(string)

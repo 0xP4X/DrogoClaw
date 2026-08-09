@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"sort"
@@ -61,6 +62,13 @@ type Orchestrator struct {
 }
 
 const maxHistoryMessages = 24
+
+// runBudget caps the total wall-clock time of one Execute loop. It prevents
+// indefinite hangs (e.g. waiting on an unanswered approval gate or a stalled
+// tool) and is separate from the per-command sandbox timeout. The budget
+// propagates into tool execution and the Human-in-the-Loop wait, so a stall
+// surfaces as a clear error instead of a silent 20-minute freeze.
+const runBudget = 30 * time.Minute
 
 // longRunningTools maps low-risk but time-consuming tool names to an estimated
 // runtime. When not in autopilot, the orchestrator pauses before running one of
@@ -163,6 +171,12 @@ func (o *Orchestrator) Resume(ctx context.Context, events chan<- Event) error {
 // The caller must close or drain the channel.
 func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<- Event) error {
 	defer close(events)
+
+	// Bound the whole run so a blocked tool, an unanswered approval gate, or a
+	// looping model cannot hang the session indefinitely.
+	ctx, cancel := context.WithTimeout(ctx, runBudget)
+	defer cancel()
+
 	if o.actions != nil {
 		o.actions.Begin(userMsg)
 	}
@@ -192,6 +206,13 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 
 		resp, err := o.provider.Complete(ctx, messages, o.tools.Definitions())
 		if err != nil {
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				events <- Event{Type: EvError, Content: fmt.Sprintf("Run budget exceeded (%s). The run was stalled (likely waiting on an unanswered approval or a hung tool). Run in autopilot to skip approvals, or raise runBudget.", runBudget)}
+				if o.actions != nil {
+					o.actions.Finish("failed", "run budget exceeded")
+				}
+				return context.DeadlineExceeded
+			}
 			if o.actions != nil {
 				o.actions.Finish("failed", err.Error())
 			}
@@ -299,11 +320,16 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 				o.actions.ToolFinished(tc.Function.Name, result)
 			}
 
-			// Verify tool result against the success oracle before feeding it back.
-			// A tool claiming success must have verified evidence in its output.
-			if verified, reason := o.tools.VerifySuccess(tc.Function.Name, result); !verified {
-				events <- Event{Type: EvStatus, Content: fmt.Sprintf("Evidence gate: %s", reason)}
+			// Deterministic evidence evaluation: the model is told the verified
+			// status so it cannot claim success on prose alone. Verified findings
+			// are recorded to the loot database with provenance.
+			verified, estatus, reason := o.tools.EvaluateTool(tc.Function.Name, result)
+			if verified {
+				o.tools.RecordVerifiedFinding()
 			}
+			evidenceFooter := fmt.Sprintf("\n[EVIDENCE: %s — %s]", strings.ToUpper(estatus), reason)
+			events <- Event{Type: EvStatus, Content: fmt.Sprintf("Evidence gate: %s (%s)", estatus, reason)}
+			result = result + evidenceFooter
 
 			events <- Event{Type: EvToolDone, Tool: tc.Function.Name, Result: result}
 			messages = append(messages, openai.ToolMessage(tc.ID, result))
