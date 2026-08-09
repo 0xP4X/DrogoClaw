@@ -56,7 +56,7 @@ func RunSetup(cfg *config.Manager) {
 	fmt.Println(dim("  Credentials remain strictly local (~/.drogonclaw/config.json)."))
 	fmt.Println()
 
-	fmt.Println(stepIndicator(1, 4, "Authorisation Check"))
+  fmt.Println(stepIndicator(1, 5, "Authorisation Check"))
 	fmt.Println()
 
 	var authorised bool
@@ -74,7 +74,7 @@ func RunSetup(cfg *config.Manager) {
 	}
 
 	fmt.Println()
-	fmt.Println(stepIndicator(2, 4, "Select Neural Provider"))
+  fmt.Println(stepIndicator(2, 5, "Select Neural Provider"))
 	fmt.Println()
 
 	err = huh.NewSelect[string]().
@@ -131,7 +131,7 @@ func RunSetup(cfg *config.Manager) {
 	var ollamaURL string
 
 	fmt.Println()
-	fmt.Println(stepIndicator(3, 4, "Credentials & Model Selection"))
+  fmt.Println(stepIndicator(3, 5, "Credentials & Model Selection"))
 	fmt.Println()
 
 	if provider == "ollama" {
@@ -189,7 +189,7 @@ func RunSetup(cfg *config.Manager) {
 	}
 
 	fmt.Println()
-	fmt.Println(stepIndicator(4, 4, "Remote C2 Gateway (Optional)"))
+  fmt.Println(stepIndicator(4, 5, "Remote C2 Gateway (Optional)"))
 	fmt.Println()
 
 	var enableTelegram bool
@@ -223,6 +223,58 @@ func RunSetup(cfg *config.Manager) {
 		} else {
 			fmt.Println("  [!] Telegram setup skipped.")
 		}
+	}
+
+	fmt.Println()
+	fmt.Println(stepIndicator(5, 5, "Secondary API Keys (Optional)"))
+	fmt.Println()
+
+	// Secondary recon/OSINT keys are all configured here — no environment
+	// exports required. The operator may skip the whole set, or pick only the
+	// keys they want to provide.
+	type secondaryKey struct {
+		configKey string
+		label     string
+	}
+	secondaryKeys := []secondaryKey{
+		{"GITHUB_TOKEN", "GitHub Token (authenticated code/search)"},
+		{"SHODAN_API_KEY", "Shodan (exposed-asset intelligence)"},
+		{"VIRUSTOTAL_API_KEY", "VirusTotal (hash/URL reputation)"},
+		{"BRAVE_SEARCH_API_KEY", "Brave Search (web dorking)"},
+		{"HUNTER_IO_API_KEY", "Hunter.io (email discovery)"},
+		{"EXA_API_KEY", "Exa (AI web search)"},
+	}
+
+	var selected []string
+	options := make([]huh.Option[string], len(secondaryKeys))
+	for i, k := range secondaryKeys {
+		options[i] = huh.NewOption(k.label, k.configKey)
+	}
+
+	err = huh.NewMultiSelect[string]().
+		Title("Which secondary API keys do you want to set up?").
+		Description("Leave all unselected to skip. You can re-run setup any time.").
+		Options(options...).
+		Value(&selected).
+		WithTheme(CustomHuhTheme()).
+		Run()
+
+	if err == nil && len(selected) > 0 {
+		for _, key := range selected {
+			var val string
+			err = huh.NewInput().
+				Title(fmt.Sprintf("%s", key)).
+				Description("Stored locally in ~/.drogonclaw/config.json.").
+				EchoMode(huh.EchoModePassword).
+				Value(&val).
+				WithTheme(CustomHuhTheme()).
+				Run()
+			if err == nil && val != "" {
+				cfg.Set(key, val)
+			}
+		}
+	} else {
+		fmt.Println("  [i] Secondary API keys skipped.")
 	}
 
 	fmt.Println()

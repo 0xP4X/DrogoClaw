@@ -79,34 +79,27 @@ This package publishes the Linux x64 executable only. Non-Linux platforms are in
 
 ### Configure
 
-DrogonClaw is configured through its **Setup Wizard** — not by exporting
-environment variables. On first launch the wizard walks you through provider
-selection and credential entry, then writes everything to
-`~/.drogonclaw/config.json` (owner read/write only). Re-run it any time with
-`drogonclaw setup` or `/setup` inside the terminal.
+DrogonClaw is configured entirely through its **Setup Wizard** — there is no
+environment-variable or export-based configuration. On first launch the wizard
+walks you through everything and writes it to `~/.drogonclaw/config.json`
+(owner read/write only):
+
+1. **Authorisation** — scope/compliance acknowledgement.
+2. **Neural Provider** — OpenRouter (default), NVIDIA NIM, OpenAI, Google Gemini, or local Ollama, plus model selection.
+3. **Credentials** — the provider API key (or Ollama endpoint).
+4. **Remote C2 Gateway** (optional) — Telegram bot token + chat ID.
+5. **Secondary API Keys** (optional) — pick any of GitHub, Shodan, VirusTotal, Brave Search, Hunter.io, or Exa to enable OSINT/recon features. Skip the whole set, or choose only the ones you want.
+
+Re-run it any time with `drogonclaw setup` or `/setup` inside the terminal.
 
 ```bash
 ./drogonclaw setup
 ```
 
-Environment variables are only optional overrides that take precedence over the
-saved config file. You do **not** need to export anything — prefer the wizard.
-If you must drive configuration from the environment, this is the supported
-shape (Linux only):
-
-```bash
-# OpenAI
-export AI_PROVIDER=openai
-export OPENAI_API_KEY=sk-your-key-here
-export AI_MODEL=gpt-4o
-
-# Local Ollama
-export AI_PROVIDER=ollama
-export OLLAMA_BASE_URL=http://localhost:11434
-export AI_MODEL=llama3.1
-
-./drogonclaw
-```
+> Note: configuration is stored only in `~/.drogonclaw/config.json`. DrogonClaw
+> does **not** read provider/model settings from environment variables, so a
+> stray `export AI_PROVIDER=…` in your shell can no longer override your saved
+> setup.
 
 ### Start
 

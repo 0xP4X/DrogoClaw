@@ -33,9 +33,13 @@ func (m *Manager) load() {
 	m.v.AddConfigPath(cfgDir)
 	m.v.AddConfigPath(".")
 
-	// Env vars override config file
-	m.v.AutomaticEnv()
-	m.v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	// NOTE: AutomaticEnv() is intentionally NOT enabled. The Setup Wizard
+	// (`./drogonclaw setup` / `/setup`) is the single source of truth for
+	// provider/model/API-key configuration, persisted to
+	// ~/.drogonclaw/config.json. Environment variables are only consulted as a
+	// fallback (see the Get* helpers) and only for values the wizard does not
+	// manage — e.g. OSINT keys like SHODAN_API_KEY. This prevents a stray
+	// `export AI_PROVIDER=...` from silently overriding the saved config.
 
 	// Defaults
 	m.v.SetDefault("WORKSPACE_ROOT", home)
@@ -62,14 +66,14 @@ func (m *Manager) save() {
 }
 
 func (m *Manager) GetProvider() string {
-	p := strings.ToLower(m.GetString("AI_PROVIDER"))
+	p := m.GetString("AI_PROVIDER")
 	if p == "" {
-		p = strings.ToLower(os.Getenv("AI_PROVIDER"))
+		p = os.Getenv("AI_PROVIDER")
 	}
 	if p == "" {
 		p = "openrouter"
 	}
-	return p
+	return strings.ToLower(p)
 }
 
 func (m *Manager) GetModel() string {
@@ -85,6 +89,8 @@ func (m *Manager) GetModel() string {
 
 func (m *Manager) GetAPIKey() string {
 	provider := m.GetProvider()
+	// The wizard-stored key (config file) always takes precedence over an env
+	// var. Env vars are only a fallback for keys the wizard does not manage.
 	switch provider {
 	case "openai":
 		return firstNonEmpty(m.GetString("OPENAI_API_KEY"), os.Getenv("OPENAI_API_KEY"))
