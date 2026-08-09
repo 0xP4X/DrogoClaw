@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -176,6 +177,18 @@ func (m *Manager) GetGitHubToken() string {
 
 func (m *Manager) IsVerified() bool {
 	return strings.ToLower(m.GetString("DROGONCLAW_VERIFIED")) == "true"
+}
+
+func (m *Manager) GetMaxIterations() int {
+	v := m.GetString("MAX_ITERATIONS")
+	if v == "" {
+		return 100
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 1 {
+		return 100
+	}
+	return n
 }
 
 func (m *Manager) SetVerified(verified bool) {

@@ -27,11 +27,10 @@ const (
 	defaultWorkDir = "/workspace"
 )
 
-// commandTimeout caps how long a single sandboxed command may run. Long
-// reconnaissance tools (gobuster, ffuf, large nmap/nuclei sweeps) routinely need
-// far more than the old 30-minute ceiling, so it is set generously. The parent
-// context (mission timeout) still applies as an upper bound.
-const commandTimeout = 90 * time.Minute
+// commandTimeout caps how long a single command may run. Most pentest commands
+// complete in seconds; reconnaissance sweeps may need a couple of minutes. The
+// parent context (mission timeout) still applies as an upper bound.
+const commandTimeout = 5 * time.Minute
 
 // Docker wraps the Docker SDK for sandboxed command execution.
 type Docker struct {
@@ -53,6 +52,17 @@ func New() (*Docker, error) {
 // IsNativeMode returns whether the sandbox is running in native mode (host OS) vs Docker.
 func (d *Docker) IsNativeMode() bool {
 	return d.nativeMode
+}
+
+// RuntimeLabel returns a human-readable label for the current execution environment.
+func (d *Docker) RuntimeLabel() string {
+	if d == nil {
+		return "unavailable"
+	}
+	if d.nativeMode {
+		return "native host"
+	}
+	return "Docker sandbox"
 }
 
 // IsReady reports whether Execute can run commands in the selected runtime.

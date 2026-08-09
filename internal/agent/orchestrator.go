@@ -46,10 +46,11 @@ type Event struct {
 
 // Orchestrator is the DrogonClaw agent — a hand-rolled ReAct loop.
 type Orchestrator struct {
-	provider  *Provider
-	tools     *ToolRegistry
-	history   []openai.ChatCompletionMessageParamUnion
-	sysPrompt string
+	provider       *Provider
+	tools          *ToolRegistry
+	history        []openai.ChatCompletionMessageParamUnion
+	sysPrompt      string
+	maxIterations  int
 
 	// Session state
 	Autopilot bool
@@ -64,27 +65,25 @@ type Orchestrator struct {
 const maxHistoryMessages = 24
 
 // runBudget caps the total wall-clock time of one Execute loop. It prevents
-// indefinite hangs (e.g. waiting on an unanswered approval gate or a stalled
-// tool) and is separate from the per-command sandbox timeout. The budget
-// propagates into tool execution and the Human-in-the-Loop wait, so a stall
-// surfaces as a clear error instead of a silent 20-minute freeze.
-const runBudget = 30 * time.Minute
+// indefinite hangs and is separate from the per-command timeout. Five minutes
+// is enough for a single CTF challenge; adjust via config if needed.
+const runBudget = 5 * time.Minute
 
 // longRunningTools maps low-risk but time-consuming tool names to an estimated
 // runtime. When not in autopilot, the orchestrator pauses before running one of
 // these and asks the operator to accept or skip it (see EvApproval).
 var longRunningTools = map[string]time.Duration{
-	"run_gobuster":       45 * time.Minute,
-	"run_ffuf":           45 * time.Minute,
-	"run_nuclei":         30 * time.Minute,
-	"run_nmap":           30 * time.Minute,
-	"fuzz_endpoint":      40 * time.Minute,
-	"run_subfinder":      15 * time.Minute,
-	"run_httpx":          15 * time.Minute,
-	"refresh_cve_feeds":  20 * time.Minute,
-	"deep_research":      20 * time.Minute,
-	"osint_certs":        15 * time.Minute,
-	"run_forensics_triage": 30 * time.Minute,
+	"run_gobuster":       2 * time.Minute,
+	"run_ffuf":           2 * time.Minute,
+	"run_nuclei":         2 * time.Minute,
+	"run_nmap":           3 * time.Minute,
+	"fuzz_endpoint":      3 * time.Minute,
+	"run_subfinder":      1 * time.Minute,
+	"run_httpx":          1 * time.Minute,
+	"refresh_cve_feeds":  2 * time.Minute,
+	"deep_research":      2 * time.Minute,
+	"osint_certs":        1 * time.Minute,
+	"run_forensics_triage": 3 * time.Minute,
 }
 
 // isLongRunningTool reports whether a tool is expected to run a long time and,
@@ -101,17 +100,21 @@ func isLongRunningTool(name string) (time.Duration, bool) {
 }
 
 // NewOrchestrator creates the agent core.
-func NewOrchestrator(provider *Provider, tools *ToolRegistry, sysPrompt, sessionID string, graph *memory.Graph) *Orchestrator {
-	return NewOrchestratorWithJournal(provider, tools, sysPrompt, sessionID, graph, memory.NewActionJournal(sessionID))
+func NewOrchestrator(provider *Provider, tools *ToolRegistry, sysPrompt, sessionID string, graph *memory.Graph, maxIterations int) *Orchestrator {
+	return NewOrchestratorWithJournal(provider, tools, sysPrompt, sessionID, graph, memory.NewActionJournal(sessionID), maxIterations)
 }
 
 // NewOrchestratorWithJournal permits the primary UI to use a stable journal
 // name across application restarts while worker agents keep isolated journals.
-func NewOrchestratorWithJournal(provider *Provider, tools *ToolRegistry, sysPrompt, sessionID string, graph *memory.Graph, actions *memory.ActionJournal) *Orchestrator {
+func NewOrchestratorWithJournal(provider *Provider, tools *ToolRegistry, sysPrompt, sessionID string, graph *memory.Graph, actions *memory.ActionJournal, maxIterations int) *Orchestrator {
+	if maxIterations <= 0 {
+		maxIterations = 100
+	}
 	return &Orchestrator{
 		provider:       provider,
 		tools:          tools,
 		sysPrompt:      sysPrompt,
+		maxIterations:  maxIterations,
 		SessionID:      sessionID,
 		missionPlanner: core.NewMissionPlanner(provider, graph),
 		actions:        actions,
@@ -200,7 +203,7 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 
 	messages := BuildMessages(o.sysPrompt, o.history, userMsg)
 
-	const maxIter = 25 // hard cap on tool call loops
+	maxIter := o.maxIterations
 	for i := 0; i < maxIter; i++ {
 		events <- Event{Type: EvThinking, Content: fmt.Sprintf("Thinking... step %d/%d", i+1, maxIter)}
 

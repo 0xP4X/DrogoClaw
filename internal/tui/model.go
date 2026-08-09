@@ -20,7 +20,6 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -179,7 +178,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.executing = false
 					m.activeToolName = ""
 					m.ctrlCAt = time.Time{}
-					// Clear any suspended approval so the prompt doesn't stick.
 					if core.GlobalHitL.HasPending() {
 						core.GlobalHitL.Resolve("CANCELLED")
 					}
@@ -190,6 +188,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				return m, tea.Quit
 			}
+			return m, nil
+		}
+
+		if msg.Type == tea.KeyF2 {
+			m.appendLine(m.copyConversation())
 			return m, nil
 		}
 
@@ -560,36 +563,9 @@ func summarizeResult(result string, limit int) string {
 	cleaned = strings.ReplaceAll(cleaned, "\n", " ")
 	cleaned = strings.Join(strings.Fields(cleaned), " ")
 	cleaned = strings.TrimPrefix(cleaned, "[Sandbox Error] ")
+	cleaned = strings.TrimPrefix(cleaned, "[Native Error] ")
 	cleaned = strings.TrimPrefix(cleaned, "[Certs Error] ")
 	return truncate(cleaned, limit)
-}
-
-func toolCategory(name string) (badge string, style lipgloss.Style) {
-	switch {
-	case strings.HasPrefix(name, "osint_") || name == "web_search" || name == "fetch_url" || name == "deep_research" || name == "lookup_cve":
-		return "INTEL", ToolBadgeIntelStyle
-	case name == "run_nmap" || name == "run_nuclei" || name == "run_gobuster" || name == "run_ffuf" ||
-		name == "run_subfinder" || name == "run_httpx" || name == "run_forensics_triage":
-		return "RECON", ToolBadgeReconStyle
-	case name == "run_sqlmap" || name == "run_hydra" || name == "run_pwntools":
-		return "EXPLOIT", ToolBadgeExploitStyle
-	case name == "run_checksec" || name == "run_angr" || name == "run_ropper" || name == "run_one_gadget":
-		return "BINARY", ToolBadgeMemoryStyle
-	case name == "run_volatility3":
-		return "FORENSICS", ToolBadgeIntelStyle
-	case strings.HasPrefix(name, "nmap") || strings.HasPrefix(name, "gobuster") || strings.HasPrefix(name, "ffuf") || strings.HasPrefix(name, "nuclei") || strings.HasPrefix(name, "subfinder") || strings.HasPrefix(name, "httpx"):
-		return "RECON", ToolBadgeReconStyle
-	case name == "shell_execute" || strings.HasPrefix(name, "shell_session") || name == "catch_shell":
-		return "SHELL", ToolBadgeExploitStyle
-	case name == "update_neural_memory":
-		return "MEMORY", ToolBadgeMemoryStyle
-	case name == "create_skill" || name == "update_directive" || name == "install_tool" || name == "github_download" || name == "write_and_run_script":
-		return "SYSTEM", ToolBadgeSystemStyle
-	case name == "download_loot":
-		return "LOOT", ToolBadgeIntelStyle
-	default:
-		return "TOOL", ToolBadgeReconStyle
-	}
 }
 
 func (m Model) confirmationAccepted(answer string) bool {
@@ -607,14 +583,11 @@ func (m Model) confirmationPhrase() string {
 	}
 }
 
-func runtimeLabel(sb *sandbox.Docker) string {
-	if sb == nil {
+func (m Model) runtimeLabel() string {
+	if m.sandbox == nil {
 		return "unavailable"
 	}
-	if sb.IsNativeMode() {
-		return "native host"
-	}
-	return "Docker sandbox"
+	return m.sandbox.RuntimeLabel()
 }
 
 func max(a, b int) int {
@@ -798,7 +771,7 @@ func (m *Model) switchSection(sectionID string) {
 
 	newGraph := memory.NewGraph(target)
 	newJournal := memory.NewActionJournal(target)
-	sysPrompt := agent.BuildSystemPrompt(newGraph, m.opsecMgr, "")
+	sysPrompt := agent.BuildSystemPrompt(newGraph, m.opsecMgr, "", m.sandbox.RuntimeLabel())
 	newOrch := agent.NewOrchestratorWithJournal(
 		m.orch.GetProvider(),
 		m.orch.GetTools(),
@@ -806,6 +779,7 @@ func (m *Model) switchSection(sectionID string) {
 		target,
 		newGraph,
 		newJournal,
+		m.cfg.GetMaxIterations(),
 	)
 
 	m.orch = newOrch
@@ -813,7 +787,7 @@ func (m *Model) switchSection(sectionID string) {
 	m.sessionID = target
 	if m.promptRefresher != nil {
 		m.SetPromptRefresher(func() string {
-			return agent.BuildSystemPrompt(m.graph, m.opsecMgr, "")
+			return agent.BuildSystemPrompt(m.graph, m.opsecMgr, "", m.sandbox.RuntimeLabel())
 		})
 	}
 	m.lines = nil

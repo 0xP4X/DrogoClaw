@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/0xP4X/drogonclaw-go/internal/core"
 	"github.com/0xP4X/drogonclaw-go/internal/memory"
@@ -75,7 +76,7 @@ func (m Model) renderWelcome() string {
 
 	provider := fallback(m.cfg.GetProvider(), "provider")
 	model := fallback(m.cfg.GetModel(), "model")
-	runtime := runtimeLabel(m.sandbox)
+	runtime := m.sandbox.RuntimeLabel()
 	mode := m.activeMode
 	if mode == "" {
 		mode = "default"
@@ -136,7 +137,7 @@ func (m Model) renderHeader(width int) string {
 	}
 	provider := m.cfg.GetProvider()
 	model := m.cfg.GetModel()
-	runtime := runtimeLabel(m.sandbox)
+	runtime := m.sandbox.RuntimeLabel()
 
 	sep := HeaderSepStyle.Render(" │ ")
 
@@ -268,7 +269,7 @@ func (m Model) renderSidebar(width, height int) string {
 	}
 
 	section("CONTROLS")
-	row("Sandbox", SidebarValueStyle.Render(runtimeLabel(m.sandbox)))
+	row("Sandbox", SidebarValueStyle.Render(m.sandbox.RuntimeLabel()))
 	if m.autopilot {
 		row("Auto-run", StatusOnStyle.Render("● ON"))
 	} else {
@@ -336,7 +337,7 @@ func (m Model) renderStatusReport() string {
 	sb.WriteString(row("Rate Limit", onOff(m.opsecMgr.IsActive(), "ACTIVE")) + "\n")
 	sb.WriteString(row("Auto-run", onOff(m.autopilot, "ENABLED")) + "\n\n")
 	sb.WriteString("  " + heading("ENVIRONMENT") + "\n")
-	sb.WriteString(row("Execution Engine", value(runtimeLabel(m.sandbox))) + "\n")
+	sb.WriteString(row("Execution Engine", value(m.sandbox.RuntimeLabel())) + "\n")
 	sb.WriteString(row("Telegram Gateway", onOff(telegramReady, "READY")) + "\n\n")
 	sb.WriteString("  " + heading("INTELLIGENCE GRAPH") + "\n")
 	sb.WriteString(row("Graph Nodes", StatusNodeStyle.Render(fmt.Sprintf("%d", m.graph.NodeCount()))) + "\n")
@@ -374,6 +375,27 @@ func (m Model) renderInputArea() string {
 		avail = 8
 	}
 	m.input.SetWidth(avail)
+
+	taWidth := m.input.Width()
+	if taWidth < 1 {
+		taWidth = 1
+	}
+	text := m.input.Value()
+	if text == "" {
+		m.input.SetHeight(1)
+	} else {
+		lines := strings.Split(text, "\n")
+		totalLines := 0
+		for _, line := range lines {
+			runeCount := utf8.RuneCountInString(line)
+			if runeCount == 0 {
+				totalLines++
+			} else {
+				totalLines += (runeCount + taWidth - 1) / taWidth
+			}
+		}
+		m.input.SetHeight(clamp(totalLines, 1, 8))
+	}
 
 	lines = append(lines, glyph+m.input.View())
 	if m.pendingConfirm != "" {
@@ -432,7 +454,7 @@ func (m *Model) appendBanner() {
 
 	m.appendLine("")
 	m.appendLine(HeaderBrandStyle.Render("  DrogonClaw v2"))
-	m.appendLine(HintDescStyle.Render(fmt.Sprintf("  Operator: %s  ·  Engine: %s/%s  ·  Runtime: %s", opName, provider, model, runtimeLabel(m.sandbox))))
+	m.appendLine(HintDescStyle.Render(fmt.Sprintf("  Operator: %s  ·  Engine: %s/%s  ·  Runtime: %s", opName, provider, model, m.sandbox.RuntimeLabel())))
 	if m.recovery != nil {
 		tool := m.recovery.CurrentTool
 		if tool == "" {

@@ -251,12 +251,17 @@ func RunSetup(cfg *config.Manager) {
 		options[i] = huh.NewOption(k.label, k.configKey)
 	}
 
-	err = huh.NewMultiSelect[string]().
+	multi := huh.NewMultiSelect[string]().
 		Title("Which secondary API keys do you want to set up?").
-		Description("Leave all unselected to skip. You can re-run setup any time.").
+		Description("Space / x to toggle · Enter to confirm · Leave all unselected to skip").
 		Options(options...).
 		Value(&selected).
-		WithTheme(CustomHuhTheme()).
+		Filterable(false).
+		WithTheme(CustomHuhTheme())
+
+	err = huh.NewForm(huh.NewGroup(multi)).
+		WithShowHelp(true).
+		WithHeight(14).
 		Run()
 
 	if err == nil && len(selected) > 0 {

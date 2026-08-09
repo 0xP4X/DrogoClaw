@@ -18,21 +18,20 @@ func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 		m.lastStatus = ev.Content
 		m.phase = phaseFromStatus(ev.Content, "reasoning")
 		m.phaseDetail = ev.Content
-		m.lastStatus = "thinking..."
-		m.appendLine(ThinkingLineStyle.Render(fmt.Sprintf("  ⟳ %s", ev.Content)))
+		m.appendLine(StatusLineStyle.Render(fmt.Sprintf("  [thinking] %s", ev.Content)))
 
 	case agent.EvPlan:
 		m.lastPlan = ev.Plan
 		m.phase = "planning"
 		if ev.Plan != nil && len(ev.Plan.Steps) > 0 {
 			m.phaseDetail = fmt.Sprintf("plan: %d steps", len(ev.Plan.Steps))
-			m.appendLine(StatusLineStyle.Render(fmt.Sprintf("  📋 Mission plan (%d steps):", len(ev.Plan.Steps))))
+			m.appendLine(StatusLineStyle.Render(fmt.Sprintf("  [plan] %d steps:", len(ev.Plan.Steps))))
 			for i, step := range ev.Plan.Steps {
 				target := step.TargetAssetID
 				if target == "" {
 					target = "—"
 				}
-				m.appendLine(ToolOutputStyle.Render(fmt.Sprintf("    %d. %s  →  %s", i+1, step.Action, target)))
+				m.appendLine(fmt.Sprintf("    %d. %s  →  %s", i+1, step.Action, target))
 			}
 			m.updateViewportContent()
 		} else {
@@ -43,9 +42,7 @@ func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 		m.lastStatus = ev.Content
 		m.phase = phaseFromStatus(ev.Content, m.phase)
 		m.phaseDetail = ev.Content
-		// Render a clean, dim status line so the operator can follow progress
-		// without it being confused with tool output or final answers.
-		m.appendLine(StatusLineStyle.Render(fmt.Sprintf("  » %s", ev.Content)))
+		m.appendLine(StatusLineStyle.Render(fmt.Sprintf("  [status] %s", ev.Content)))
 
 	case agent.EvApproval:
 		est := ev.Content
@@ -54,9 +51,7 @@ func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 		}
 		m.pendingApprovalTool = ev.Tool
 		m.pendingApprovalEst = est
-		banner := fmt.Sprintf("  ⏱ %s  may take ~%s", ev.Tool, ApprovalClockStyle.Render(est))
-		m.appendLine(ApprovalBoxStyle.Render(banner))
-		m.appendLine(ApprovalHintStyle.Render(fmt.Sprintf("    Approve running this tool? [y/n]  (Enter = run, n/skip = decline)")))
+		m.appendLine(WarningStyle.Render(fmt.Sprintf("  [approval] %s may take ~%s. Type y/n or Enter to run:", ev.Tool, est)))
 		m.phase = "waiting"
 		m.phaseDetail = fmt.Sprintf("approval: %s", ev.Tool)
 
@@ -73,9 +68,12 @@ func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 		m.phase = "executing"
 		m.phaseDetail = ev.Tool
 		m.toolStartTime = time.Now()
-		badge, badgeStyle := toolCategory(ev.Tool)
 
-		m.appendLine(fmt.Sprintf("  ⚡ %s  %s", ToolStartStyle.Render(ev.Tool), badgeStyle.Render(" "+badge+" ")))
+		if ev.Args != "" {
+			m.appendLine(fmt.Sprintf("  $ %s %s", ev.Tool, ev.Args))
+		} else {
+			m.appendLine(fmt.Sprintf("  $ %s", ev.Tool))
+		}
 		m.activeToolLine = len(m.lines) - 1
 
 	case agent.EvToolDone:
@@ -84,24 +82,15 @@ func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 		m.phase = "verifying"
 		m.phaseDetail = ev.Tool
 		elapsed := time.Since(m.toolStartTime)
-		badge, badgeStyle := toolCategory(ev.Tool)
+
 		isError := strings.Contains(strings.ToLower(ev.Result), "error") ||
 			strings.Contains(strings.ToLower(ev.Result), "failed") ||
 			strings.Contains(strings.ToLower(ev.Result), "exit status 127")
 
-		var statusIcon string
 		if isError {
-			statusIcon = ToolOutputErrorStyle.Render("✖")
+			m.appendLine(ErrorStyle.Render(fmt.Sprintf("  [exit %s] %s", elapsed.Round(10*time.Millisecond), ev.Tool)))
 		} else {
-			statusIcon = ToolOutputSuccessStyle.Render("✔")
-		}
-
-		statusLine := fmt.Sprintf("  %s %s  %s  %s", statusIcon, ToolStartStyle.Render(ev.Tool), badgeStyle.Render(" "+badge+" "), ToolTimingStyle.Render(elapsed.Round(10*time.Millisecond).String()))
-
-		if m.activeToolLine >= 0 && m.activeToolLine < len(m.lines) {
-			m.lines[m.activeToolLine] = statusLine
-		} else {
-			m.lines = append(m.lines, statusLine)
+			m.appendLine(ToolDoneStyle.Render(fmt.Sprintf("  [done] %s  (%s)", ev.Tool, elapsed.Round(10*time.Millisecond))))
 		}
 
 		outputLines := strings.Split(ev.Result, "\n")
@@ -147,7 +136,7 @@ func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 		m.phase = "error"
 		m.phaseDetail = ev.Content
 		m.lastPlan = nil
-		m.appendLine(ErrorStyle.Render(fmt.Sprintf("  ✗ Execution Error: %s", ev.Content)))
+		m.appendLine(ErrorStyle.Render(fmt.Sprintf("  [error] %s", ev.Content)))
 		m.executing = false
 		m.cancelFn = nil
 		m.processQueue(&cmds)
@@ -174,30 +163,22 @@ func (m *Model) processQueue(cmds *[]tea.Cmd) {
 	}
 }
 
-// colorizeOutputLine shades a tool-output line by severity so errors, warnings,
-// and successes stand out from routine scan output. The leading tree prefix is
-// preserved; the severity is judged from the inner (un-prefixed) content.
+// colorizeOutputLine applies minimal styling so tool output stays readable
+// without overwhelming the terminal. Errors and warnings get a color; everything
+// else is plain.
 func colorizeOutputLine(raw string) string {
 	inner := strings.TrimSpace(raw)
-	switch classifyOutputLine(inner) {
-	case SeverityError:
-		return ErrorStyle.Render(raw)
-	case SeverityWarning:
-		return WarningStyle.Render(raw)
-	case SeveritySuccess:
-		return ToolOutputSuccessStyle.Render(raw)
-	case SeveritySignal:
-		return InfoStyle.Render(raw)
-	}
 	lower := strings.ToLower(inner)
 	switch {
-	case strings.Contains(lower, "error") || strings.Contains(lower, "fail") ||
+	case strings.Contains(lower, "error") || strings.Contains(lower, "failed") ||
 		strings.Contains(lower, "denied") || strings.Contains(lower, "refused") ||
-		strings.Contains(lower, "not found") || strings.Contains(lower, "timeout"):
-		return ToolOutputErrorStyle.Render(raw)
-	case strings.Contains(lower, "open") || strings.Contains(lower, "found") ||
-		strings.Contains(lower, "success") || strings.Contains(lower, "complete") ||
-		strings.Contains(lower, "✔") || strings.Contains(lower, "✓"):
+		strings.Contains(lower, "not found") || strings.Contains(lower, "timeout") ||
+		strings.Contains(lower, "exit status"):
+		return ErrorStyle.Render(raw)
+	case strings.Contains(lower, "warning") || strings.Contains(lower, "warn"):
+		return WarningStyle.Render(raw)
+	case strings.Contains(lower, "success") || strings.Contains(lower, "complete") ||
+		strings.Contains(lower, "found") || strings.Contains(lower, "open"):
 		return ToolOutputSuccessStyle.Render(raw)
 	default:
 		return ToolOutputStyle.Render(raw)

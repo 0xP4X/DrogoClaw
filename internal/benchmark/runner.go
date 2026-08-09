@@ -89,11 +89,11 @@ func runChallenge(ctx context.Context, ch Challenge, cfg *config.Manager, manife
 	loot, _ := memory.NewLootDB()
 	graph := memory.NewGraph(fmt.Sprintf("bench-%s", ch.ID))
 	opsecMgr := opsec.NewManager()
-	sysPrompt := agent.BuildSystemPrompt(graph, opsecMgr, "")
+	sysPrompt := agent.BuildSystemPrompt(graph, opsecMgr, "", "benchmark sandbox")
 
 	tools := agent.NewToolRegistry(manifest, sb, validator, loot, cfg, graph, provider)
 	sessionID := fmt.Sprintf("bench-%s", ch.ID)
-	orch := agent.NewOrchestratorWithJournal(provider, tools, sysPrompt, sessionID, graph, memory.NewActionJournal(sessionID))
+	orch := agent.NewOrchestratorWithJournal(provider, tools, sysPrompt, sessionID, graph, memory.NewActionJournal(sessionID), 100)
 	orch.Autopilot = true // headless: no operator to approve gates
 
 	goal := buildGoal(ch)

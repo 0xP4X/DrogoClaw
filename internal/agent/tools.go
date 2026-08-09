@@ -234,7 +234,7 @@ func (r *ToolRegistry) classifyOutcome(name, out string, runErr error) ToolResul
 	if tr.FailureClass == "none" {
 		low := strings.ToLower(out)
 		switch {
-		case strings.Contains(low, "[sandbox error]"), strings.Contains(low, "[tool error]"):
+		case strings.Contains(low, "[sandbox error]"), strings.Contains(low, "[native error]"), strings.Contains(low, "[tool error]"):
 			tr.FailureClass = "no_signal"
 			tr.Success = false
 		case strings.Contains(low, "command not found"):
@@ -895,8 +895,8 @@ func (r *ToolRegistry) Execute(ctx context.Context, name string, argsJSON string
 	result, err := r.sandbox.Execute(ctx, cmd)
 	if err != nil {
 		r.lastTarget = extractTarget(args)
-		r.lastResult = r.classifyOutcome(name, fmt.Sprintf("[Sandbox Error] %v", err), err)
-		return fmt.Sprintf("[Sandbox Error] %v", err)
+		r.lastResult = r.classifyOutcome(name, fmt.Sprintf("[%s Error] %v", r.executionModeLabel(), err), err)
+		return fmt.Sprintf("[%s Error] %v", r.executionModeLabel(), err)
 	}
 	r.recordToolEvidence(name, result)
 	r.lastTarget = extractTarget(args)
@@ -1123,6 +1123,13 @@ func truncateToolEvidence(result string, limit int) string {
 	return result[:limit-3] + "..."
 }
 
+func (r *ToolRegistry) executionModeLabel() string {
+	if r.sandbox == nil || r.sandbox.IsNativeMode() {
+		return "Native"
+	}
+	return "Sandbox"
+}
+
 func (r *ToolRegistry) registerBuiltins() {
 	// Register all Phase 2 structured tool wrappers
 	r.registerToolWrappers()
@@ -1135,7 +1142,7 @@ func (r *ToolRegistry) registerBuiltins() {
 		}
 		result, err := r.sandbox.Execute(ctx, cmd)
 		if err != nil {
-			return fmt.Sprintf("[Sandbox Error] %v", err)
+			return fmt.Sprintf("[%s Error] %v", r.executionModeLabel(), err)
 		}
 		return result
 	}
@@ -1942,7 +1949,7 @@ OUTPUT ONLY THE SOURCE CODE. NO EXPLANATIONS. NO MARKDOWN.`, command)
 		ntlmHash, _ := args["ntlm_hash"].(string)
 		result, err := lateral.DumpLSASS(ctx, target, user, domain, password, ntlmHash, r.sandbox)
 		if err != nil {
-			return fmt.Sprintf("[Sandbox Error] %v", err)
+			return fmt.Sprintf("[%s Error] %v", r.executionModeLabel(), err)
 		}
 		return result
 	}
@@ -1957,7 +1964,7 @@ OUTPUT ONLY THE SOURCE CODE. NO EXPLANATIONS. NO MARKDOWN.`, command)
 		}
 		result, err := lateral.PassTheHash(ctx, targetIP, user, hash, command, r.sandbox)
 		if err != nil {
-			return fmt.Sprintf("[Sandbox Error] %v", err)
+			return fmt.Sprintf("[%s Error] %v", r.executionModeLabel(), err)
 		}
 		return result
 	}
@@ -1973,7 +1980,7 @@ OUTPUT ONLY THE SOURCE CODE. NO EXPLANATIONS. NO MARKDOWN.`, command)
 		}
 		result, err := lateral.BloodHoundCollect(ctx, domain, dcIP, username, password, hash, r.sandbox)
 		if err != nil {
-			return fmt.Sprintf("[Sandbox Error] %v", err)
+			return fmt.Sprintf("[%s Error] %v", r.executionModeLabel(), err)
 		}
 		return result
 	}
@@ -1987,7 +1994,7 @@ OUTPUT ONLY THE SOURCE CODE. NO EXPLANATIONS. NO MARKDOWN.`, command)
 		}
 		result, err := exfil.CompressAndEncrypt(ctx, sourcePath, destPath, password, r.sandbox)
 		if err != nil {
-			return fmt.Sprintf("[Sandbox Error] %v", err)
+			return fmt.Sprintf("[%s Error] %v", r.executionModeLabel(), err)
 		}
 		return result
 	}
@@ -2000,7 +2007,7 @@ OUTPUT ONLY THE SOURCE CODE. NO EXPLANATIONS. NO MARKDOWN.`, command)
 		}
 		result, err := exfil.ExfiltrateDNS(ctx, filePath, targetDomain, r.sandbox)
 		if err != nil {
-			return fmt.Sprintf("[Sandbox Error] %v", err)
+			return fmt.Sprintf("[%s Error] %v", r.executionModeLabel(), err)
 		}
 		return result
 	}
@@ -2013,7 +2020,7 @@ OUTPUT ONLY THE SOURCE CODE. NO EXPLANATIONS. NO MARKDOWN.`, command)
 		}
 		result, err := exfil.ExfiltrateICMP(ctx, filePath, targetIP, r.sandbox)
 		if err != nil {
-			return fmt.Sprintf("[Sandbox Error] %v", err)
+			return fmt.Sprintf("[%s Error] %v", r.executionModeLabel(), err)
 		}
 		return result
 	}

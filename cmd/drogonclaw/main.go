@@ -144,8 +144,8 @@ func main() {
 	}()
 
 	opsecMgr := opsec.NewManager()
-	sysPrompt := agent.BuildSystemPrompt(graph, opsecMgr, "")
-	orch := agent.NewOrchestratorWithJournal(provider, tools, sysPrompt, sessionID, graph, memory.NewActionJournal(sessionID))
+	sysPrompt := agent.BuildSystemPrompt(graph, opsecMgr, "", sb.RuntimeLabel())
+	orch := agent.NewOrchestratorWithJournal(provider, tools, sysPrompt, sessionID, graph, memory.NewActionJournal(sessionID), cfg.GetMaxIterations())
 
 	tgGateway, err := gateway.NewTelegramGateway(cfg, orch, graph, opsecMgr)
 	if err == nil && tgGateway != nil {
@@ -169,7 +169,7 @@ func main() {
 	}
 
 	model.SetPromptRefresher(func() string {
-		return agent.BuildSystemPrompt(graph, opsecMgr, "")
+		return agent.BuildSystemPrompt(graph, opsecMgr, "", sb.RuntimeLabel())
 	})
 
 	p := tea.NewProgram(

@@ -183,27 +183,12 @@ var (
 // ─────────────────────────────────────────────────────────────────────────────
 
 var (
-	ToolStartStyle = lipgloss.NewStyle().
-			Foreground(ColorAccent).
-			Bold(true)
-
 	ToolDoneStyle = lipgloss.NewStyle().
 			Foreground(ColorSuccess)
 
 	ToolArgsStyle = lipgloss.NewStyle().
 			Foreground(ColorMuted).
 			Italic(true)
-
-	ToolErrorStyle = lipgloss.NewStyle().
-			Foreground(ColorDanger).
-			Bold(true)
-
-	ToolWarningStyle = lipgloss.NewStyle().
-				Foreground(ColorWarning)
-
-	ToolSuccessStyle = lipgloss.NewStyle().
-				Foreground(ColorSuccess).
-				Bold(true)
 
 	ToolOutputStyle = lipgloss.NewStyle().
 			Foreground(ColorOutputInfo)
@@ -213,72 +198,6 @@ var (
 
 	ToolOutputErrorStyle = lipgloss.NewStyle().
 				Foreground(ColorOutputError)
-
-	ToolTimingStyle = lipgloss.NewStyle().
-			Foreground(ColorDim).
-			Italic(true)
-)
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Tool Category Badges — Compact pills
-// ─────────────────────────────────────────────────────────────────────────────
-
-var (
-	ToolBadgeReconStyle = lipgloss.NewStyle().
-				Foreground(ColorBg).
-				Background(ColorAccent).
-				Bold(true).
-				Padding(0, 1)
-
-	ToolBadgeExploitStyle = lipgloss.NewStyle().
-				Foreground(ColorBg).
-				Background(ColorDanger).
-				Bold(true).
-				Padding(0, 1)
-
-	ToolBadgeIntelStyle = lipgloss.NewStyle().
-				Foreground(ColorBg).
-				Background(ColorWarning).
-				Bold(true).
-				Padding(0, 1)
-
-	ToolBadgeMemoryStyle = lipgloss.NewStyle().
-				Foreground(ColorBg).
-				Background(ColorPurple).
-				Bold(true).
-				Padding(0, 1)
-
-	ToolBadgeSystemStyle = lipgloss.NewStyle().
-				Foreground(ColorBg).
-				Background(ColorSuccess).
-				Bold(true).
-				Padding(0, 1)
-
-	ToolBadgeEvidenceStyle = lipgloss.NewStyle().
-				Foreground(ColorBg).
-				Background(ColorCyan).
-				Bold(true).
-				Padding(0, 1)
-)
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Tool Panel Detail Styles
-// ─────────────────────────────────────────────────────────────────────────────
-
-var (
-	ToolPanelBorderStyle = lipgloss.NewStyle().
-				Foreground(ColorGhost)
-
-	ToolPanelHeaderStyle = lipgloss.NewStyle().
-				Foreground(ColorCyan).
-				Bold(true)
-
-	ToolArgKeyStyle = lipgloss.NewStyle().
-			Foreground(ColorAccent).
-			Bold(true)
-
-	ToolArgValStyle = lipgloss.NewStyle().
-			Foreground(ColorWhite)
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -354,26 +273,8 @@ var (
 	InfoStyle = lipgloss.NewStyle().
 			Foreground(ColorCyan)
 
-	HitLBannerStyle = lipgloss.NewStyle().
-			Foreground(ColorDanger).
-			Bold(true)
-
 	SpinnerStyle = lipgloss.NewStyle().
 			Foreground(ColorAccent)
-
-	// ── Approval / Duration Gate ──────────────────────────────────────────
-	ApprovalBoxStyle = lipgloss.NewStyle().
-				Foreground(ColorWarning).
-				Border(lipgloss.RoundedBorder(), true).
-				BorderForeground(ColorWarning).
-				Padding(0, 1).
-				Bold(true)
-
-	ApprovalClockStyle = lipgloss.NewStyle().
-				Foreground(ColorGold)
-
-	ApprovalHintStyle = lipgloss.NewStyle().
-				Foreground(ColorSubtle)
 
 	// ── Prompt Queue ─────────────────────────────────────────────────────
 	QueueStyle = lipgloss.NewStyle().
@@ -387,10 +288,6 @@ var (
 	StatusLineStyle = lipgloss.NewStyle().
 			Foreground(ColorSubtle).
 			Italic(true)
-
-	ThinkingLineStyle = lipgloss.NewStyle().
-				Foreground(ColorPurple).
-				Italic(true)
 
 	SignalLineStyle = lipgloss.NewStyle().
 			Foreground(ColorAccent).

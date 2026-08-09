@@ -160,41 +160,36 @@ func BuildMessages(systemPrompt string, history []openai.ChatCompletionMessagePa
 	return msgs
 }
 
-// IsChatOnly returns true if the message is conversational and needs no tools.
+// IsChatOnly returns true if the message is purely conversational and needs no tools.
+// It is intentionally conservative: when in doubt, the agent should use tools so the
+// LLM can decide at runtime rather than being blocked here.
 func IsChatOnly(msg string, graph *memory.Graph, opsecMgr *opsec.Manager) bool {
 	lower := strings.ToLower(strings.TrimSpace(msg))
 
-	// Mission keywords that always trigger the full agent
-	missionKeywords := []string{
-		"scan", "hack", "exploit", "fuzz", "enumerate", "brute", "attack",
-		"recon", "nmap", "sqlmap", "metasploit", "osint", "whois",
-		"shodan", "nuclei", "gobuster", "ffuf", "payload", "shell",
-		"reverse", "privesc", "ctf", "target", "pentest", "vuln",
-		"crack", "hash", "password", "bypass", "inject", "rce", "lfi",
-		"ssrf", "xss", "sqli", "directory", "subdomain", "port",
+	// Obvious greetings / small talk — no tools needed.
+	greetings := []string{
+		"hi", "hello", "hey", "greetings", "good morning", "good afternoon",
+		"good evening", "howdy", "yo", "sup", "what's up", "whats up",
+		"nice to meet you", "pleasure", "thanks", "thank you", "thx",
 	}
-
-	for _, kw := range missionKeywords {
-		if strings.Contains(lower, kw) {
-			return false
+	for _, g := range greetings {
+		if lower == g {
+			return true
 		}
 	}
 
-	// IP/URL pattern suggests a target
-	if containsTarget(lower) {
-		return false
+	// Short pleasantries with no actionable content.
+	if len(strings.Fields(lower)) <= 2 {
+		for _, g := range greetings {
+			if strings.HasPrefix(lower, g) {
+				return true
+			}
+		}
 	}
 
-	return true
-}
-
-func containsTarget(s string) bool {
-	// Very simple heuristic — proper regex would be overkill here
-	return strings.Contains(s, "http://") ||
-		strings.Contains(s, "https://") ||
-		strings.Contains(s, ".htb") ||
-		strings.Contains(s, ".thm") ||
-		countDots(s) >= 3 // IPv4-like
+	// Anything with a target, a tool keyword, or a question about a system
+	// should go through the full agent so it can use tools.
+	return false
 }
 
 func retryBackoff(attempt int) time.Duration {
@@ -244,8 +239,4 @@ func isRetryableLLMError(err error) bool {
 		return true
 	}
 	return false
-}
-
-func countDots(s string) int {
-	return strings.Count(s, ".")
 }

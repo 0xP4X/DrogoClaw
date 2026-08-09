@@ -54,7 +54,7 @@ func (s *SwarmCommander) ExecuteSwarm(ctx context.Context, mission string, event
 			
 			// We must drain the orchestrator's event channel or it blocks
 			agentEvents := make(chan Event, 32)
-			orch := NewOrchestrator(s.provider, s.tools, s.sysPrompt, fmt.Sprintf("%s-agent-%d", s.sessionID, idx), s.graph)
+			orch := NewOrchestrator(s.provider, s.tools, s.sysPrompt, fmt.Sprintf("%s-agent-%d", s.sessionID, idx), s.graph, 100)
 			
 			var finalOutput string
 			go func() {
