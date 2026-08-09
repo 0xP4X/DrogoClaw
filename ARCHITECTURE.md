@@ -5,14 +5,14 @@ DrogonClaw is an autonomous, offensive Red Team agent designed to execute full-c
 ## Core Architectural Components
 
 ### 1. The Orchestrator (ReAct Engine)
-DrogonClaw's brain is driven by a custom, hyper-fast Go-based ReAct (Reasoning & Acting) loop. The Orchestrator (`internal/agent/orchestrator.go`) binds the chosen LLM (Claude, GPT-4o, Ollama, etc.) to a suite of offensive security tools. 
+DrogonClaw's brain is driven by a custom, hyper-fast Go-based ReAct (Reasoning & Acting) loop. The Orchestrator (`internal/agent/orchestrator.go`) binds the chosen LLM (OpenRouter, NVIDIA NIM, OpenAI, Google Gemini, or a local Ollama model) to a suite of offensive security tools. 
 - The Orchestrator does not use artificial constraints or execution cages. 
 - It uses a **Mission Planner** to generate a tactical execution graph before beginning.
 - It leverages an **Evidence Validator** to double-check tool outputs and prevent LLM hallucinations.
 - Concurrency is achieved natively via **Swarm Commander**, using OS-level Goroutines to execute parallel attack vectors (`internal/agent/swarm.go`).
 
 ### 2. The Unrestricted Sandbox
-DrogonClaw executes shell commands via an isolated, root-privileged Docker sandbox (`internal/sandbox/sandbox.go`).
+DrogonClaw executes shell commands via an isolated, root-privileged Docker sandbox (`internal/sandbox/docker.go`).
 - **No Allowlist:** The agent can run `apt-get install`, use `gcc` to compile custom C payloads, or drop into Python.
 - **Stateful Shell:** Network interfaces, routing tables, and dropped files persist across tool calls within the same session.
 
@@ -52,7 +52,7 @@ sequenceDiagram
 
 ## Execution Modes
 
-1. **Manual Mode:** The Orchestrator strictly enforces Human-in-the-Loop (HitL) authorization. Before running an aggressive exploit or dropping a payload, the agent will pause and prompt the user via the `ask_human_approval` tool.
+1. **Manual Mode:** The Orchestrator strictly enforces Human-in-the-Loop (HitL) authorization. Before running an aggressive exploit or dropping a payload, the agent will pause and prompt the user via the `ask_operator` tool.
 2. **Autopilot Overdrive:** HitL is disabled. The agent will run relentlessly, chaining exploits, pivoting via Ligolo, and attempting to reach the final objective autonomously.
 
 *Built for absolute destruction.*

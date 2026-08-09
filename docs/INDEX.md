@@ -33,24 +33,25 @@ DrogonClaw relies on a Go-based architecture and Docker for sandbox execution.
    ```bash
    make build
    ```
-2. Start the core services and API:
+2. (Optional) Start the supporting services (e.g. a local Ollama instance):
    ```bash
    make docker-compose
    ```
-3. Run the interactive setup:
+3. Run the interactive setup wizard, which writes your configuration to
+   `~/.drogonclaw/config.json`:
    ```bash
    ./drogonclaw setup
    ```
 
 ### Local API
 
-The REST API is an optional local control-plane component. It uses a static
-Bearer token from `DROGONCLAW_API_KEY`; it does not currently implement JWT or
-role-based access control. The default HTTP listener is loopback-only. Use the
-explicit TLS server entrypoint and a deliberate host binding for any remote
+The REST API (`internal/api/server.go`) is an optional, local control-plane
+component. It is not started by the CLI or the Docker image, so it must be
+wired up separately (e.g. by your own process) if you need it. It authenticates
+with a static Bearer token from `DROGONCLAW_API_KEY` and does not implement JWT
+or role-based access control. Use the explicit TLS server entrypoint
+(`StartTLSServerAt`) and a deliberate host binding for any non-loopback
 deployment.
-*   **Port**: `18789`
-*   **Docs**: See `internal/api/server.go` for available endpoints.
 *   **Authentication**: Static Bearer token via `DROGONCLAW_API_KEY` environment variable.
 *   **Limitations**: No JWT, no RBAC, no TLS by default. The API binds to loopback only unless `StartServerAt` or `StartTLSServerAt` is used with an explicit host.
 

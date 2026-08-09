@@ -44,12 +44,5 @@ RUN useradd -r -m -s /bin/bash drogon
 RUN chown -R drogon:drogon /app
 USER drogon
 
-# Expose gateway port
-EXPOSE 18789
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:18789/health || exit 1
-
 # Start DrogonClaw
 ENTRYPOINT ["/app/drogonclaw"]

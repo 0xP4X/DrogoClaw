@@ -63,7 +63,7 @@ go build -o drogonclaw ./cmd/drogonclaw/
 
 Once built, run `./drogonclaw` to launch the terminal interface.
 
-*(Note: The legacy TypeScript/Node.js version is archived in the `legacy_v1/` directory for reference, but is no longer maintained.)*
+*(Note: DrogonClaw is a pure Go project — there is no separate TypeScript/Node.js version.)*
 
 ### Install (From npm)
 
@@ -71,30 +71,40 @@ If you want the prebuilt Linux CLI from npm:
 
 ```bash
 npm install -g drogonclaw
-drogonclaw --help
+drogonclaw setup
+drogonclaw
 ```
 
 This package publishes the Linux x64 executable only. Non-Linux platforms are intentionally blocked at install time.
 
 ### Configure
 
-On first launch, the **Configuration Wizard** guides you through provider selection and credential entry. Re-run it any time with `drogonclaw setup` or `/setup` inside the terminal.
-
-**Fastest OpenAI setup (Linux/macOS):**
+DrogonClaw is configured through its **Setup Wizard** — not by exporting
+environment variables. On first launch the wizard walks you through provider
+selection and credential entry, then writes everything to
+`~/.drogonclaw/config.json` (owner read/write only). Re-run it any time with
+`drogonclaw setup` or `/setup` inside the terminal.
 
 ```bash
-export OPENAI_API_KEY=sk-your-key-here
-export AI_PROVIDER=openai
-export AI_MODEL=gpt-4o
-./drogonclaw
+./drogonclaw setup
 ```
 
-**Fastest local Ollama setup (Linux/macOS):**
+Environment variables are only optional overrides that take precedence over the
+saved config file. You do **not** need to export anything — prefer the wizard.
+If you must drive configuration from the environment, this is the supported
+shape (Linux only):
 
 ```bash
+# OpenAI
+export AI_PROVIDER=openai
+export OPENAI_API_KEY=sk-your-key-here
+export AI_MODEL=gpt-4o
+
+# Local Ollama
 export AI_PROVIDER=ollama
 export OLLAMA_BASE_URL=http://localhost:11434
 export AI_MODEL=llama3.1
+
 ./drogonclaw
 ```
 
@@ -124,7 +134,7 @@ Run the agent from your phone via the Telegram gateway without the terminal UI:
 | Google Gemini | `gemini` | Enterprise reasoning core (`gemini-2.5-pro`, `gemini-2.5-flash`) |
 | Ollama | `ollama` | Autonomous offline runtime; point `OLLAMA_BASE_URL` at your local server |
 
-Provider credentials are stored locally in `~/.drogonclaw/config.json` (owner read/write only).
+Provider credentials are configured via the **Setup Wizard** (`./drogonclaw setup` or `/setup`) and stored locally in `~/.drogonclaw/config.json` (owner read/write only).
 
 ## Architectural Pillars
 
@@ -209,6 +219,7 @@ DrogonClaw isolates operational risk and prevents unintended damage through:
 
 Inside the `drogon>` prompt, you can converse with the AI naturally or use specific slash commands:
 
+- `/setup` - Launch the configuration wizard
 - `/skills` - Show loaded module categories and usage guidance
 - `/skills <term>` - Search modules by name, description, category, or parameter
 - `/skills <exact_name>` - Inspect a module's required parameters and execution backend
@@ -216,8 +227,17 @@ Inside the `drogon>` prompt, you can converse with the AI naturally or use speci
 - `/health` - Run sandbox/toolkit diagnostics
 - `/ctf <path>` - Offline local-CTF triage with artifact inventory and verified flag detection
 - `/profile <target>` - Build a passive, source-accountable profile before any focused research
-- `/setup` - Relaunch the configuration wizard
+- `/auto` - Toggle autopilot (skip Human-in-the-Loop approvals)
+- `/persona` - Switch the agent persona
+- `/stealth` - Adjust the OPSEC stealth posture
+- `/mode` - Switch operational mode
+- `/report` - Generate an engagement report
+- `/swarm` - Manage the agent swarm
+- `/analyze <path>` - Analyze a target artifact or source
+- `/sandbox` - Inspect or toggle the sandbox runtime
+- `/queue` - Show the pending task queue
 - `/clear` - Wipe the terminal screen
+- `/help` - Show the full command reference
 
 **Graceful Action Abortion:** If DrogonClaw is running a long scan or executing an exploit and you want to steer it in a different direction, simply press `Ctrl+C`. This will instantly sever the active thread, halt all sandboxed executions, and drop you back to the prompt, preserving the session memory so you can inject new instructions.
 

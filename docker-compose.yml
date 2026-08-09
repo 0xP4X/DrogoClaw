@@ -4,18 +4,17 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: drogonclaw
-    ports:
-      - "18789:18789"
     environment:
-      - AI_PROVIDER=${AI_PROVIDER:-openai}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - AI_PROVIDER=${AI_PROVIDER:-openrouter}
+      - AI_MODEL=${AI_MODEL:-meta-llama/llama-3.1-70b-instruct}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-      - GATEWAY_PORT=18789
-      - GATEWAY_HOST=0.0.0.0
-      - LOG_LEVEL=${LOG_LEVEL:-info}
-      - DATABASE_PATH=/app/data/drogonclaw.db
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-}
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - DROGONCLAW_API_KEY=${DROGONCLAW_API_KEY:-}
       - USE_SANDBOX=false
     volumes:
       - ./data:/app/data
@@ -24,12 +23,6 @@ services:
     networks:
       - drogonclaw-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:18789/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 15s
 
   # Optional: Ollama for local LLM
   ollama:
