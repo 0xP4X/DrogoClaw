@@ -779,7 +779,7 @@ func renderPhaseBadge(phase string) (string, lipgloss.Style) {
 	}
 }
 
-var xmlTagRegex = regexp.MustCompile(`<[^>]+>|(?s:<environment_details>.*?</environment_details>)`)
+var xmlTagRegex = regexp.MustCompile(`(?s:<environment_details>.*?</environment_details>)|<[^>]+>`)
 
 func stripXMLTags(s string) string {
 	return xmlTagRegex.ReplaceAllString(s, "")

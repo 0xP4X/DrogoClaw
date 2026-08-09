@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -1141,6 +1142,43 @@ func (r *ToolRegistry) registerBuiltins() {
 			return "[Error] No command provided"
 		}
 		result, err := r.sandbox.Execute(ctx, cmd)
+		if err != nil {
+			return fmt.Sprintf("[%s Error] %v", r.executionModeLabel(), err)
+		}
+		return result
+	}
+
+	r.builtins["python_execute"] = func(ctx context.Context, args map[string]any) string {
+		script, _ := args["script"].(string)
+		if script == "" {
+			return "[Error] No script provided"
+		}
+
+		tmpFile, err := os.CreateTemp("", "drogonclaw-python-*.py")
+		if err != nil {
+			return fmt.Sprintf("[Error] Failed to create temp file: %v", err)
+		}
+		tmpPath := tmpFile.Name()
+		_ = tmpFile.Close()
+
+		if werr := os.WriteFile(tmpPath, []byte(script), 0644); werr != nil {
+			os.Remove(tmpPath)
+			return fmt.Sprintf("[Error] Failed to write script: %v", werr)
+		}
+
+		timeoutSecs := 60
+		if t, ok := args["timeout_seconds"].(float64); ok {
+			timeoutSecs = int(t)
+		}
+
+		cmd := fmt.Sprintf("python3 %s", tmpPath)
+		if timeoutSecs > 0 {
+			cmd = fmt.Sprintf("timeout %d %s", timeoutSecs, cmd)
+		}
+
+		result, err := r.sandbox.Execute(ctx, cmd)
+		os.Remove(tmpPath)
+
 		if err != nil {
 			return fmt.Sprintf("[%s Error] %v", r.executionModeLabel(), err)
 		}
