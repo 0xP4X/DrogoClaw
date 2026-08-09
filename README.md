@@ -271,7 +271,6 @@ Other useful targets: `make test-cover`, `make format`, `make vet`, `make skills
 - `skills/` - executable module definitions
 - `supabase/` - backend/schema assets
 - `assets/` - logos and generated charts
-- `tests/` - integration and fixture tests
 - `.github/` - repo automation and funding metadata
 
 ## Security
