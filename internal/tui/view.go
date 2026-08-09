@@ -419,15 +419,7 @@ func (m Model) promptGlyph(agName string) (string, int) {
 		g := WarningStyle.Render("OPERATOR APPROVAL REQUIRED > ")
 		return g, lipgloss.Width(g)
 	case m.executing:
-		elapsed := int(time.Since(m.execStartTime).Seconds())
-		phaseStr := m.phase
-		if phaseStr == "" {
-			phaseStr = "reasoning"
-		}
-		if m.activeToolName != "" {
-			phaseStr = "executing " + m.activeToolName
-		}
-		g := m.spinner.View() + " " + SpinnerStyle.Render(fmt.Sprintf("%s [%02d:%02d]", phaseStr, elapsed/60, elapsed%60)) + " "
+		g := PromptGlyphStyle.Render(fmt.Sprintf("%s ❯ ", agName))
 		return g, lipgloss.Width(g)
 	default:
 		g := PromptGlyphStyle.Render(fmt.Sprintf("%s ❯ ", agName))
@@ -787,7 +779,7 @@ func renderPhaseBadge(phase string) (string, lipgloss.Style) {
 	}
 }
 
-var xmlTagRegex = regexp.MustCompile(`<[^>]+>`)
+var xmlTagRegex = regexp.MustCompile(`<[^>]+>|(?s:<environment_details>.*?</environment_details>)`)
 
 func stripXMLTags(s string) string {
 	return xmlTagRegex.ReplaceAllString(s, "")

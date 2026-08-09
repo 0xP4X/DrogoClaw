@@ -382,20 +382,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		if !m.executing || core.GlobalHitL.HasPending() {
-			var inputCmd tea.Cmd
-			m.input, inputCmd = m.input.Update(msg)
-			cmds = append(cmds, inputCmd)
+		var inputCmd tea.Cmd
+		m.input, inputCmd = m.input.Update(msg)
+		cmds = append(cmds, inputCmd)
 
-			if !m.executing && strings.HasPrefix(m.input.Value(), "/") {
-				m.hints = matchHints(m.input.Value())
-				if m.selectedHint >= len(m.hints) {
-					m.selectedHint = 0
-				}
-			} else {
-				m.hints = nil
+		if !m.executing && strings.HasPrefix(m.input.Value(), "/") {
+			m.hints = matchHints(m.input.Value())
+			if m.selectedHint >= len(m.hints) {
 				m.selectedHint = 0
 			}
+		} else {
+			m.hints = nil
+			m.selectedHint = 0
 		}
 
 	case spinner.TickMsg:
