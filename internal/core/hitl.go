@@ -124,7 +124,7 @@ func (h *HitLManager) ConsumeAnswer() string {
 func (h *HitLManager) ConsumeApproved() bool {
 	ans := strings.ToLower(strings.TrimSpace(h.ConsumeAnswer()))
 	switch ans {
-	case "", "y", "yes", "approve", "run", "ok", "go", "accept", "confirmed":
+	case "", "y", "yes", "approve", "approved", "run", "ok", "go", "accept", "confirmed":
 		return true
 	}
 	return false

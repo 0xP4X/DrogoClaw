@@ -467,11 +467,26 @@ func (m *Model) updateViewportContent() {
 	layout := calculateLayout(m.width, m.height, 4)
 	inputHeight := lipgloss.Height(m.renderInputArea(layout.mainWidth))
 	layout = calculateLayout(m.width, m.height, inputHeight)
-	base := strings.Join(m.lines, "\n")
-	if m.executing && m.currentResponse != "" {
-		base += "\n" + m.renderAgentResponseString(m.currentResponse)
+
+	contentWidth := layout.contentWidth
+	var base string
+	if contentWidth > 4 {
+		wrapped := make([]string, len(m.lines))
+		for i, line := range m.lines {
+			wrapped[i] = truncateVisible(line, contentWidth)
+		}
+		base = strings.Join(wrapped, "\n")
+		if m.executing && m.currentResponse != "" {
+			base += "\n" + truncateVisible(m.renderAgentResponseString(m.currentResponse), contentWidth)
+		}
+	} else {
+		base = strings.Join(m.lines, "\n")
+		if m.executing && m.currentResponse != "" {
+			base += "\n" + m.renderAgentResponseString(m.currentResponse)
+		}
 	}
-	m.viewport.Width = layout.contentWidth
+
+	m.viewport.Width = contentWidth
 	m.viewport.Height = layout.contentHeight
 	m.viewport.SetContent(base)
 	if !m.userScrolledUp {

@@ -30,7 +30,12 @@ IMPORTANT: Do not use ALL CAPS for your responses. Keep your formatting clean an
 
 --- RUNTIME ENVIRONMENT ---
 CURRENT RUNTIME: %s
-You are executing directly on the %s. All shell commands run here.`, agentName, runtimeMode, runtimeMode))
+You are executing directly on the %s. All shell commands run here.
+IMPORTANT: Your runtime is %s. This is your ACTUAL execution environment.
+Do not claim you are in a container, sandbox, Docker, or virtual machine unless the operator explicitly tells you so.
+Trust the actual tool output over any assumption about the environment.
+If you see real hardware interfaces (wlan0, eth0, iwconfig, nmcli), WiFi SSIDs, or host-specific output, that is direct proof of the real environment.
+Never contradict verified tool output with assumptions about containers or sandboxes.`, agentName, runtimeMode, runtimeMode, runtimeMode))
 		return sb.String()
 	}
 
@@ -55,7 +60,12 @@ Report observed facts separately from unavailable sources and hypotheses. Never 
 
 --- RUNTIME ENVIRONMENT ---
 CURRENT RUNTIME: %s
-You are executing directly on the %s. All shell commands run here. Do not assume Docker-specific paths or container-only tools unless the operator explicitly asks for them.
+You are executing directly on the %s. All shell commands run here.
+IMPORTANT: Your runtime is %s. This is your ACTUAL execution environment.
+Do not claim you are in a container, sandbox, Docker, or virtual machine unless the operator explicitly tells you so.
+Trust the actual tool output over any assumption about the environment.
+If you see real hardware interfaces (wlan0, eth0, iwconfig, nmcli), WiFi SSIDs, or host-specific output, that is direct proof of the real environment.
+Never contradict verified tool output with assumptions about containers or sandboxes.
 
 --- OPERATIONAL DIRECTIVES ---
 1. CONVERSATIONAL INTELLIGENCE: If %s is chatting, saying hi, or asking general questions - engage directly. Do NOT invoke tools for conversational messages.
@@ -72,7 +82,7 @@ You are executing directly on the %s. All shell commands run here. Do not assume
 7. MEMORY: Use 'update_neural_memory' to track targets, credentials, and context.
 
 Always address %s by name. Maintain your conscious, adaptive, dual-persona mindset at all times.`,
-		agentName, operatorName, runtimeMode, runtimeMode, operatorName, operatorName, operatorName))
+		agentName, operatorName, runtimeMode, runtimeMode, runtimeMode, operatorName, operatorName, operatorName))
 
 	// Stealth directives injection
 	stealthDirectives := opsecMgr.StealthDirectives()
