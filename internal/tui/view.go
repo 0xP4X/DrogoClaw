@@ -372,16 +372,40 @@ func (m Model) renderInputArea() string {
 		lines = append(lines, HintBorderStyle.Render(prefix)+cmdStr+pad+HintDescStyle.Render(truncateVisible(h.desc, available)))
 	}
 
-	var promptGlyph string
+	glyph, glyphWidth := m.promptGlyph(opName, agName)
+
+	// Size the textarea to the space actually left inside the input pane after
+	// the prompt glyph so long input wraps inside the pane instead of being
+	// clipped/hidden. The textarea is rendered inside InputPaneStyle, so
+	// account for both the pane frame and the glyph width.
+	avail := m.width - InputPaneStyle.GetHorizontalFrameSize() - glyphWidth
+	if avail < 8 {
+		avail = 8
+	}
+	m.input.SetWidth(avail)
+
+	lines = append(lines, glyph+m.input.View())
+	if m.pendingConfirm != "" {
+		lines = append(lines, WarningStyle.Render("Action requires exact confirmation: type "+m.confirmationPhrase()+" or Enter to cancel."))
+	}
+
+	return InputPaneStyle.Width(max(8, m.width-InputPaneStyle.GetHorizontalFrameSize())).Render(strings.Join(lines, "\n"))
+}
+
+// promptGlyph returns the current prompt prefix and its visible (unstyled)
+// rune width, which callers use to size the input textarea.
+func (m Model) promptGlyph(opName, agName string) (string, int) {
 	switch {
 	case m.pendingConfirm != "":
-		promptGlyph = WarningStyle.Render("CONFIRMATION REQUIRED > ")
+		g := WarningStyle.Render("CONFIRMATION REQUIRED > ")
+		return g, lipgloss.Width(g)
 	case m.executing && core.GlobalHitL.HasPending():
 		if core.GlobalHitL.PendingKind() == core.ApprovalDuration {
-			promptGlyph = WarningStyle.Render("TOOL APPROVAL (y/n) > ")
-		} else {
-			promptGlyph = WarningStyle.Render("OPERATOR APPROVAL REQUIRED > ")
+			g := WarningStyle.Render("TOOL APPROVAL (y/n) > ")
+			return g, lipgloss.Width(g)
 		}
+		g := WarningStyle.Render("OPERATOR APPROVAL REQUIRED > ")
+		return g, lipgloss.Width(g)
 	case m.executing:
 		elapsed := int(time.Since(m.execStartTime).Seconds())
 		phaseStr := m.phase
@@ -391,17 +415,12 @@ func (m Model) renderInputArea() string {
 		if m.activeToolName != "" {
 			phaseStr = "executing " + m.activeToolName
 		}
-		promptGlyph = m.spinner.View() + " " + SpinnerStyle.Render(fmt.Sprintf("%s [%02d:%02d]", phaseStr, elapsed/60, elapsed%60)) + " "
+		g := m.spinner.View() + " " + SpinnerStyle.Render(fmt.Sprintf("%s [%02d:%02d]", phaseStr, elapsed/60, elapsed%60)) + " "
+		return g, lipgloss.Width(g)
 	default:
-		promptGlyph = PromptGlyphStyle.Render(fmt.Sprintf("%s@%s ❯ ", opName, agName))
+		g := PromptGlyphStyle.Render(fmt.Sprintf("%s ❯ ", agName))
+		return g, lipgloss.Width(g)
 	}
-
-	lines = append(lines, promptGlyph+m.input.View())
-	if m.pendingConfirm != "" {
-		lines = append(lines, WarningStyle.Render("Action requires exact confirmation: type "+m.confirmationPhrase()+" or Enter to cancel."))
-	}
-
-	return InputPaneStyle.Width(max(8, m.width-InputPaneStyle.GetHorizontalFrameSize())).Render(strings.Join(lines, "\n"))
 }
 
 func (m *Model) appendBanner() {

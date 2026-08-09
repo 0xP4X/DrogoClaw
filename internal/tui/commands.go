@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"regexp"
+	"runtime"
 	"strings"
 	"time"
 
@@ -15,6 +18,13 @@ import (
 	"github.com/0xP4X/drogonclaw-go/internal/intel"
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+// ansiRE strips terminal escape sequences so copied output is plain text.
+var ansiRE = regexp.MustCompile(`\x1b\[[0-9;?]*[a-zA-Z]`)
+
+func stripANSI(s string) string {
+	return ansiRE.ReplaceAllString(s, "")
+}
 
 func (m *Model) handleSlashCommand(raw string) (Model, tea.Cmd) {
 	parts := strings.Fields(raw)
@@ -263,6 +273,9 @@ func (m *Model) handleSlashCommand(raw string) (Model, tea.Cmd) {
 			break
 		}
 		m.switchSection(args)
+
+	case "/copy":
+		m.appendLine(m.copyConversation())
 
 	case "/help":
 		m.appendLine(renderHelp())

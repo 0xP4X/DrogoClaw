@@ -163,9 +163,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		inputHeight := lipgloss.Height(m.renderInputArea())
-		layout := calculateLayout(msg.Width, msg.Height, inputHeight)
-		m.input.SetWidth(layout.contentWidth)
+		// The textarea width is finalized inside renderInputArea() (which
+		// subtracts the pane frame and prompt glyph), so just trigger a render.
+		m.input.SetWidth(max(8, msg.Width-InputPaneStyle.GetHorizontalFrameSize()-8))
 
 	case showBannerMsg:
 		m.appendBanner()
