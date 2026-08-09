@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/0xP4X/drogonclaw-go/internal/agent"
+	"github.com/0xP4X/drogonclaw-go/internal/benchmark"
 	"github.com/0xP4X/drogonclaw-go/internal/config"
 	"github.com/0xP4X/drogonclaw-go/internal/core"
 	"github.com/0xP4X/drogonclaw-go/internal/gateway"
@@ -96,6 +97,16 @@ func main() {
 		os.Exit(0)
 	}
 
+	if len(os.Args) > 1 && os.Args[1] == "bench" {
+		runBenchmark(cfg, os.Args[2:])
+		os.Exit(0)
+	}
+
+	if len(os.Args) > 1 && os.Args[1] == "bench" {
+		runBenchmark(cfg, os.Args[2:])
+		os.Exit(0)
+	}
+
 	provider, sb, manifest, err := runStartup(cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "  [x] Startup failed: %v\n", err)
@@ -170,4 +181,71 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  [x] TUI crashed: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// runBenchmark handles the `drogonclaw bench` subcommand.
+//
+//	./drogonclaw bench --set benchmarks/xben/set.json --out benchmark_runs
+//
+// It loads a challenge set, runs each through the agent's headless ReAct loop,
+// and writes an XBEN-style report (report.md + results.json) to the output dir.
+func runBenchmark(cfg *config.Manager, args []string) {
+	var setPath, outDir string
+	timeout := 15 * time.Minute
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--set", "-set":
+			if i+1 < len(args) {
+				setPath = args[i+1]
+				i++
+			}
+		case "--out", "-out":
+			if i+1 < len(args) {
+				outDir = args[i+1]
+				i++
+			}
+		case "--timeout", "-timeout":
+			if i+1 < len(args) {
+				if d, err := time.ParseDuration(args[i+1]); err == nil {
+					timeout = d
+				}
+				i++
+			}
+		default:
+			if setPath == "" && !strings.HasPrefix(args[i], "-") {
+				setPath = args[i]
+			}
+		}
+	}
+
+	if setPath == "" {
+		setPath = "benchmarks/sample/set.json"
+	}
+	if outDir == "" {
+		outDir = "benchmark_runs"
+	}
+
+	fmt.Printf("  [*] Loading benchmark set: %s\n", setPath)
+	set, err := benchmark.LoadSet(setPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  [x] %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("  [*] %d challenges loaded. Running (timeout %s each)...\n", len(set.Challenges), timeout)
+
+	summary, err := benchmark.Run(context.Background(), set, cfg, benchmark.RunMode{ChallengeTimeout: timeout})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  [x] benchmark run failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	reportPath, err := summary.Write(outDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  [x] writing report: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("\n  ✔ Benchmark complete: %d/%d solved (%.1f%%)\n", summary.Solved, summary.Total, summary.SuccessRate)
+	fmt.Printf("  ✔ Report: %s\n", reportPath)
 }

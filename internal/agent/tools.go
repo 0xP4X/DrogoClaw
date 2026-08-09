@@ -847,6 +847,21 @@ func (r *ToolRegistry) Definitions() []openai.ChatCompletionToolParam {
 		},
 	})
 
+	defs = append(defs, openai.ChatCompletionToolParam{
+		Type: "function",
+		Function: openai.FunctionDefinitionParam{
+			Name:        "source_review",
+			Description: openai.String("Static analysis (SAST) of a source file or directory for vulnerability sinks (injection, SSTI, insecure deserialization, weak crypto, disabled TLS). Prefers semgrep when available, else a built-in pattern scanner."),
+			Parameters: openai.FunctionParameters{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"target": map[string]interface{}{"type": "string", "description": "Path to a file or directory to review"},
+				},
+				"required": []string{"target"},
+			},
+		},
+	})
+
 	return defs
 }
 
@@ -1281,7 +1296,7 @@ REQUIREMENTS:
 2. Implement advanced mutations: massive buffer overflows (10,000+ bytes of 'A'), format string injections (%%x%%n), and random bitflips.
 3. Catch connection errors (ConnectionReset, Timeout). If the target crashes, print exactly which payload caused the crash and exit.
 4. Execute a maximum of %d iterations (safety limit to prevent infinite loops).
-5. Output ONLY the raw Python 3 code. No markdown formatting (like \`+"`"+`python). No explanations.
+	5. Output ONLY the raw Python 3 code. No markdown formatting (e.g. a python code fence). No explanations.
 
 OUTPUT ONLY VALID PYTHON SOURCE CODE.`, targetIp, targetPort, protocol, fuzzingDepth*50)
 
@@ -2461,6 +2476,8 @@ OUTPUT ONLY THE SOURCE CODE. NO EXPLANATIONS. NO MARKDOWN.`, command)
 		}
 		return out
 	}
+	r.builtins["source_review"] = sastBuiltin
+
 	r.builtins["setup_phish_domain"] = func(ctx context.Context, args map[string]any) string {
 		domainName, _ := args["domain_name"].(string)
 		targetSite, _ := args["target_site"].(string)
