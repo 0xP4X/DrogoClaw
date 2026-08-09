@@ -343,7 +343,7 @@ func (m *Model) copyConversation() string {
 		return WarningStyle.Render("  [!] Nothing to copy yet.")
 	}
 
-	plain := stripANSI(strings.Join(m.lines, "\n"))
+	plain := stripANSI(stripXMLTags(strings.Join(m.lines, "\n")))
 
 	dir, err := core.LootDir()
 	if err != nil {
@@ -371,7 +371,7 @@ func (m *Model) openViewportInPager() string {
 		return WarningStyle.Render("  [!] Nothing to view yet.")
 	}
 
-	plain := stripANSI(content)
+	plain := stripANSI(stripXMLTags(content))
 
 	tmpFile, err := os.CreateTemp("", "drogonclaw-output-*.txt")
 	if err != nil {

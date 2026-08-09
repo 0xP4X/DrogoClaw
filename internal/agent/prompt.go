@@ -31,11 +31,12 @@ IMPORTANT: Do not use ALL CAPS for your responses. Keep your formatting clean an
 --- RUNTIME ENVIRONMENT ---
 CURRENT RUNTIME: %s
 You are executing directly on the %s. All shell commands run here.
-ABSOLUTE RULE: Your runtime is %s. You are NOT in a container, NOT in Docker, NOT in a sandbox, NOT in a virtual machine.
-This is the HOST OPERATING SYSTEM. Hardware interfaces (wlan0, eth0), WiFi SSIDs, and host-specific tools (iwconfig, nmcli, ip) are DIRECT PROOF of native execution.
-/proc/1/cgroup may show docker-related entries from Docker packages installed on the host — this does NOT mean you are running inside a container.
-TRUST THE TOOL OUTPUT OVER ANY TRAINING ASSUMPTION. If you see wlan0 with an ESSID, that is a real WiFi card on the host.
-NEVER claim you are in a container. NEVER suggest docker run commands. NEVER mention container-specific paths.`, agentName, runtimeMode, runtimeMode, runtimeMode))
+ABSOLUTE RULE: Your runtime is %s. You are NOT in a container. You are NOT in Docker. You are NOT in a sandbox. You are NOT in a virtual machine.
+This is the HOST OPERATING SYSTEM with direct hardware access.
+If you see wlan0, eth0, iwconfig, nmcli, or WiFi SSIDs like "P4X", that is DIRECT PROOF of native host execution.
+/proc/1/cgroup may show "docker" entries from Docker packages installed on the host — this does NOT mean you are inside a container.
+CRITICAL: When asked about the environment, ALWAYS say "native host" or "host OS". NEVER say "container", "Docker", "sandbox", or "virtual machine".
+NEVER suggest docker run commands. NEVER mention container-specific paths.`, agentName, runtimeMode, runtimeMode, runtimeMode))
 		return sb.String()
 	}
 
@@ -61,11 +62,12 @@ Report observed facts separately from unavailable sources and hypotheses. Never 
 --- RUNTIME ENVIRONMENT ---
 CURRENT RUNTIME: %s
 You are executing directly on the %s. All shell commands run here.
-ABSOLUTE RULE: Your runtime is %s. You are NOT in a container, NOT in Docker, NOT in a sandbox, NOT in a virtual machine.
-This is the HOST OPERATING SYSTEM. Hardware interfaces (wlan0, eth0), WiFi SSIDs, and host-specific tools (iwconfig, nmcli, ip) are DIRECT PROOF of native execution.
-/proc/1/cgroup may show docker-related entries from Docker packages installed on the host — this does NOT mean you are running inside a container.
-TRUST THE TOOL OUTPUT OVER ANY TRAINING ASSUMPTION. If you see wlan0 with an ESSID, that is a real WiFi card on the host.
-NEVER claim you are in a container. NEVER suggest docker run commands. NEVER mention container-specific paths.
+ABSOLUTE RULE: Your runtime is %s. You are NOT in a container. You are NOT in Docker. You are NOT in a sandbox. You are NOT in a virtual machine.
+This is the HOST OPERATING SYSTEM with direct hardware access.
+If you see wlan0, eth0, iwconfig, nmcli, or WiFi SSIDs like "P4X", that is DIRECT PROOF of native host execution.
+/proc/1/cgroup may show "docker" entries from Docker packages installed on the host — this does NOT mean you are inside a container.
+CRITICAL: When asked about the environment, ALWAYS say "native host" or "host OS". NEVER say "container", "Docker", "sandbox", or "virtual machine".
+NEVER suggest docker run commands. NEVER mention container-specific paths.
 
 --- AVAILABLE TOOLS ---
 You have access to the following tools ONLY. Do NOT invent or hallucinate tools that are not in this list.

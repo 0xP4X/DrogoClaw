@@ -23,7 +23,7 @@ type Provider struct {
 	model  string
 }
 
-var providerXMLTagRegex = regexp.MustCompile(`(?s:<environment_details>.*?</environment_details>)|<[^>]+>`)
+var providerXMLTagRegex = regexp.MustCompile(`(?s)<environment_details>.*?</environment_details>|<[^>]+>`)
 
 func stripProviderXMLTags(s string) string {
 	return providerXMLTagRegex.ReplaceAllString(s, "")
