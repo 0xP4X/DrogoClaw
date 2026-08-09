@@ -185,7 +185,12 @@ func (m Model) renderStatusBar() string {
 		tool = "ready"
 	}
 
-	left := fmt.Sprintf(" %s %s ", phase, HeaderDimStyle.Render("│ "+elapsed))
+	anim := ""
+	if m.executing {
+		anim = m.spinner.View() + " "
+	}
+
+	left := fmt.Sprintf(" %s%s %s ", anim, phase, HeaderDimStyle.Render("│ "+elapsed))
 	centerValue := lipgloss.NewStyle().Foreground(ColorWhite).Render(truncateVisible(tool, max(8, m.width/3)))
 	center := fmt.Sprintf(" %s %s ", HeaderDimStyle.Render("tool:"), centerValue)
 

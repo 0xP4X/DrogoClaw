@@ -182,11 +182,11 @@ func (m *Manager) IsVerified() bool {
 func (m *Manager) GetMaxIterations() int {
 	v := m.GetString("MAX_ITERATIONS")
 	if v == "" {
-		return 100
+		return 20
 	}
 	n, err := strconv.Atoi(v)
 	if err != nil || n < 1 {
-		return 100
+		return 20
 	}
 	return n
 }

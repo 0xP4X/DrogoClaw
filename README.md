@@ -230,11 +230,12 @@ Inside the `drogon>` prompt, you can converse with the AI naturally or use speci
 - `/sandbox` - Inspect or toggle the sandbox runtime
 - `/queue` - Show the pending task queue
 - `/copy` - Copy the on-screen transcript to the clipboard (and save to `drogonclaw_loot/drogonclaw_transcript.txt`)
+- `F3` - Open the current output in your pager (`$PAGER` or `less -R`) so you can freely select and copy any part of it
 - `/help` - Show the full command reference
 
 **Graceful Action Abortion:** If DrogonClaw is running a long scan or executing an exploit and you want to steer it in a different direction, simply press `Ctrl+C`. This will instantly sever the active thread, halt all sandboxed executions, and drop you back to the prompt, preserving the session memory so you can inject new instructions.
 
-**Copying output:** The terminal runs in the alternate screen, which has no scrollback, so you cannot select-and-copy arbitrary text from the UI (a drag highlights the whole screen). Use the `/copy` command to export the transcript to your clipboard and to `~/drogonclaw_loot/drogonclaw_transcript.txt`, then paste or open that file from a normal terminal.
+**Copying output:** The terminal runs in the alternate screen, which has no scrollback, so you cannot select-and-copy arbitrary text from the UI (a drag highlights the whole screen). Press `F3` to open the current output in your pager, where you can freely select and copy any part of it. Use `/copy` to export the full transcript to your clipboard and to `~/drogonclaw_loot/drogonclaw_transcript.txt`.
 
 ### Telegram Gateway
 

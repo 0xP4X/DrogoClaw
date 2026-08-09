@@ -54,15 +54,15 @@ inside the terminal) any time to change settings.
 
 ## Sandbox Execution
 
-DrogonClaw runs tools in an isolated, ephemeral Docker sandbox. Native host
-execution is disabled unless you explicitly set `USE_SANDBOX=false`; the engine
-fails closed rather than silently falling back to the host.
+DrogonClaw can run tools in two modes:
 
-Ensure Docker is running:
+- **Native mode** (default): commands run directly on your host OS. This is the recommended mode for most use cases.
+- **Sandbox mode**: commands run inside an isolated Docker container. Use this if you want complete isolation from your host.
 
-```bash
-docker info
-```
+You can switch modes with the `/sandbox` command inside the terminal, or launch
+with `./drogonclaw sandbox` / `./drogonclaw native`.
+
+If Docker is not available, DrogonClaw will fall back to native mode automatically.
 
 ## Telegram C2 Gateway
 

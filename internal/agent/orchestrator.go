@@ -108,7 +108,7 @@ func NewOrchestrator(provider *Provider, tools *ToolRegistry, sysPrompt, session
 // name across application restarts while worker agents keep isolated journals.
 func NewOrchestratorWithJournal(provider *Provider, tools *ToolRegistry, sysPrompt, sessionID string, graph *memory.Graph, actions *memory.ActionJournal, maxIterations int) *Orchestrator {
 	if maxIterations <= 0 {
-		maxIterations = 100
+		maxIterations = 20
 	}
 	return &Orchestrator{
 		provider:       provider,
