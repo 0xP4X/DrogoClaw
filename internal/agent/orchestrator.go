@@ -205,8 +205,6 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 
 	maxIter := o.maxIterations
 	for i := 0; i < maxIter; i++ {
-		events <- Event{Type: EvThinking, Content: fmt.Sprintf("Thinking... step %d/%d", i+1, maxIter)}
-
 		resp, err := o.provider.Complete(ctx, messages, o.tools.Definitions())
 		if err != nil {
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {

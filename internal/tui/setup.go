@@ -10,31 +10,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func stepIndicator(current, total int, label string) string {
-	barWidth := 20
-	completed := float64(current) / float64(total)
-	filledWidth := int(completed * float64(barWidth))
-	if filledWidth > barWidth {
-		filledWidth = barWidth
-	}
-
-	var bar strings.Builder
-	for i := 0; i < filledWidth; i++ {
-		bar.WriteString(HeaderBrandStyle.Render("━"))
-	}
-	for i := filledWidth; i < barWidth; i++ {
-		bar.WriteString(SectionRuleStyle.Render("─"))
-	}
-
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("  %s  %s  %s\n",
-		HeaderBrandStyle.Render(fmt.Sprintf("[%d/%d]", current, total)),
-		bar.String(),
-		SidebarLabelStyle.Render(label),
-	))
-	return sb.String()
-}
-
 func sectionHeader(number, title string) string {
 	return lipgloss.NewStyle().
 		Foreground(ColorAccent).
@@ -56,7 +31,7 @@ func RunSetup(cfg *config.Manager) {
 	fmt.Println(dim("  Credentials remain strictly local (~/.drogonclaw/config.json)."))
 	fmt.Println()
 
-  fmt.Println(stepIndicator(1, 5, "Authorisation Check"))
+	fmt.Println(sectionHeader("1", "Authorisation Check"))
 	fmt.Println()
 
 	var authorised bool
@@ -74,7 +49,7 @@ func RunSetup(cfg *config.Manager) {
 	}
 
 	fmt.Println()
-  fmt.Println(stepIndicator(2, 5, "Select Neural Provider"))
+	fmt.Println(sectionHeader("2", "Select Neural Provider"))
 	fmt.Println()
 
 	err = huh.NewSelect[string]().
@@ -131,7 +106,7 @@ func RunSetup(cfg *config.Manager) {
 	var ollamaURL string
 
 	fmt.Println()
-  fmt.Println(stepIndicator(3, 5, "Credentials & Model Selection"))
+	fmt.Println(sectionHeader("3", "Credentials & Model Selection"))
 	fmt.Println()
 
 	if provider == "ollama" {
@@ -189,7 +164,7 @@ func RunSetup(cfg *config.Manager) {
 	}
 
 	fmt.Println()
-  fmt.Println(stepIndicator(4, 5, "Remote C2 Gateway (Optional)"))
+	fmt.Println(sectionHeader("4", "Remote C2 Gateway (Optional)"))
 	fmt.Println()
 
 	var enableTelegram bool
@@ -226,7 +201,7 @@ func RunSetup(cfg *config.Manager) {
 	}
 
 	fmt.Println()
-	fmt.Println(stepIndicator(5, 5, "Secondary API Keys (Optional)"))
+	fmt.Println(sectionHeader("5", "Secondary API Keys (Optional)"))
 	fmt.Println()
 
 	// Secondary recon/OSINT keys are all configured here — no environment

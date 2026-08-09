@@ -18,8 +18,7 @@ func (m Model) View() string {
 		return "Loading DrogonClaw..."
 	}
 
-	inputArea := m.renderInputArea()
-	layout := calculateLayout(m.width, m.height, lipgloss.Height(inputArea))
+	layout := calculateLayout(m.width, m.height, 0)
 	mainWidth := layout.mainWidth
 	_, vpHeight := m.viewportDimensions()
 	output := m.viewport
@@ -49,6 +48,8 @@ func (m Model) View() string {
 	}
 
 	statusBar := m.renderStatusBar()
+
+	inputArea := m.renderInputArea(mainWidth)
 
 	if sidebar != "" {
 		return lipgloss.JoinVertical(lipgloss.Left,
@@ -113,7 +114,7 @@ func (m Model) renderWelcome() string {
 }
 
 func (m Model) viewportDimensions() (width, height int) {
-	layout := calculateLayout(m.width, m.height, lipgloss.Height(m.renderInputArea()))
+	layout := calculateLayout(m.width, m.height, 4)
 	return layout.contentWidth, layout.contentHeight
 }
 
@@ -347,7 +348,7 @@ func (m Model) renderStatusReport() string {
 	return sb.String()
 }
 
-func (m Model) renderInputArea() string {
+func (m Model) renderInputArea(mainWidth int) string {
 	agName := "drogonclaw"
 
 	var lines []string
@@ -360,17 +361,14 @@ func (m Model) renderInputArea() string {
 			cmdStr = HintSelectedStyle.Render(h.cmd)
 		}
 		pad := strings.Repeat(" ", max(1, 14-len(h.cmd)))
-		available := max(12, m.width-InputPaneStyle.GetHorizontalFrameSize()-18)
+		available := max(12, mainWidth-InputPaneStyle.GetHorizontalFrameSize()-18)
 		lines = append(lines, HintBorderStyle.Render(prefix)+cmdStr+pad+HintDescStyle.Render(truncateVisible(h.desc, available)))
 	}
 
 	glyph, glyphWidth := m.promptGlyph(agName)
 
-	// Size the textarea to the space actually left inside the input pane after
-	// the prompt glyph so long input wraps inside the pane instead of being
-	// clipped/hidden. The textarea is rendered inside InputPaneStyle, so
-	// account for both the pane frame and the glyph width.
-	avail := m.width - InputPaneStyle.GetHorizontalFrameSize() - glyphWidth
+	paneWidth := max(8, mainWidth-InputPaneStyle.GetHorizontalFrameSize())
+	avail := paneWidth - glyphWidth
 	if avail < 8 {
 		avail = 8
 	}
@@ -394,7 +392,7 @@ func (m Model) renderInputArea() string {
 				totalLines += (runeCount + taWidth - 1) / taWidth
 			}
 		}
-		m.input.SetHeight(clamp(totalLines, 1, 8))
+		m.input.SetHeight(clamp(totalLines, 1, 3))
 	}
 
 	lines = append(lines, glyph+m.input.View())
@@ -402,7 +400,7 @@ func (m Model) renderInputArea() string {
 		lines = append(lines, WarningStyle.Render("Action requires exact confirmation: type "+m.confirmationPhrase()+" or Enter to cancel."))
 	}
 
-	return InputPaneStyle.Width(max(8, m.width-InputPaneStyle.GetHorizontalFrameSize())).Render(strings.Join(lines, "\n"))
+	return InputPaneStyle.Width(paneWidth).Render(strings.Join(lines, "\n"))
 }
 
 // promptGlyph returns the current prompt prefix and its visible (unstyled)
@@ -466,8 +464,9 @@ func (m *Model) appendBanner() {
 }
 
 func (m *Model) updateViewportContent() {
-	inputHeight := lipgloss.Height(m.renderInputArea())
-	layout := calculateLayout(m.width, m.height, inputHeight)
+	layout := calculateLayout(m.width, m.height, 4)
+	inputHeight := lipgloss.Height(m.renderInputArea(layout.mainWidth))
+	layout = calculateLayout(m.width, m.height, inputHeight)
 	base := strings.Join(m.lines, "\n")
 	if m.executing && m.currentResponse != "" {
 		base += "\n" + m.renderAgentResponseString(m.currentResponse)
