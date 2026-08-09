@@ -88,7 +88,7 @@ func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 			if i < len(outputLines)-1 || strings.TrimSpace(line) != "" {
 				prefix = "    │ "
 			}
-			m.lines = append(m.lines, colorizeOutputLine(truncateLine(prefix+line)))
+			m.lines = append(m.lines, colorizeOutputLine(truncateLine(stripXMLTags(prefix+line))))
 		}
 
 		m.activeToolLine = -1

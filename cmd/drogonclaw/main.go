@@ -30,7 +30,7 @@ func runStartup(cfg *config.Manager) (*agent.Provider, *sandbox.Docker, *skills.
 
 	steps := []string{
 		"Loading skills manifest",
-		"Initializing sandbox runtime",
+		"Initializing runtime",
 		"Connecting to model provider",
 		"Preparing workspace",
 	}

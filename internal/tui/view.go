@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -504,9 +505,10 @@ func (m *Model) appendLine(line string) {
 }
 
 func (m Model) renderAgentResponseString(content string) string {
-	rendered, err := m.mdRenderer.Render(strings.TrimRight(content, "\n"))
+	clean := stripXMLTags(content)
+	rendered, err := m.mdRenderer.Render(strings.TrimRight(clean, "\n"))
 	if err != nil || rendered == "" {
-		rendered = strings.TrimRight(content, "\n")
+		rendered = strings.TrimRight(clean, "\n")
 	}
 	var lines []string
 	for _, line := range strings.Split(rendered, "\n") {
@@ -783,4 +785,10 @@ func renderPhaseBadge(phase string) (string, lipgloss.Style) {
 	default:
 		return PhaseIdleStyle.Render("IDLE"), PhaseIdleStyle
 	}
+}
+
+var xmlTagRegex = regexp.MustCompile(`<[^>]+>`)
+
+func stripXMLTags(s string) string {
+	return xmlTagRegex.ReplaceAllString(s, "")
 }
