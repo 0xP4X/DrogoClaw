@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -62,7 +63,10 @@ func runStartup(cfg *config.Manager, forceSandbox *bool) (*agent.Provider, *sand
 			provider = agent.NewProvider(cfg)
 			pingCtx, pingCancel := context.WithTimeout(context.Background(), 20*time.Second)
 			defer pingCancel()
-			return provider.Ping(pingCtx)
+			if err := provider.Ping(pingCtx); err != nil {
+				return diagnoseProviderError(cfg, err)
+			}
+			return nil
 		case 3:
 			return nil
 		default:
@@ -259,4 +263,18 @@ func runBenchmark(cfg *config.Manager, args []string) {
 
 	fmt.Printf("\n  ✔ Benchmark complete: %d/%d solved (%.1f%%)\n", summary.Solved, summary.Total, summary.SuccessRate)
 	fmt.Printf("  ✔ Report: %s\n", reportPath)
+}
+
+// diagnoseProviderError turns a raw ping failure into an actionable message.
+func diagnoseProviderError(cfg *config.Manager, err error) error {
+	base := fmt.Sprintf("provider %q (model %q, endpoint %s)", cfg.GetProvider(), cfg.GetModel(), cfg.GetBaseURL())
+	msg := err.Error()
+	switch {
+	case errors.Is(err, context.DeadlineExceeded) || strings.Contains(msg, "deadline exceeded") || strings.Contains(msg, "Client.Timeout"):
+		return fmt.Errorf("could not reach %s within 20s: %w\n  - check this host can reach the endpoint (e.g. curl -sS %s/models)\n  - if behind a corporate proxy, export HTTP_PROXY/HTTPS_PROXY (or NO_PROXY for the host)\n  - verify DNS resolution", base, err, cfg.GetBaseURL())
+	case strings.Contains(msg, "401") || strings.Contains(msg, "403") || strings.Contains(msg, "unauthorized") || strings.Contains(msg, "invalid api key"):
+		return fmt.Errorf("auth rejected by %s: %w\n  - re-run ./drogonclaw setup and paste a valid API key", base, err)
+	default:
+		return fmt.Errorf("provider connection failed for %s: %w", base, err)
+	}
 }

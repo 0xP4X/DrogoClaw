@@ -234,10 +234,11 @@ func RunSetup(cfg *config.Manager) {
 		Filterable(false).
 		WithTheme(CustomHuhTheme())
 
-	err = huh.NewForm(huh.NewGroup(multi)).
-		WithShowHelp(true).
-		WithHeight(14).
-		Run()
+	// Run the MultiSelect directly. Wrapping a single MultiSelect inside
+	// huh.NewForm(...).WithHeight() constrains the viewport and breaks
+	// arrow-key navigation (cursor sticks on the first row), so options
+	// below the top one can never be highlighted.
+	err = multi.Run()
 
 	if err == nil && len(selected) > 0 {
 		for _, key := range selected {

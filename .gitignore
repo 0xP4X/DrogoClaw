@@ -52,8 +52,8 @@ npm-debug.log*
 website/
 
 # Stray binaries and artifacts
-drogonclaw
-drogonclaw.exe
+/drogonclaw
+/drogonclaw.exe
 kirocli-x86_64-linux.zip
 Screenshot*.png
 tests/
