@@ -103,6 +103,19 @@ type ToolRegistry struct {
 	// success oracle can verify real evidence instead of model prose.
 	lastResult ToolResult
 	lastTarget string
+
+	// recentCommands deduplicates repeated shell_execute calls within a
+	// short time window so the agent cannot burn iterations re-running
+	// commands that already returned the same data.
+	recentCommands map[string]recentCmd
+}
+
+const shellDedupWindow = 60 * time.Second
+const maxRecentCommands = 200
+
+type recentCmd struct {
+	result   string
+	executed time.Time
 }
 
 type toolEvidence struct {
@@ -113,16 +126,17 @@ type toolEvidence struct {
 
 func NewToolRegistry(manifest *skills.Manifest, sb *sandbox.Docker, val *EvidenceValidator, loot *memory.LootDB, cfg *config.Manager, graph *memory.Graph, provider *Provider) *ToolRegistry {
 	r := &ToolRegistry{
-		manifest:  manifest,
-		sandbox:   sb,
-		validator: val,
-		lootDb:    loot,
-		shells:    shell.GlobalShells,
-		cfg:       cfg,
-		graph:     graph,
-		provider:  provider,
-		oracle:    NewSuccessOracle(""),
-		builtins:  make(map[string]BuiltinFn),
+		manifest:        manifest,
+		sandbox:         sb,
+		validator:       val,
+		lootDb:          loot,
+		shells:          shell.GlobalShells,
+		cfg:             cfg,
+		graph:           graph,
+		provider:        provider,
+		oracle:          NewSuccessOracle(""),
+		builtins:        make(map[string]BuiltinFn),
+		recentCommands:  make(map[string]recentCmd),
 	}
 	r.registerBuiltins()
 	return r
@@ -1141,9 +1155,26 @@ func (r *ToolRegistry) registerBuiltins() {
 		if cmd == "" {
 			return "[Error] No command provided"
 		}
+
+		if cached, ok := r.recentCommands[cmd]; ok && time.Since(cached.executed) < shellDedupWindow {
+			return "[Dedup] Same shell_execute call already ran within the last 60s. Reusing prior result:\n" + cached.result
+		}
+
 		result, err := r.sandbox.Execute(ctx, cmd)
 		if err != nil {
 			return fmt.Sprintf("[%s Error] %v", r.executionModeLabel(), err)
+		}
+		r.recentCommands[cmd] = recentCmd{result: result, executed: time.Now()}
+		if len(r.recentCommands) > maxRecentCommands {
+			oldest := cmd
+			oldestTime := time.Now()
+			for k, v := range r.recentCommands {
+				if v.executed.Before(oldestTime) {
+					oldestTime = v.executed
+					oldest = k
+				}
+			}
+			delete(r.recentCommands, oldest)
 		}
 		return result
 	}
