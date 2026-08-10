@@ -40,6 +40,46 @@ func resolveHttpx() (string, error) {
 	return "", fmt.Errorf("projectdiscovery/httpx not found (the 'httpx' on PATH is the Python client). Install it with: go install github.com/projectdiscovery/httpx/cmd/httpx@latest — and ensure ~/go/bin precedes /usr/bin on PATH, or run inside the sandbox")
 }
 
+// buildNmapFlags assembles nmap CLI flags for the given mode and optional
+// explicit port list. When ports is non-empty it replaces any preset -p flag
+// so we never emit two -p options (which makes nmap abort). -Pn is included in
+// every mode because CTF/target hosts routinely block ICMP, which otherwise
+// yields a false "Host seems down".
+func buildNmapFlags(mode, ports string) string {
+	var flags string
+	switch strings.ToLower(mode) {
+	case "quick":
+		flags = "-Pn -sV -sC --open -T4 -p 80,443,22,21,25,8080,8443,3306,5432"
+	case "udp":
+		flags = "-Pn -sU --top-ports 200 -T4"
+	case "vuln":
+		flags = "-Pn -sV -sC --script vuln -T4"
+	case "stealth":
+		flags = "-Pn -sS -sV -T2 --randomize-hosts"
+	case "full":
+		flags = "-Pn -sV -sC -O -A -T4 -p-"
+	default: // "default" or empty
+		flags = "-Pn -sV -sC --open -T4"
+	}
+	if ports != "" && ports != "-" {
+		fields := strings.Fields(flags)
+		cleaned := make([]string, 0, len(fields))
+		for i := 0; i < len(fields); i++ {
+			if fields[i] == "-p" && i+1 < len(fields) {
+				i++ // skip the port value that follows
+				continue
+			}
+			if strings.HasPrefix(fields[i], "-p") {
+				continue // joined form like "-p80,443" or "-p-"
+			}
+			cleaned = append(cleaned, fields[i])
+		}
+		flags = strings.Join(cleaned, " ")
+		flags = fmt.Sprintf("%s -p %s", flags, ports)
+	}
+	return flags
+}
+
 // registerToolWrappers adds all structured tool wrappers to the registry.
 // Called from registerBuiltins().
 func (r *ToolRegistry) registerToolWrappers() {
@@ -55,24 +95,7 @@ func (r *ToolRegistry) registerToolWrappers() {
 		if ports == "" {
 			ports = "-"
 		}
-		var flags string
-		switch strings.ToLower(mode) {
-		case "quick":
-			flags = "-sV -sC --open -T4 -p 80,443,22,21,25,8080,8443,3306,5432"
-		case "udp":
-			flags = "-sU --top-ports 200 -T4"
-		case "vuln":
-			flags = "-sV -sC --script vuln -T4"
-		case "stealth":
-			flags = "-sS -sV -T2 --randomize-hosts"
-		case "full":
-			flags = "-sV -sC -O -A -T4 -p-"
-		default: // "default" or empty
-			flags = "-sV -sC --open -T4"
-		}
-		if ports != "-" {
-			flags = fmt.Sprintf("%s -p %s", flags, ports)
-		}
+		flags := buildNmapFlags(mode, ports)
 		cmd := fmt.Sprintf("nmap %s %s 2>&1", flags, target)
 		out, err := r.sandbox.Execute(ctx, cmd)
 		if err != nil {

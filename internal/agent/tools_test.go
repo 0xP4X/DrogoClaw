@@ -1,6 +1,9 @@
 package agent
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestBuildMemoryEdgesInfersTargetRelationship(t *testing.T) {
 	props := map[string]any{"target_id": "target:example.com"}
@@ -32,5 +35,49 @@ func TestBuildMemoryEdgesUsesExplicitRelationship(t *testing.T) {
 	}
 	if edges[0].Relationship != "HAS_VULNERABILITY" {
 		t.Fatalf("unexpected relationship: %s", edges[0].Relationship)
+	}
+}
+
+func TestBuildNmapFlagsNoDuplicatePortFlag(t *testing.T) {
+	// Regression: passing an explicit ports value must not produce two -p
+	// options, which makes nmap abort with "Only 1 -p option allowed".
+	cases := []struct {
+		mode  string
+		ports string
+	}{
+		{"quick", "32402"},
+		{"full", "32402"},
+		{"default", "80,443"},
+		{"vuln", "8080"},
+	}
+	for _, c := range cases {
+		flags := buildNmapFlags(c.mode, c.ports)
+		count := 0
+		fields := strings.Fields(flags)
+		for i := 0; i < len(fields); i++ {
+			if fields[i] == "-p" {
+				count++
+				// the value must immediately follow
+				if i+1 >= len(fields) {
+					t.Fatalf("mode=%s ports=%s: -p has no value", c.mode, c.ports)
+				}
+				i++
+			} else if strings.HasPrefix(fields[i], "-p") {
+				count++
+			}
+		}
+		if count != 1 {
+			t.Fatalf("mode=%s ports=%s: expected exactly 1 -p flag, got %d (flags=%q)", c.mode, c.ports, count, flags)
+		}
+	}
+}
+
+func TestBuildNmapFlagsIncludesPn(t *testing.T) {
+	// Hosts that block ICMP must still be scanned; -Pn must be present in every mode.
+	for _, mode := range []string{"quick", "udp", "vuln", "stealth", "full", "default", ""} {
+		flags := buildNmapFlags(mode, "")
+		if !strings.Contains(flags, "-Pn") {
+			t.Fatalf("mode=%q: expected -Pn in flags %q", mode, flags)
+		}
 	}
 }
