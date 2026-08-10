@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -188,6 +190,79 @@ func (g *Graph) GetFullJSON() string {
 	data := graphData{Nodes: nodes, Edges: g.edges, OperatorProfile: g.operatorProfile, AgentProfile: g.agentProfile}
 	b, _ := json.MarshalIndent(data, "", "  ")
 	return string(b)
+}
+
+// Snapshot returns a compact, human-readable view of the graph for injection
+// into the agent's context. Without this the graph is write-only: the agent
+// stores entities but never sees them again, so memory never actually
+// influences behaviour.
+func (g *Graph) Snapshot() string {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	var sb strings.Builder
+	sb.WriteString("MEMORY GRAPH STATE\n")
+
+	if g.operatorProfile != nil && g.operatorProfile.Name != "" {
+		sb.WriteString("Operator: " + g.operatorProfile.Name + "\n")
+	} else {
+		sb.WriteString("Operator: (unknown)\n")
+	}
+
+	if len(g.nodes) == 0 {
+		sb.WriteString("Entities: none recorded yet.\n")
+		return strings.TrimRight(sb.String(), "\n")
+	}
+
+	labelCounts := make(map[NodeLabel]int)
+	for _, n := range g.nodes {
+		labelCounts[n.Label]++
+	}
+	labels := make([]string, 0, len(labelCounts))
+	for l := range labelCounts {
+		labels = append(labels, string(l))
+	}
+	sort.Strings(labels)
+	var lcParts []string
+	for _, l := range labels {
+		lcParts = append(lcParts, fmt.Sprintf("%s=%d", l, labelCounts[NodeLabel(l)]))
+	}
+	sb.WriteString(fmt.Sprintf("Entities: %d (%s)\n", len(g.nodes), strings.Join(lcParts, ", ")))
+	sb.WriteString(fmt.Sprintf("Relationships: %d\n", len(g.edges)))
+
+	// Show the most recent entities so the agent can reason about what it knows.
+	recent := make([]*Node, 0, len(g.nodes))
+	for _, n := range g.nodes {
+		recent = append(recent, n)
+	}
+	sort.Slice(recent, func(i, j int) bool { return recent[i].Timestamp > recent[j].Timestamp })
+	limit := len(recent)
+	if limit > 12 {
+		limit = 12
+	}
+	for _, n := range recent[:limit] {
+		sb.WriteString(fmt.Sprintf("- %s [%s]", n.ID, n.Label))
+		if len(n.Properties) > 0 {
+			var props []string
+			for k, v := range n.Properties {
+				props = append(props, fmt.Sprintf("%s=%v", k, v))
+			}
+			sb.WriteString(" (" + strings.Join(props, ", ") + ")")
+		}
+		sb.WriteString("\n")
+	}
+
+	if len(g.edges) > 0 {
+		limit := len(g.edges)
+		if limit > 12 {
+			limit = 12
+		}
+		for _, e := range g.edges[:limit] {
+			sb.WriteString(fmt.Sprintf("- %s --%s--> %s\n", e.SourceID, e.Relationship, e.TargetID))
+		}
+	}
+
+	return strings.TrimRight(sb.String(), "\n")
 }
 
 func (g *Graph) Reset() {

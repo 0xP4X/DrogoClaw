@@ -162,9 +162,17 @@ func (p *Provider) Ping(ctx context.Context) error {
 }
 
 // BuildMessages constructs the initial message array from history + new user message.
-func BuildMessages(systemPrompt string, history []openai.ChatCompletionMessageParamUnion, userMsg string) []openai.ChatCompletionMessageParamUnion {
+// BuildMessages assembles the message list for one LLM call. memoryContext, if
+// non-empty, is appended as a second system message so the agent can see the
+// current state of its memory graph (entities/links) on every turn. It is kept
+// separate from systemPrompt so persona/stealth overrides applied via
+// UpdateSystemPrompt are not clobbered.
+func BuildMessages(systemPrompt string, memoryContext string, history []openai.ChatCompletionMessageParamUnion, userMsg string) []openai.ChatCompletionMessageParamUnion {
 	msgs := []openai.ChatCompletionMessageParamUnion{
 		openai.SystemMessage(systemPrompt),
+	}
+	if memoryContext != "" {
+		msgs = append(msgs, openai.SystemMessage(memoryContext))
 	}
 	msgs = append(msgs, history...)
 	msgs = append(msgs, openai.UserMessage(userMsg))

@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -1223,8 +1224,15 @@ func (r *ToolRegistry) registerBuiltins() {
 		sourceID, _ := args["source_id"].(string)
 		targetID, _ := args["target_id"].(string)
 		relationship, _ := args["relationship"].(string)
-		if id == "" || label == "" {
-			return "[Error] id and label are required"
+		if label == "" {
+			return "[Error] label is required (e.g. Target, Asset, Port, Service, Vulnerability, Credential, Flag)"
+		}
+		// Auto-generate an id when the model does not supply one, so recording
+		// a finding never fails on a missing id. Deterministic per (label+data)
+		// so the same fact is not duplicated across turns.
+		if id == "" {
+			sum := sha256.Sum256([]byte(label + "|" + data))
+			id = fmt.Sprintf("%s-%x", strings.ToLower(label), sum[:6])
 		}
 
 		// Use the evidence validator to verify the finding against

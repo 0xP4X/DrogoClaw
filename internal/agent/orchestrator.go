@@ -60,6 +60,7 @@ type Orchestrator struct {
 	// Subsystems
 	missionPlanner *core.MissionPlanner
 	actions        *memory.ActionJournal
+	graph          *memory.Graph
 }
 
 const maxHistoryMessages = 24
@@ -118,6 +119,7 @@ func NewOrchestratorWithJournal(provider *Provider, tools *ToolRegistry, sysProm
 		SessionID:      sessionID,
 		missionPlanner: core.NewMissionPlanner(provider, graph),
 		actions:        actions,
+		graph:          graph,
 	}
 }
 
@@ -201,7 +203,11 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 		events <- Event{Type: EvStatus, Content: "Planning fallback engaged; proceeding with direct reasoning..."}
 	}
 
-	messages := BuildMessages(o.sysPrompt, o.history, userMsg)
+	memoryCtx := ""
+	if o.graph != nil {
+		memoryCtx = o.graph.Snapshot()
+	}
+	messages := BuildMessages(o.sysPrompt, memoryCtx, o.history, userMsg)
 
 	maxIter := o.maxIterations
 	for i := 0; i < maxIter; i++ {
@@ -366,7 +372,11 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 func (o *Orchestrator) ExecuteChat(ctx context.Context, userMsg string, events chan<- Event) error {
 	defer close(events)
 
-	messages := BuildMessages(o.sysPrompt, o.history, userMsg)
+	memoryCtx := ""
+	if o.graph != nil {
+		memoryCtx = o.graph.Snapshot()
+	}
+	messages := BuildMessages(o.sysPrompt, memoryCtx, o.history, userMsg)
 
 	events <- Event{Type: EvStatus, Content: "Thinking..."}
 
