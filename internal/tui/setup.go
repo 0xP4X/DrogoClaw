@@ -100,6 +100,7 @@ func RunSetup(cfg *config.Manager) {
 		modelOptions = openRouterModelOptions()
 	case "nvidia":
 		modelOptions = []huh.Option[string]{
+			huh.NewOption("Poolside Laguna XS 2.1 (verified)", "poolside/laguna-xs-2.1"),
 			huh.NewOption("Nemotron 3 Ultra 550B", "nvidia/nemotron-3-ultra-550b-a55b"),
 			huh.NewOption("Qwen 3.5: 397B Instruct", "qwen/qwen3.5-397b-a17b"),
 			huh.NewOption("DeepSeek: DeepSeek V4 Pro", "deepseek-ai/deepseek-v4-pro"),
