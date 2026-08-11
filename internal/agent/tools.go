@@ -127,17 +127,17 @@ type toolEvidence struct {
 
 func NewToolRegistry(manifest *skills.Manifest, sb *sandbox.Docker, val *EvidenceValidator, loot *memory.LootDB, cfg *config.Manager, graph *memory.Graph, provider *Provider) *ToolRegistry {
 	r := &ToolRegistry{
-		manifest:        manifest,
-		sandbox:         sb,
-		validator:       val,
-		lootDb:          loot,
-		shells:          shell.GlobalShells,
-		cfg:             cfg,
-		graph:           graph,
-		provider:        provider,
-		oracle:          NewSuccessOracle(""),
-		builtins:        make(map[string]BuiltinFn),
-		recentCommands:  make(map[string]recentCmd),
+		manifest:       manifest,
+		sandbox:        sb,
+		validator:      val,
+		lootDb:         loot,
+		shells:         shell.GlobalShells,
+		cfg:            cfg,
+		graph:          graph,
+		provider:       provider,
+		oracle:         NewSuccessOracle(""),
+		builtins:       make(map[string]BuiltinFn),
+		recentCommands: make(map[string]recentCmd),
 	}
 	r.registerBuiltins()
 	return r
@@ -961,7 +961,8 @@ func classifyToolPolicy(name string) toolPolicy {
 	case strings.HasPrefix(name, "osint_") ||
 		name == "profile_target" || name == "web_search" || name == "fetch_url" ||
 		name == "deep_research" || name == "lookup_cve" || name == "binary_recon" ||
-		name == "analyze_source_code" || name == "binary_gdb_run" || name == "run_sast":
+		name == "analyze_source_code" || name == "binary_gdb_run" || name == "run_sast" ||
+		name == "run_attack_plan" || name == "run_sliver":
 		return toolPolicyObserve
 	case name == "download_loot" || name == "shell_session_exec" || name == "deploy_pivot" ||
 		name == "route_traffic" || name == "auto_privesc" || name == "establish_persistence" ||
@@ -971,7 +972,7 @@ func classifyToolPolicy(name string) toolPolicy {
 	case name == "ad_dump_lsass" || name == "ad_pass_the_hash" || name == "aws_enum_iam" ||
 		name == "aws_escalate_privs" || name == "aws_dump_s3" || name == "send_phish":
 		return toolPolicyCredentialed
-	case 		name == "shell_execute" || name == "run_exploit" || name == "run_ad_template" ||
+	case name == "shell_execute" || name == "run_exploit" || name == "run_ad_template" ||
 		name == "auth_bypass_scan" || name == "binary_ret2libc" || name == "fuzz_endpoint" ||
 		name == "generate_fud_payload" || name == "setup_phish_domain" || name == "browser_validate" ||
 		name == "autonomous_fuzzing_engine" || name == "autonomous_exploit_writer" ||

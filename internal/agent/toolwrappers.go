@@ -10,12 +10,16 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/0xP4X/drogonclaw-go/internal/c2"
+	"github.com/0xP4X/drogonclaw-go/internal/cloud"
+	"github.com/0xP4X/drogonclaw-go/internal/mitre"
 	"github.com/openai/openai-go"
 )
 
@@ -109,6 +113,7 @@ func (r *ToolRegistry) registerToolWrappers() {
 		target, _ := args["target"].(string)
 		severity, _ := args["severity"].(string)
 		tags, _ := args["tags"].(string)
+		dast, _ := args["dast"].(bool)
 		if target == "" {
 			return "[Error] target is required"
 		}
@@ -116,6 +121,9 @@ func (r *ToolRegistry) registerToolWrappers() {
 			severity = "critical,high,medium"
 		}
 		cmd := fmt.Sprintf("nuclei -u %s -severity %s -silent -timeout 10 -retries 2", target, severity)
+		if dast {
+			cmd += " -dast"
+		}
 		if tags != "" {
 			cmd += fmt.Sprintf(" -tags %s", tags)
 		}
@@ -359,7 +367,7 @@ xxd %s | head -4
 		if binaryPath == "" || findAddr == "" {
 			return "[Error] binary_path and find_addr are required"
 		}
-		
+
 		script := fmt.Sprintf(`import angr
 import sys
 
@@ -467,6 +475,84 @@ else:
 		}
 		return fmt.Sprintf("[VOLATILITY3 — %s — %s]\n%s", plugin, memFile, out)
 	}
+
+	// ── 16. PROWLER (multi-cloud CSPM) ───────────────────────────────────────
+	// Wraps the external Prowler CLI (orchestration, not reimplementation) to
+	// absorb its 1000+ multi-cloud posture checks — extends internal/cloud
+	// beyond the existing AWS-IAM enumeration without duplicating Prowler.
+	r.builtins["run_prowler"] = func(ctx context.Context, args map[string]any) string {
+		provider, _ := args["provider"].(string)
+		account, _ := args["account"].(string)
+		region, _ := args["region"].(string)
+		if provider == "" {
+			provider = "aws"
+		}
+		opts := cloud.Options{Account: account, Region: region}
+		if envRaw, ok := args["creds_json"].(string); ok && envRaw != "" {
+			var env map[string]string
+			if err := json.Unmarshal([]byte(envRaw), &env); err == nil {
+				opts.Env = env
+			}
+		}
+		findings, err := cloud.RunProwler(ctx, r.sandbox, cloud.Provider(provider), opts)
+		if err != nil {
+			return fmt.Sprintf("[prowler Error] %v", err)
+		}
+		if len(findings) == 0 {
+			return fmt.Sprintf("[prowler] No FAIL findings for %s (account=%s).", provider, account)
+		}
+		var b strings.Builder
+		fmt.Fprintf(&b, "[PROWLER — %s — %d FAIL findings]\n", provider, len(findings))
+		for _, f := range findings {
+			fmt.Fprintf(&b, "- [%s] %s | %s | %s | %s\n", f.Severity, f.CheckID, f.Service, f.Resource, f.Message)
+			if r.lootDb != nil {
+				_ = r.lootDb.InsertVulnerability(
+					fmt.Sprintf("%s:%s", f.Provider, f.Account),
+					"",
+					fmt.Sprintf("[%s] %s — %s", f.CheckID, f.Service, f.Message),
+					strings.ToLower(f.Severity),
+				)
+			}
+		}
+		return b.String()
+	}
+
+	// ── 17. ATT&CK EMULATION PLANNER ──────────────────────────────────────
+	// Promotes the embedded techniqueDB into a Caldera-style, kill-chain-ordered
+	// emulation plan. Reuses mitre.BuildEmulationPlan — no parallel planner.
+	r.builtins["run_attack_plan"] = func(ctx context.Context, args map[string]any) string {
+		toolsRaw, _ := args["tools"].(string)
+		var available []string
+		if toolsRaw != "" {
+			for _, t := range strings.Split(toolsRaw, ",") {
+				t = strings.TrimSpace(t)
+				if t != "" {
+					available = append(available, t)
+				}
+			}
+		} else {
+			available = mitre.DefaultToolSet()
+		}
+		steps := mitre.BuildEmulationPlan(available)
+		return mitre.RenderEmulationPlan(steps)
+	}
+
+	// ── 18. SLIVER C2 BACKEND ───────────────────────────────────────────────
+	// Wraps the operator's own Sliver server (orchestration only) as a C2
+	// backend beside the Telegram gateway. No Sliver code is forked.
+	r.builtins["run_sliver"] = func(ctx context.Context, args map[string]any) string {
+		sub, _ := args["subcommand"].(string)
+		rest, _ := args["args"].(string)
+		be := c2.NewSliverBackend(r.sandbox.Execute)
+		out, err := be.Run(ctx, sub, rest)
+		if err != nil {
+			return fmt.Sprintf("[sliver Error] %v", err)
+		}
+		if strings.TrimSpace(out) == "" {
+			return "[sliver] command dispatched (no output)."
+		}
+		return "[SLIVER]\n" + out
+	}
 }
 
 // toolWrapperDefinitions returns LLM-facing tool schemas for all wrappers.
@@ -492,13 +578,14 @@ func toolWrapperDefinitions() []openai.ChatCompletionToolParam {
 			Type: "function",
 			Function: openai.FunctionDefinitionParam{
 				Name:        "run_nuclei",
-				Description: openai.String("Structured Nuclei vulnerability scanner wrapper. Automatically adds -silent, -timeout, -retries best-practice flags."),
+				Description: openai.String("Structured Nuclei wrapper. Adds -silent, -timeout, -retries best-practice flags. Set dast=true to enable Nuclei's DAST/fuzzing templates for unknown-vulnerability discovery."),
 				Parameters: openai.FunctionParameters{
 					"type": "object",
 					"properties": map[string]interface{}{
 						"target":   map[string]interface{}{"type": "string", "description": "URL to scan"},
 						"severity": map[string]interface{}{"type": "string", "description": "critical,high,medium,low (default: critical,high,medium)"},
 						"tags":     map[string]interface{}{"type": "string", "description": "Optional comma-separated tags e.g. 'rce,sqli,xss,api,jwt'"},
+						"dast":     map[string]interface{}{"type": "boolean", "description": "Enable DAST/fuzzing templates for active unknown-vuln discovery (default: false)"},
 					},
 					"required": []string{"target"},
 				},
@@ -703,6 +790,52 @@ func toolWrapperDefinitions() []openai.ChatCompletionToolParam {
 						"plugin":   map[string]interface{}{"type": "string", "description": "Volatility 3 plugin name"},
 					},
 					"required": []string{"mem_file", "plugin"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: openai.FunctionDefinitionParam{
+				Name:        "run_prowler",
+				Description: openai.String("Multi-cloud security posture scan via wrapped Prowler (aws | azure | gcp | kubernetes). Returns FAIL findings with severity, service, and resource. Absorbs Prowler's 1000+ checks without reimplementation. Pass creds_json ({\"KEY\":\"VAL\"}) for provider authentication."),
+				Parameters: openai.FunctionParameters{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"provider":   map[string]interface{}{"type": "string", "description": "aws | azure | gcp | kubernetes (default: aws)"},
+						"account":    map[string]interface{}{"type": "string", "description": "Account/subscription/project id (optional)"},
+						"region":     map[string]interface{}{"type": "string", "description": "Region to scope the scan (optional)"},
+						"creds_json": map[string]interface{}{"type": "string", "description": "JSON object of credential env vars, e.g. {\"AWS_ACCESS_KEY_ID\":\"...\",\"AWS_SECRET_ACCESS_KEY\":\"...\"}"},
+					},
+					"required": []string{},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: openai.FunctionDefinitionParam{
+				Name:        "run_attack_plan",
+				Description: openai.String("Build a MITRE ATT&CK kill-chain-ordered emulation plan from the tools/techniques DrogonClaw maps. Reuses the embedded ATT&CK DB; pass tools (comma-separated) to scope the plan, or omit to use the full built-in tool set."),
+				Parameters: openai.FunctionParameters{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"tools": map[string]interface{}{"type": "string", "description": "Optional comma-separated tool/action names to include (e.g. 'nmap_scan,metasploit,kerberoasting'). Omit for the full set."},
+					},
+					"required": []string{},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: openai.FunctionDefinitionParam{
+				Name:        "run_sliver",
+				Description: openai.String("Drive the operator's own Sliver C2 server (orchestration only). Runs a sliver subcommand against the operator-controlled Sliver instance — e.g. generate an implant, start a listener, or list sessions. For authorized engagements; Sliver must be installed in the sandbox."),
+				Parameters: openai.FunctionParameters{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"subcommand": map[string]interface{}{"type": "string", "description": "sliver subcommand (e.g. generate, listener, sessions, use)"},
+						"args":       map[string]interface{}{"type": "string", "description": "Arguments for the subcommand (e.g. '--os windows --http 10.0.0.5 --save /tmp/implant')"},
+					},
+					"required": []string{"subcommand"},
 				},
 			},
 		},

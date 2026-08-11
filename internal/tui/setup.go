@@ -17,6 +17,26 @@ func sectionHeader(number, title string) string {
 		Render(fmt.Sprintf("  %s %s", number, title))
 }
 
+// ollamaModelOptions discovers models installed in the local Ollama instance so
+// the offline runtime only offers what is actually present. Falls back to a
+// small static list when Ollama is unreachable (e.g. not yet started).
+func ollamaModelOptions(baseURL string) []huh.Option[string] {
+	fallback := []huh.Option[string]{
+		huh.NewOption("Llama 3.1 8B (Local)", "llama3.1"),
+		huh.NewOption("Llama 3.1 70B (Local)", "llama3.1:70b"),
+		huh.NewOption("Mistral (Local)", "mistral"),
+	}
+	names, err := config.OllamaModels(baseURL)
+	if err != nil || len(names) == 0 {
+		return fallback
+	}
+	opts := make([]huh.Option[string], 0, len(names))
+	for _, n := range names {
+		opts = append(opts, huh.NewOption(n+" (Local)", n))
+	}
+	return opts
+}
+
 func RunSetup(cfg *config.Manager) {
 	var provider string
 	var err error
@@ -85,6 +105,14 @@ func RunSetup(cfg *config.Manager) {
 			huh.NewOption("DeepSeek: DeepSeek V4 Pro", "deepseek-ai/deepseek-v4-pro"),
 			huh.NewOption("Llama 3.1 Nemotron 70B", "nvidia/llama-3.1-nemotron-70b-instruct"),
 		}
+		if apiKey := cfg.GetAPIKey(); apiKey != "" {
+			if names, err := config.NVIDIAModels(cfg.GetBaseURL(), apiKey); err == nil && len(names) > 0 {
+				modelOptions = make([]huh.Option[string], 0, len(names))
+				for _, n := range names {
+					modelOptions = append(modelOptions, huh.NewOption(n, n))
+				}
+			}
+		}
 	case "openai":
 		modelOptions = []huh.Option[string]{
 			huh.NewOption("gpt-4o (Recommended)", "gpt-4o"),
@@ -96,11 +124,7 @@ func RunSetup(cfg *config.Manager) {
 			huh.NewOption("Gemini 2.5 Flash", "gemini-2.5-flash"),
 		}
 	case "ollama":
-		modelOptions = []huh.Option[string]{
-			huh.NewOption("Llama 3.1 8B (Local)", "llama3.1"),
-			huh.NewOption("Llama 3.1 70B (Local)", "llama3.1:70b"),
-			huh.NewOption("Mistral (Local)", "mistral"),
-		}
+		modelOptions = ollamaModelOptions("http://localhost:11434")
 	}
 
 	var ollamaURL string

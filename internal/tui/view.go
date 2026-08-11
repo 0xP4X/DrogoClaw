@@ -294,6 +294,20 @@ func (m Model) renderSidebar(width, height int) string {
 		row("Detail", HintDescStyle.Render(truncate(m.phaseDetail, max(1, width-14))))
 	}
 
+	if len(m.promptQueue) > 0 {
+		section("QUEUE")
+		limit := len(m.promptQueue)
+		if limit > 3 {
+			limit = 3
+		}
+		for i := 0; i < limit; i++ {
+			row(fmt.Sprintf("%d.", i+1), truncate(m.promptQueue[i], max(1, width-16)))
+		}
+		if len(m.promptQueue) > 3 {
+			row("…", fmt.Sprintf("+%d more", len(m.promptQueue)-3))
+		}
+	}
+
 	return SidebarPaneStyle.Width(max(8, width-SidebarPaneStyle.GetHorizontalFrameSize())).Height(height).Render(sb.String())
 }
 

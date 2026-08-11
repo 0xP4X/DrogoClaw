@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -136,6 +137,93 @@ func readModelsFile(path string) ([]string, error) {
 		if m.ID != "" {
 			ids = append(ids, m.ID)
 		}
+	}
+	return ids, nil
+}
+
+// OllamaModels returns the model names installed in a local Ollama instance by
+// querying its native /api/tags endpoint. It only ever contacts the operator's
+// own Ollama server (localhost by default), so it works fully offline and lets
+// the "autonomous offline runtime" offer models that are actually present
+// rather than a stale static list. Falls back to the caller on any error.
+func OllamaModels(baseURL string) ([]string, error) {
+	base := strings.TrimRight(baseURL, "/")
+	base = strings.TrimSuffix(base, "/v1") // accept either the /v1 or root URL
+	u := base + "/api/tags"
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ollama tags error %d", resp.StatusCode)
+	}
+	var out struct {
+		Models []struct {
+			Name string `json:"name"`
+		} `json:"models"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(out.Models))
+	for _, m := range out.Models {
+		if m.Name != "" {
+			ids = append(ids, m.Name)
+		}
+	}
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("ollama returned no installed models")
+	}
+	return ids, nil
+}
+
+// NVIDIAModels returns the model IDs available to the operator's NVIDIA NIM
+// account by querying the OpenAI-compatible /v1/models endpoint with the
+// operator's API key. This lets the setup wizard offer whatever models the key
+// is entitled to (including community models like poolside/laguna-xs-2.1)
+// instead of a hard-coded list.
+func NVIDIAModels(baseURL, apiKey string) ([]string, error) {
+	base := strings.TrimRight(baseURL, "/")
+	if base == "" {
+		base = "https://integrate.api.nvidia.com/v1"
+	}
+	u := base + "/models"
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	if apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("nvidia models error %d", resp.StatusCode)
+	}
+	var out struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(out.Data))
+	for _, m := range out.Data {
+		if m.ID != "" {
+			ids = append(ids, m.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("nvidia returned no models")
 	}
 	return ids, nil
 }

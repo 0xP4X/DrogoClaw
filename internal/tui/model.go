@@ -414,7 +414,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cancelFn = nil
 		}
 		m.activeEvents = nil
-		m.appendLine(strings.TrimRight(msg.Output, "\n"))
+		trimmed := strings.TrimRight(msg.Output, "\n")
+		for _, line := range strings.Split(trimmed, "\n") {
+			m.appendLine(line)
+		}
 		cmds = append(cmds, textarea.Blink)
 
 	case SandboxToggleResultMsg:

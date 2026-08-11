@@ -26,6 +26,11 @@ func stripANSI(s string) string {
 	return ansiRE.ReplaceAllString(s, "")
 }
 
+var needSetup bool
+
+// NeedSetup reports whether the operator requested /setup from inside the TUI.
+func NeedSetup() bool { return needSetup }
+
 func (m *Model) handleSlashCommand(raw string) (Model, tea.Cmd) {
 	parts := strings.Fields(raw)
 	cmd := strings.ToLower(parts[0])
@@ -96,15 +101,9 @@ func (m *Model) handleSlashCommand(raw string) (Model, tea.Cmd) {
 		}
 
 	case "/setup":
-		m.appendLine(SpinnerStyle.Render("  [*] Launching setup wizard..."))
-		return *m, func() tea.Msg {
-			cmd := exec.Command(os.Args[0], "setup")
-			cmd.Stdin = os.Stdin
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			err := cmd.Run()
-			return SetupResultMsg{Err: err}
-		}
+		needSetup = true
+		m.appendLine(InfoStyle.Render("  [i] Launching setup wizard — DrogonClaw will restart afterward."))
+		return *m, tea.Quit
 
 	case "/report":
 		m.phase = "planning"
@@ -141,13 +140,13 @@ func (m *Model) handleSlashCommand(raw string) (Model, tea.Cmd) {
 			m.activeEvents = events
 			go func() {
 				defer close(events)
-			events <- agent.Event{Type: agent.EvStatus, Content: "Running local CTF solver (scan -> decode -> verify)..."}
-			rs, err := ctf.Solve(ctx, ctf.LocalTask{Path: args})
-			if err != nil {
-				events <- agent.Event{Type: agent.EvError, Content: fmt.Sprintf("CTF solve failed: %v", err)}
-				return
-			}
-			events <- agent.Event{Type: agent.EvDone, Content: ctf.FormatSolve(rs)}
+				events <- agent.Event{Type: agent.EvStatus, Content: "Running local CTF solver (scan -> decode -> verify)..."}
+				rs, err := ctf.Solve(ctx, ctf.LocalTask{Path: args})
+				if err != nil {
+					events <- agent.Event{Type: agent.EvError, Content: fmt.Sprintf("CTF solve failed: %v", err)}
+					return
+				}
+				events <- agent.Event{Type: agent.EvDone, Content: ctf.FormatSolve(rs)}
 			}()
 		}
 
@@ -231,7 +230,9 @@ func (m *Model) handleSlashCommand(raw string) (Model, tea.Cmd) {
 		m.appendLine(WarningStyle.Render("  [CONFIRM] Type TOGGLE SANDBOX to switch execution environment."))
 
 	case "/status":
-		m.appendLine(m.renderStatusReport())
+		for _, line := range strings.Split(m.renderStatusReport(), "\n") {
+			m.appendLine(line)
+		}
 
 	case "/health":
 		m.appendLine(SpinnerStyle.Render("  [*] Running diagnostic checks..."))

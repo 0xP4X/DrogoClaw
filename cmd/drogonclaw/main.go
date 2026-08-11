@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/0xP4X/drogonclaw-go/internal/agent"
@@ -21,6 +23,7 @@ import (
 	"github.com/0xP4X/drogonclaw-go/internal/sandbox"
 	"github.com/0xP4X/drogonclaw-go/internal/skills"
 	"github.com/0xP4X/drogonclaw-go/internal/tui"
+	"github.com/0xP4X/drogonclaw-go/internal/whitebox"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -117,8 +120,8 @@ func main() {
 		os.Exit(0)
 	}
 
-	if len(os.Args) > 1 && os.Args[1] == "bench" {
-		runBenchmark(cfg, os.Args[2:])
+	if len(os.Args) > 1 && os.Args[1] == "whitebox" {
+		runWhitebox(cfg, os.Args[2:])
 		os.Exit(0)
 	}
 
@@ -196,6 +199,19 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  [x] TUI crashed: %v\n", err)
 		os.Exit(1)
 	}
+
+	if tui.NeedSetup() {
+		tui.RunSetup(cfg)
+		cfg.Reload()
+		bin := os.Args[0]
+		if !strings.Contains(bin, "/") && !strings.Contains(bin, "\\") {
+			if p, err := exec.LookPath(bin); err == nil {
+				bin = p
+			}
+		}
+		_ = syscall.Exec(bin, os.Args, os.Environ())
+		os.Exit(0)
+	}
 }
 
 // runBenchmark handles the `drogonclaw bench` subcommand.
@@ -263,6 +279,109 @@ func runBenchmark(cfg *config.Manager, args []string) {
 
 	fmt.Printf("\n  ✔ Benchmark complete: %d/%d solved (%.1f%%)\n", summary.Solved, summary.Total, summary.SuccessRate)
 	fmt.Printf("  ✔ Report: %s\n", reportPath)
+}
+
+// runWhitebox handles the `drogonclaw whitebox` subcommand.
+//
+//	./drogonclaw whitebox -u https://app.example.com -r ./my-repo -o out/
+//
+// It runs DrogonClaw's autonomous white-box web/API pipeline (source SAST →
+// recon → five vuln agents → proof-by-exploitation → Markdown + SARIF report).
+func runWhitebox(cfg *config.Manager, args []string) {
+	var targetURL, repoPath, outDir, sessionOverride string
+	verify := true
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "-u", "--url":
+			if i+1 < len(args) {
+				targetURL = args[i+1]
+				i++
+			}
+		case "-r", "--repo":
+			if i+1 < len(args) {
+				repoPath = args[i+1]
+				i++
+			}
+		case "-o", "--out":
+			if i+1 < len(args) {
+				outDir = args[i+1]
+				i++
+			}
+		case "-s", "--session":
+			if i+1 < len(args) {
+				sessionOverride = args[i+1]
+				i++
+			}
+		case "--no-verify":
+			verify = false
+		default:
+			if targetURL == "" && repoPath == "" && !strings.HasPrefix(args[i], "-") {
+				targetURL = args[i]
+			}
+		}
+	}
+
+	if targetURL == "" && repoPath == "" {
+		fmt.Fprintln(os.Stderr, "  [x] whitebox requires -u <url> and/or -r <repo>")
+		os.Exit(1)
+	}
+
+	provider, sb, manifest, err := runStartup(cfg, nil)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  [x] Startup failed: %v\n", err)
+		os.Exit(1)
+	}
+	if sb == nil {
+		fmt.Fprintln(os.Stderr, "  [x] Sandbox initialization failed")
+		os.Exit(1)
+	}
+
+	sessionID := sessionOverride
+	if sessionID == "" {
+		sessionID = fmt.Sprintf("wb%010d", rand.Intn(9000000000)+1000000000)
+	}
+	// Reusing a session ID reloads its task tree from data/graph_<session>.json,
+	// so already-completed phases are skipped (resume).
+	graph := memory.NewGraph(sessionID)
+
+	lootDb, err := memory.NewLootDB()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  [!] Loot DB init failed: %v\n", err)
+	} else {
+		defer lootDb.Close()
+	}
+
+	validator := agent.NewEvidenceValidator(provider)
+	tools := agent.NewToolRegistry(manifest, sb, validator, lootDb, cfg, graph, provider)
+
+	fmt.Printf("  [*] White-box assessment: url=%s repo=%s verify=%v\n", targetURL, repoPath, verify)
+
+	rep, err := whitebox.Run(context.Background(), whitebox.Config{
+		TargetURL: targetURL,
+		RepoPath:  repoPath,
+		SessionID: sessionID,
+		OutDir:    outDir,
+		Verify:    verify,
+	}, tools, graph, lootDb)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  [x] whitebox run failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	path, err := rep.Write(outDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  [x] writing report: %v\n", err)
+		os.Exit(1)
+	}
+
+	verified := 0
+	for _, f := range rep.Findings {
+		if f.Verified {
+			verified++
+		}
+	}
+	fmt.Printf("  [+] %d findings (%d verified). Report: %s\n", len(rep.Findings), verified, path)
 }
 
 // diagnoseProviderError turns a raw ping failure into an actionable message.

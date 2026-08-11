@@ -21,6 +21,7 @@ const (
 	LabelVulnerability NodeLabel = "Vulnerability"
 	LabelCredential    NodeLabel = "Credential"
 	LabelFlag          NodeLabel = "Flag"
+	LabelTask          NodeLabel = "Task"
 )
 
 type Node struct {
@@ -116,6 +117,15 @@ func (g *Graph) GetNodes() map[string]*Node {
 		nodes[id] = node
 	}
 	return nodes
+}
+
+// Edges returns a copy of the current relationship set.
+func (g *Graph) Edges() []*Edge {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	out := make([]*Edge, len(g.edges))
+	copy(out, g.edges)
+	return out
 }
 
 func (g *Graph) LabelCounts() map[NodeLabel]int {
