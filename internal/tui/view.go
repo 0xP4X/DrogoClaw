@@ -22,36 +22,40 @@ func (m Model) View() string {
 
 	layout := calculateLayout(m.width, m.height, 0)
 	mainWidth := layout.mainWidth
-	_, vpHeight := m.viewportDimensions()
+
+	inputArea := m.renderInputArea(mainWidth)
+	inputHeight := lipgloss.Height(inputArea)
+	layout = calculateLayout(m.width, m.height, inputHeight)
+
+	vpWidth, vpHeight := m.viewportDimensions()
 	output := m.viewport
-	mainPaneContentWidth := max(8, mainWidth-MainPaneStyle.GetHorizontalFrameSize())
-	output.Width = max(8, mainPaneContentWidth-OutputPaneStyle.GetHorizontalFrameSize())
+	output.Width = vpWidth
 	output.Height = vpHeight
+
+	mainPaneContentWidth := max(8, layout.mainWidth-MainPaneStyle.GetHorizontalFrameSize())
 
 	var mainPane string
 	if m.lines == nil || len(m.lines) == 0 {
-		mainPane = MainPaneStyle.Width(mainPaneContentWidth).Height(vpHeight).Render(
+		mainPane = MainPaneStyle.Width(mainPaneContentWidth).Height(layout.mainHeight).Render(
 			m.renderWelcome(),
 		)
 	} else {
-		mainPane = MainPaneStyle.Width(mainPaneContentWidth).Height(vpHeight).Render(output.View())
+		mainPane = MainPaneStyle.Width(mainPaneContentWidth).Height(layout.mainHeight).Render(output.View())
 	}
 
 	var sidebar string
 	if layout.sidebarWidth > 0 {
-		sidebar = m.renderSidebar(layout.sidebarWidth, m.height)
+		sidebar = m.renderSidebar(layout.sidebarWidth, layout.mainHeight)
 	}
 
 	var headerBar string
 	if layout.sidebarWidth > 0 {
-		headerBar = m.renderHeader(mainWidth + layout.sidebarWidth + 1)
+		headerBar = m.renderHeader(layout.mainWidth + layout.sidebarWidth + 1)
 	} else {
 		headerBar = m.renderHeader(m.width)
 	}
 
 	statusBar := m.renderStatusBar()
-
-	inputArea := m.renderInputArea(mainWidth)
 
 	if sidebar != "" {
 		return lipgloss.JoinVertical(lipgloss.Left,
@@ -117,7 +121,12 @@ func (m Model) renderWelcome() string {
 
 func (m Model) viewportDimensions() (width, height int) {
 	layout := calculateLayout(m.width, m.height, 4)
-	return layout.contentWidth, layout.contentHeight
+	inputHeight := lipgloss.Height(m.renderInputArea(layout.mainWidth))
+	layout = calculateLayout(m.width, m.height, inputHeight)
+
+	vpWidth := max(8, layout.mainWidth-MainPaneStyle.GetHorizontalFrameSize()-OutputPaneStyle.GetHorizontalFrameSize())
+	vpHeight := max(3, layout.mainHeight-MainPaneStyle.GetVerticalFrameSize())
+	return vpWidth, vpHeight
 }
 
 func (m Model) renderHeader(width int) string {
@@ -500,21 +509,30 @@ func (m *Model) appendBanner() {
 	m.appendLine("")
 }
 
-func (m *Model) updateViewportContent() {
-	layout := calculateLayout(m.width, m.height, 4)
-	inputHeight := lipgloss.Height(m.renderInputArea(layout.mainWidth))
-	layout = calculateLayout(m.width, m.height, inputHeight)
+func wrapStyledLine(line string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	wrapped := lipgloss.NewStyle().Width(width).Render(line)
+	lines := strings.Split(wrapped, "\n")
+	for i, l := range lines {
+		lines[i] = strings.TrimRight(l, " ")
+	}
+	return strings.Join(lines, "\n")
+}
 
-	contentWidth := layout.contentWidth
+func (m *Model) updateViewportContent() {
+	vpWidth, vpHeight := m.viewportDimensions()
+
 	var base string
-	if contentWidth > 4 {
+	if vpWidth > 4 {
 		wrapped := make([]string, len(m.lines))
 		for i, line := range m.lines {
-			wrapped[i] = truncateVisible(line, contentWidth)
+			wrapped[i] = wrapStyledLine(line, vpWidth)
 		}
 		base = strings.Join(wrapped, "\n")
 		if m.executing && m.currentResponse != "" {
-			base += "\n" + truncateVisible(m.renderAgentResponseString(m.currentResponse), contentWidth)
+			base += "\n" + wrapStyledLine(m.renderAgentResponseString(m.currentResponse), vpWidth)
 		}
 	} else {
 		base = strings.Join(m.lines, "\n")
@@ -523,8 +541,8 @@ func (m *Model) updateViewportContent() {
 		}
 	}
 
-	m.viewport.Width = contentWidth
-	m.viewport.Height = layout.contentHeight
+	m.viewport.Width = vpWidth
+	m.viewport.Height = vpHeight
 	m.viewport.SetContent(base)
 	if !m.userScrolledUp {
 		m.viewport.GotoBottom()
