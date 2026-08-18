@@ -82,17 +82,16 @@ func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 			m.appendLine(ToolDoneStyle.Render(fmt.Sprintf("  [done] %s  (%s)", ev.Tool, elapsed.Round(10*time.Millisecond))))
 		}
 
-		outputLines := strings.Split(ev.Result, "\n")
-		for i, line := range outputLines {
+		outputLines := sanitizeToolOutputLines(ev.Result)
+		for _, line := range outputLines {
 			prefix := "    "
-			if i < len(outputLines)-1 || strings.TrimSpace(line) != "" {
+			if !strings.HasPrefix(line, "    ") {
 				prefix = "    │ "
 			}
-			m.lines = append(m.lines, colorizeOutputLine(truncateLine(stripXMLTags(prefix+line))))
+			m.appendLine(colorizeOutputLine(truncateLine(stripXMLTags(prefix + strings.TrimPrefix(line, "    │ ")))))
 		}
 
 		m.activeToolLine = -1
-		m.updateViewportContent()
 
 	case agent.EvToken:
 		m.currentResponse += ev.Content
@@ -172,6 +171,30 @@ func colorizeOutputLine(raw string) string {
 	default:
 		return ToolOutputStyle.Render(raw)
 	}
+}
+
+func sanitizeToolOutputLines(result string) []string {
+	// Filter raw HTML index pages with font CSS dumps
+	if strings.Contains(result, "@font-face") || strings.Contains(result, "--mat-sys-") || strings.Contains(result, "<!DOCTYPE html>") {
+		return []string{"[HTML/CSS Web Response — OWASP Juice Shop App Index]"}
+	}
+	// Filter raw Express 500 stacktrace dumps
+	if strings.Contains(result, "Unexpected path:") && strings.Contains(result, "#stacktrace") {
+		lines := strings.Split(result, "\n")
+		for _, l := range lines {
+			if strings.Contains(l, "Error:") {
+				return []string{fmt.Sprintf("[HTTP 500 Server Error — %s]", strings.TrimSpace(l))}
+			}
+		}
+		return []string{"[HTTP 500 Server Error — Unexpected path]"}
+	}
+
+	lines := strings.Split(result, "\n")
+	if len(lines) > 25 {
+		truncated := append(lines[:20], fmt.Sprintf("... (%d additional lines hidden)", len(lines)-20))
+		return truncated
+	}
+	return lines
 }
 
 func waitForEvent(events <-chan agent.Event) tea.Cmd {
