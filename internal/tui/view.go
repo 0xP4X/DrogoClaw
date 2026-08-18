@@ -12,7 +12,6 @@ import (
 	"github.com/0xP4X/drogonclaw-go/internal/core"
 	"github.com/0xP4X/drogonclaw-go/internal/memory"
 	"github.com/0xP4X/drogonclaw-go/internal/skills"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -559,7 +558,7 @@ func (m *Model) appendLine(raw string) {
 	clean := stripXMLTags(raw)
 	if clean == "" {
 		m.lines = append(m.lines, "")
-		tea.Println("")
+		fmt.Println()
 		return
 	}
 
@@ -570,7 +569,7 @@ func (m *Model) appendLine(raw string) {
 
 	for _, line := range lines {
 		m.lines = append(m.lines, line)
-		tea.Println(line)
+		fmt.Println(line)
 	}
 	if len(m.lines) > maxOutputLines {
 		m.lines = truncateOutput(m.lines)
