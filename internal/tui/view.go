@@ -27,16 +27,8 @@ func (m Model) View() string {
 		sb.WriteString(m.renderWelcome())
 		sb.WriteString("\n\n")
 	} else {
-		// Display recent output lines fitted cleanly to terminal height
-		maxVisibleLines := max(3, m.height-5)
-		if m.executing {
-			maxVisibleLines = max(3, m.height-6)
-		}
-		startIdx := 0
-		if len(m.lines) > maxVisibleLines {
-			startIdx = len(m.lines) - maxVisibleLines
-		}
-		for i := startIdx; i < len(m.lines); i++ {
+		// Render output buffer lines cleanly so standard terminal scrollback is preserved
+		for i := 0; i < len(m.lines); i++ {
 			sb.WriteString(m.lines[i])
 			sb.WriteString("\n")
 		}
