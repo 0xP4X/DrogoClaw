@@ -231,11 +231,7 @@ var (
 				Foreground(ColorAccent).
 				Bold(true)
 
-	InputPaneStyle = lipgloss.NewStyle().
-			Border(lipgloss.NormalBorder(), true, false, false, false).
-			BorderForeground(ColorBorder).
-			Padding(0, 1).
-			Background(ColorBgInput)
+	InputPaneStyle = lipgloss.NewStyle()
 )
 
 // ─────────────────────────────────────────────────────────────────────────────

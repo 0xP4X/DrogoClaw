@@ -12,6 +12,7 @@ import (
 	"github.com/0xP4X/drogonclaw-go/internal/core"
 	"github.com/0xP4X/drogonclaw-go/internal/memory"
 	"github.com/0xP4X/drogonclaw-go/internal/skills"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -20,81 +21,46 @@ func (m Model) View() string {
 		return "Loading DrogonClaw..."
 	}
 
-	// First pass: get widths with placeholder heights so we can measure
-	// the actual rendered heights of the header and input area.
-	layout := calculateLayout(m.width, m.height, 0)
-	mainWidth := layout.mainWidth
+	var sb strings.Builder
 
-	// Measure header: HeaderBarBorderStyle has a bottom border, making it
-	// 2 lines tall — not 1. We measure rather than hard-code so any future
-	// style change is automatically accounted for.
-	headerWidth := m.width
-	if layout.sidebarWidth > 0 {
-		headerWidth = layout.mainWidth + layout.sidebarWidth + 1
+	// Render command autocomplete hints if user is typing a slash command
+	if len(m.hints) > 0 {
+		sb.WriteString(m.renderHints())
+		sb.WriteString("\n")
 	}
-	headerBar := m.renderHeader(headerWidth)
-	headerBarHeight := lipgloss.Height(headerBar)
 
-	// Measure input area (includes top border from InputPaneStyle).
-	inputArea := m.renderInputArea(mainWidth)
-	inputHeight := lipgloss.Height(inputArea)
+	// Render compact 1-line execution status while tool/agent is running
+	if m.executing {
+		tool := m.activeToolName
+		if tool == "" {
+			tool = m.lastTool
+		}
+		if tool == "" {
+			tool = "thinking"
+		}
+		elapsed := ""
+		if !m.execStartTime.IsZero() {
+			elapsed = time.Since(m.execStartTime).Round(time.Second).String()
+		}
+		phase := m.phase
+		if phase == "" {
+			phase = "executing"
+		}
 
-	// Second pass: recalculate layout with the true measured heights.
-	layout = calculateLayout(m.width, m.height, inputHeight+headerBarHeight)
-
-	vpWidth, vpHeight := m.viewportDimensions()
-	output := m.viewport
-	output.Width = vpWidth
-	output.Height = vpHeight
-
-	mainPaneContentWidth := max(8, layout.mainWidth-MainPaneStyle.GetHorizontalFrameSize())
-
-	// Subtract the style's own vertical frame (padding/border) so the
-	// *outer* rendered height equals layout.mainHeight exactly. Without
-	// this the view overflows by GetVerticalFrameSize() rows every frame,
-	// causing the terminal to scroll and leave ghost status-bar rows.
-	mainPaneInnerHeight := max(1, layout.mainHeight-MainPaneStyle.GetVerticalFrameSize())
-
-	var mainPane string
-	if m.lines == nil || len(m.lines) == 0 {
-		mainPane = MainPaneStyle.Width(mainPaneContentWidth).Height(mainPaneInnerHeight).Render(
-			m.renderWelcome(),
+		statusLine := fmt.Sprintf(" %s%s %s %s",
+			m.spinner.View(),
+			WarningStyle.Render(fmt.Sprintf("[%s]", strings.ToUpper(phase))),
+			HeaderDimStyle.Render(elapsed),
+			HeaderInfoStyle.Render("tool: "+tool),
 		)
-	} else {
-		mainPane = MainPaneStyle.Width(mainPaneContentWidth).Height(mainPaneInnerHeight).Render(output.View())
+		sb.WriteString(statusLine)
+		sb.WriteString("\n")
 	}
 
-	var sidebar string
-	if layout.sidebarWidth > 0 {
-		// Pass the inner height (outer = mainHeight) to renderSidebar.
-		sidebarInnerHeight := max(1, layout.mainHeight-SidebarPaneStyle.GetVerticalFrameSize())
-		sidebar = m.renderSidebar(layout.sidebarWidth, sidebarInnerHeight)
-	}
+	// Render input prompt line
+	sb.WriteString(m.renderInputArea(m.width))
 
-	// Re-render header with correct widths from second-pass layout.
-	headerWidth = m.width
-	if layout.sidebarWidth > 0 {
-		headerWidth = layout.mainWidth + layout.sidebarWidth + 1
-	}
-	headerBar = m.renderHeader(headerWidth)
-
-	statusBar := m.renderStatusBar()
-
-	if sidebar != "" {
-		return lipgloss.JoinVertical(lipgloss.Left,
-			headerBar,
-			lipgloss.JoinHorizontal(lipgloss.Left, mainPane, sidebar),
-			inputArea,
-			statusBar,
-		)
-	}
-
-	return lipgloss.JoinVertical(lipgloss.Left,
-		headerBar,
-		mainPane,
-		inputArea,
-		statusBar,
-	)
+	return sb.String()
 }
 
 func (m Model) renderWelcome() string {
@@ -593,7 +559,7 @@ func (m *Model) appendLine(raw string) {
 	clean := stripXMLTags(raw)
 	if clean == "" {
 		m.lines = append(m.lines, "")
-		m.updateViewportContent()
+		tea.Println("")
 		return
 	}
 
@@ -603,12 +569,12 @@ func (m *Model) appendLine(raw string) {
 	}
 
 	for _, line := range lines {
-		m.lines = append(m.lines, truncateLine(line))
+		m.lines = append(m.lines, line)
+		tea.Println(line)
 	}
 	if len(m.lines) > maxOutputLines {
 		m.lines = truncateOutput(m.lines)
 	}
-	m.updateViewportContent()
 }
 
 func (m Model) renderAgentResponseString(content string) string {
@@ -780,6 +746,21 @@ var allHints = []cmdHint{
 	{"/help", "Show complete command reference"},
 	{"/clear", "Clear terminal output screen"},
 	{"/exit", "Terminate session gracefully"},
+}
+
+func (m Model) renderHints() string {
+	if len(m.hints) == 0 {
+		return ""
+	}
+	var lines []string
+	for i, h := range m.hints {
+		prefix := "  "
+		if i == m.selectedHint {
+			prefix = " >"
+		}
+		lines = append(lines, fmt.Sprintf("%s %-12s %s", prefix, HintCmdStyle.Render(h.cmd), HintDescStyle.Render(h.desc)))
+	}
+	return strings.Join(lines, "\n")
 }
 
 func matchHints(input string) []cmdHint {
