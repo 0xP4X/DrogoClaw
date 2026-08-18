@@ -234,6 +234,13 @@ func (m *Model) handleSlashCommand(raw string) (Model, tea.Cmd) {
 			m.appendLine(line)
 		}
 
+	case "/cost":
+		if m.tracker == nil {
+			m.appendLine(WarningStyle.Render("  [!] No token tracker active."))
+		} else {
+			m.appendLine(m.tracker.Render())
+		}
+
 	case "/health":
 		m.appendLine(SpinnerStyle.Render("  [*] Running diagnostic checks..."))
 		m.phase = "verifying"
@@ -277,6 +284,9 @@ func (m *Model) handleSlashCommand(raw string) (Model, tea.Cmd) {
 
 	case "/copy":
 		m.appendLine(m.copyConversation())
+
+	case "/benchmarks":
+		m.appendLine(m.renderBenchmarks())
 
 	case "/help":
 		m.appendLine(renderHelp())
@@ -363,27 +373,33 @@ func (m *Model) copyConversation() string {
 		fmt.Sprintf("  [i] Transcript (%d lines) saved to %s — open it outside DrogonClaw to copy (clipboard unavailable here).", len(m.lines), path))
 }
 
+// PagerFinishedMsg is sent after the external pager process completes.
+type PagerFinishedMsg struct {
+	Err  error
+	Path string
+}
+
 // openViewportInPager writes the current viewport content to a temp file and
-// opens it in the user's pager so they can freely select and copy any part of
-// the output without the sidebar or input area getting in the way.
-func (m *Model) openViewportInPager() string {
+// opens it in the user's pager using tea.ExecProcess so terminal raw mode
+// is safely suspended and restored.
+func (m *Model) openViewportInPager() (tea.Cmd, string) {
 	content := m.viewport.View()
 	if strings.TrimSpace(content) == "" {
-		return WarningStyle.Render("  [!] Nothing to view yet.")
+		return nil, WarningStyle.Render("  [!] Nothing to view yet.")
 	}
 
 	plain := stripANSI(stripXMLTags(content))
 
 	tmpFile, err := os.CreateTemp("", "drogonclaw-output-*.txt")
 	if err != nil {
-		return ErrorStyle.Render(fmt.Sprintf("  [x] Could not create temp file: %v", err))
+		return nil, ErrorStyle.Render(fmt.Sprintf("  [x] Could not create temp file: %v", err))
 	}
 	tmpPath := tmpFile.Name()
 	_ = tmpFile.Close()
 
 	if werr := os.WriteFile(tmpPath, []byte(plain+"\n"), 0600); werr != nil {
 		os.Remove(tmpPath)
-		return ErrorStyle.Render(fmt.Sprintf("  [x] Could not write output: %v", werr))
+		return nil, ErrorStyle.Render(fmt.Sprintf("  [x] Could not write output: %v", werr))
 	}
 
 	pager := os.Getenv("PAGER")
@@ -391,18 +407,10 @@ func (m *Model) openViewportInPager() string {
 		pager = "less -R"
 	}
 
-	cmd := exec.Command("sh", "-c", pager+" "+tmpPath)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		os.Remove(tmpPath)
-		return WarningStyle.Render(fmt.Sprintf("  [~] Pager exited: %v", err))
-	}
-
-	os.Remove(tmpPath)
-	return InfoStyle.Render("  [i] Returned to DrogonClaw.")
+	c := exec.Command("sh", "-c", pager+" "+tmpPath)
+	return tea.ExecProcess(c, func(err error) tea.Msg {
+		return PagerFinishedMsg{Err: err, Path: tmpPath}
+	}), ""
 }
 
 // copyToClipboard attempts a native clipboard tool (xclip/wl-copy/pbcopy/...).

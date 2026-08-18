@@ -60,3 +60,6 @@ tests/
 
 # Generic scaffold scripts (not part of DrogonClaw)
 scripts/setup/
+
+# Go build cache
+.gocache/

@@ -13,6 +13,7 @@ import (
 
 	"github.com/0xP4X/drogonclaw-go/internal/agent"
 	"github.com/0xP4X/drogonclaw-go/internal/benchmark"
+	"github.com/0xP4X/drogonclaw-go/internal/billing"
 	"github.com/0xP4X/drogonclaw-go/internal/config"
 	"github.com/0xP4X/drogonclaw-go/internal/core"
 	"github.com/0xP4X/drogonclaw-go/internal/gateway"
@@ -130,6 +131,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  [x] Startup failed: %v\n", err)
 		os.Exit(1)
 	}
+	tracker := billing.New(nil)
+	provider.SetUsageCallback(tracker.Record)
 
 	if sb == nil {
 		fmt.Fprintf(os.Stderr, "  [x] Sandbox initialization failed\n")
@@ -185,6 +188,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  [x] TUI init failed: %v\n", err)
 		os.Exit(1)
 	}
+	model.SetTracker(tracker)
 
 	model.SetPromptRefresher(func() string {
 		return agent.BuildSystemPrompt(graph, opsecMgr, "", sb.RuntimeLabel())

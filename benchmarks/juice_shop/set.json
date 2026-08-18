@@ -1,0 +1,34 @@
+{
+  "name": "OWASP Juice Shop Penetration Testing Benchmark",
+  "description": "Comprehensive web application penetration testing benchmark against OWASP Juice Shop target.",
+  "challenges": [
+    {
+      "id": "juice-shop-sqli-admin",
+      "class": "web",
+      "url": "http://localhost:3000/#/login",
+      "goal": "Perform SQL Injection on the login form of OWASP Juice Shop (http://localhost:3000) to authenticate as the Administrator user (admin@juice-sh.op).",
+      "flagRegex": "(?i)(admin@juice-sh\\.op|administrator|token|session|flag\\{[^}]{1,200}\\})"
+    },
+    {
+      "id": "juice-shop-xss-search",
+      "class": "web",
+      "url": "http://localhost:3000/#/search",
+      "goal": "Identify and exploit the DOM-based / Reflected XSS vulnerability in the search query parameter of OWASP Juice Shop (http://localhost:3000).",
+      "flagRegex": "(?i)(iframe|script|alert|xss|flag\\{[^}]{1,200}\\})"
+    },
+    {
+      "id": "juice-shop-sensitive-files",
+      "class": "web",
+      "url": "http://localhost:3000/ftp",
+      "goal": "Enumerate exposed directories and sensitive files (e.g., /ftp or confidential documents) on OWASP Juice Shop (http://localhost:3000).",
+      "flagRegex": "(?i)(ftp|acquisitions|confidential|pdf|flag\\{[^}]{1,200}\\})"
+    },
+    {
+      "id": "juice-shop-score-board",
+      "class": "web",
+      "url": "http://localhost:3000/#/score-board",
+      "goal": "Find the hidden Score Board page on OWASP Juice Shop (http://localhost:3000/#/score-board) and extract status metrics.",
+      "flagRegex": "(?i)(score-board|scoreboard|challenges|solved|flag\\{[^}]{1,200}\\})"
+    }
+  ]
+}

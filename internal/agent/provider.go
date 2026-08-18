@@ -19,8 +19,9 @@ import (
 
 // Provider wraps the OpenAI-compatible client for all LLM providers.
 type Provider struct {
-	client *openai.Client
-	model  string
+	client  *openai.Client
+	model   string
+	onUsage func(model string, prompt, completion int64)
 }
 
 var providerXMLTagRegex = regexp.MustCompile(`(?s)<environment_details>.*?</environment_details>|<[^>]+>`)
@@ -51,6 +52,19 @@ func NewProvider(cfg *config.Manager) *Provider {
 	return p
 }
 
+// SetUsageCallback registers a hook that fires after every successful LLM
+// call with the model name and token counts. Used by internal/billing to
+// track session cost without coupling Provider to a specific billing impl.
+func (p *Provider) SetUsageCallback(fn func(model string, prompt, completion int64)) {
+	p.onUsage = fn
+}
+
+func (p *Provider) recordUsage(prompt, completion int64) {
+	if p.onUsage != nil {
+		p.onUsage(p.model, prompt, completion)
+	}
+}
+
 // CompletionResponse from the LLM.
 type CompletionResponse struct {
 	Message   openai.ChatCompletionMessage
@@ -78,6 +92,9 @@ func (p *Provider) Complete(ctx context.Context, messages []openai.ChatCompletio
 			choice := resp.Choices[0]
 			if choice.Message.Content != "" {
 				choice.Message.Content = stripProviderXMLTags(choice.Message.Content)
+			}
+			if resp.Usage.TotalTokens > 0 {
+				p.recordUsage(resp.Usage.PromptTokens, resp.Usage.CompletionTokens)
 			}
 			return &CompletionResponse{
 				Message:   choice.Message,
@@ -136,6 +153,9 @@ func (p *Provider) StreamFinal(ctx context.Context, messages []openai.ChatComple
 				return sb.String(), err
 			}
 			continue
+		}
+		if last := stream.Current(); last.Usage.TotalTokens > 0 {
+			p.recordUsage(last.Usage.PromptTokens, last.Usage.CompletionTokens)
 		}
 		return sb.String(), nil
 	}

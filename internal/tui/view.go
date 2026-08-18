@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -294,6 +295,16 @@ func (m Model) renderSidebar(width, height int) string {
 		row("Detail", HintDescStyle.Render(truncate(m.phaseDetail, max(1, width-14))))
 	}
 
+	if m.tracker != nil {
+		section("COST")
+		total := m.tracker.Total()
+		cost := m.tracker.TotalCost()
+		row("Prompt tokens", fmt.Sprintf("%d", total.PromptTokens))
+		row("Completion tokens", fmt.Sprintf("%d", total.CompletionTokens))
+		row("Total tokens", fmt.Sprintf("%d", total.TotalTokens))
+		row("Est. cost", fmt.Sprintf("$%.4f", cost))
+	}
+
 	if len(m.promptQueue) > 0 {
 		section("QUEUE")
 		limit := len(m.promptQueue)
@@ -415,6 +426,20 @@ func (m Model) renderInputArea(mainWidth int) string {
 		m.input.SetHeight(clamp(totalLines, 1, 3))
 	}
 
+	if len(m.promptQueue) > 0 {
+		var qItems []string
+		for i, q := range m.promptQueue {
+			qItems = append(qItems, fmt.Sprintf("%d. %s", i+1, truncate(q, 25)))
+			if i >= 2 {
+				if len(m.promptQueue) > 3 {
+					qItems = append(qItems, fmt.Sprintf("+%d more", len(m.promptQueue)-3))
+				}
+				break
+			}
+		}
+		lines = append(lines, QueueStyle.Render(fmt.Sprintf(" ⏳ QUEUE (%d): %s", len(m.promptQueue), strings.Join(qItems, " │ "))))
+	}
+
 	lines = append(lines, glyph+m.input.View())
 	if m.pendingConfirm != "" {
 		lines = append(lines, WarningStyle.Render("Action requires exact confirmation: type "+m.confirmationPhrase()+" or Enter to cancel."))
@@ -506,9 +531,11 @@ func (m *Model) updateViewportContent() {
 	}
 }
 
-func (m *Model) appendLine(line string) {
-	line = truncateLine(stripXMLTags(line))
-	m.lines = append(m.lines, line)
+func (m *Model) appendLine(raw string) {
+	clean := stripXMLTags(raw)
+	for _, line := range strings.Split(clean, "\n") {
+		m.lines = append(m.lines, truncateLine(line))
+	}
 	if len(m.lines) > maxOutputLines {
 		m.lines = truncateOutput(m.lines)
 	}
@@ -655,10 +682,11 @@ func fallback(value, def string) string {
 
 var allHints = []cmdHint{
 	{"/health", "Verify runtime environment and dependencies"},
-	{"/mode", "Select active workflow"},
-	{"/analyze", "Classify a target and determine attack path"},
+	{"/mode", "Select active workflow methodology"},
+	{"/analyze", "Classify target and determine attack path"},
 	{"/skills", "List and search available execution modules"},
 	{"/status", "Display current session and workspace details"},
+	{"/cost", "Show current API token usage and estimated cost"},
 	{"/stealth", "Toggle evasive timing policy"},
 	{"/auto", "Toggle autonomous execution mode"},
 	{"/profile", "Build passive target profile"},
@@ -666,10 +694,15 @@ var allHints = []cmdHint{
 	{"/report", "Generate structured pentest report"},
 	{"/swarm", "Run a parallel task group"},
 	{"/queue", "Show queued prompts waiting to run"},
+	{"/sections", "List all previous saved session sections"},
+	{"/section", "Switch to a previous saved session section"},
+	{"/copy", "Export transcript to clipboard and text file"},
+	{"/benchmarks", "Display benchmark statistics and Mermaid charts"},
 	{"/sandbox", "Toggle container sandbox execution"},
 	{"/persona", "Inject custom agent persona prompt"},
 	{"/new", "Clear session memory and start clean"},
 	{"/resume", "Resume interrupted execution checkpoint"},
+	{"/help", "Show complete command reference"},
 	{"/clear", "Clear terminal output screen"},
 	{"/exit", "Terminate session gracefully"},
 }
@@ -721,6 +754,7 @@ func renderHelp() string {
 			{"/report", "Generate structured pentest report"},
 			{"/swarm", "Run a parallel task group"},
 			{"/queue", "Show queued prompts waiting to run"},
+			{"/benchmarks", "Display benchmark statistics & Mermaid charts"},
 		},
 		"CONTROLS": {
 			{"/stealth", "Toggle rate limiting policy"},
@@ -802,4 +836,20 @@ var xmlTagRegex = regexp.MustCompile(`(?s)<environment_details>.*?</environment_
 
 func stripXMLTags(s string) string {
 	return xmlTagRegex.ReplaceAllString(s, "")
+}
+
+func (m Model) renderBenchmarks() string {
+	content, err := os.ReadFile("BENCHMARKS.md")
+	if err != nil {
+		content, err = os.ReadFile("../../BENCHMARKS.md")
+	}
+	if err != nil {
+		return ErrorStyle.Render("  [✗] BENCHMARKS.md file not found in workspace root.")
+	}
+
+	rendered, err := m.mdRenderer.Render(string(content))
+	if err != nil {
+		return string(content)
+	}
+	return rendered
 }

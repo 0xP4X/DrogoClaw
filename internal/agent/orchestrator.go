@@ -209,6 +209,15 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 	}
 	messages := BuildMessages(o.sysPrompt, memoryCtx, o.history, userMsg)
 
+	// Track this turn in history so recovery resumes with context instead of
+	// feeling like a brand-new run.
+	o.history = append(o.history, openai.UserMessage(userMsg))
+	o.retainHistory()
+
+	// Snapshot history length so we can recover this turn's messages on error
+	// without losing the in-flight tool-call context.
+	historyLen := len(o.history)
+
 	maxIter := o.maxIterations
 	for i := 0; i < maxIter; i++ {
 		resp, err := o.provider.Complete(ctx, messages, o.tools.Definitions())
@@ -220,6 +229,16 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 				}
 				return context.DeadlineExceeded
 			}
+			// Preserve this turn's conversation state so a follow-up like
+			// "continue" resumes with context instead of feeling like a new run.
+			startIdx := 1
+			if memoryCtx != "" {
+				startIdx = 2
+			}
+			if len(messages) > startIdx+historyLen {
+				o.history = append(o.history, messages[startIdx+historyLen:]...)
+				o.retainHistory()
+			}
 			if o.actions != nil {
 				o.actions.Finish("failed", err.Error())
 			}
@@ -229,6 +248,8 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 
 		// Append assistant message to history
 		messages = append(messages, resp.Message.ToParam())
+		o.history = append(o.history, resp.Message.ToParam())
+		o.retainHistory()
 
 		// --- Fallback Parser for Raw JSON Tool Calls ---
 		// Some uncensored models fail to use the native ToolCalls API and output JSON directly.
@@ -272,12 +293,9 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 			events <- Event{Type: EvToken, Content: finalContent}
 			events <- Event{Type: EvDone, Content: finalContent}
 
-			// Save to history
-			o.history = append(o.history,
-				openai.UserMessage(userMsg),
-				resp.Message.ToParam(),
-			)
-			o.retainHistory()
+		// Save to history
+		o.history = append(o.history, resp.Message.ToParam())
+		o.retainHistory()
 			if o.actions != nil {
 				o.actions.Finish("completed", "")
 			}
@@ -339,24 +357,28 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 		_ = reason
 
 		events <- Event{Type: EvToolDone, Tool: tc.Function.Name, Result: result}
-			messages = append(messages, openai.ToolMessage(tc.ID, result))
+		messages = append(messages, openai.ToolMessage(tc.ID, result))
+		o.history = append(o.history, openai.ToolMessage(tc.ID, result))
+		o.retainHistory()
 
-			if strings.Contains(result, "[HitL_SUSPENDED]") {
-				events <- Event{Type: EvStatus, Content: "Agent execution suspended. Awaiting human approval..."}
+		if strings.Contains(result, "[HitL_SUSPENDED]") {
+			events <- Event{Type: EvStatus, Content: "Agent execution suspended. Awaiting human approval..."}
 
-				// Block on the approval event rather than consuming a CPU core while waiting.
-				if err := core.GlobalHitL.Wait(ctx); err != nil {
-					if o.actions != nil {
-						o.actions.Finish("interrupted", err.Error())
-					}
-					return err
+			// Block on the approval event rather than consuming a CPU core while waiting.
+			if err := core.GlobalHitL.Wait(ctx); err != nil {
+				if o.actions != nil {
+					o.actions.Finish("interrupted", err.Error())
 				}
-
-				// Once answered, inject the answer into the loop context as if the tool returned it
-				ans := core.GlobalHitL.ConsumeAnswer()
-				messages = append(messages, openai.UserMessage(fmt.Sprintf("Human-in-the-loop response: %s", ans)))
-				events <- Event{Type: EvStatus, Content: "Approval received. Resuming execution..."}
+				return err
 			}
+
+			// Once answered, inject the answer into the loop context as if the tool returned it
+			ans := core.GlobalHitL.ConsumeAnswer()
+			messages = append(messages, openai.UserMessage(fmt.Sprintf("Human-in-the-loop response: %s", ans)))
+			o.history = append(o.history, openai.UserMessage(fmt.Sprintf("Human-in-the-loop response: %s", ans)))
+			o.retainHistory()
+			events <- Event{Type: EvStatus, Content: "Approval received. Resuming execution..."}
+		}
 		}
 	}
 

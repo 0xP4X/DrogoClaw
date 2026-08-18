@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/0xP4X/drogonclaw-go/internal/agent"
+	"github.com/0xP4X/drogonclaw-go/internal/billing"
 	"github.com/0xP4X/drogonclaw-go/internal/config"
 	"github.com/0xP4X/drogonclaw-go/internal/core"
 	"github.com/0xP4X/drogonclaw-go/internal/intel"
@@ -81,6 +82,7 @@ type Model struct {
 	promptQueue         []string
 	pendingApprovalTool string
 	pendingApprovalEst  string
+	tracker             *billing.Tracker
 }
 
 type cmdHint struct {
@@ -197,8 +199,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if msg.Type == tea.KeyF3 {
-			m.appendLine(m.openViewportInPager())
-			return m, nil
+			cmd, msgStr := m.openViewportInPager()
+			if msgStr != "" {
+				m.appendLine(msgStr)
+			}
+			return m, cmd
 		}
 
 		if m.pendingConfirm != "" {
@@ -347,7 +352,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Executing and not awaiting approval: queue the prompt to run
 			// automatically once the current task completes.
 			m.promptQueue = append(m.promptQueue, rawInput)
-			m.appendLine(QueueStyle.Render(fmt.Sprintf("  [⏳] Queued (%d) — runs after current task: %s", len(m.promptQueue), rawInput)))
 			return m, nil
 		}
 
@@ -448,6 +452,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.appendLine(ToolDoneStyle.Render("  [OK] Setup complete. Configuration reloaded."))
 		}
 		cmds = append(cmds, textarea.Blink)
+
+	case PagerFinishedMsg:
+		if msg.Path != "" {
+			_ = os.Remove(msg.Path)
+		}
+		if msg.Err != nil {
+			m.appendLine(WarningStyle.Render(fmt.Sprintf("  [~] Pager exited: %v", msg.Err)))
+		} else {
+			m.appendLine(InfoStyle.Render("  [i] Returned to DrogonClaw."))
+		}
 
 	case tea.QuitMsg:
 		return m, tea.Quit
@@ -614,6 +628,10 @@ var PromptRefreshFn func() string
 
 func (m *Model) SetPromptRefresher(fn func() string) {
 	m.promptRefresher = fn
+}
+
+func (m *Model) SetTracker(t *billing.Tracker) {
+	m.tracker = t
 }
 
 func (m *Model) eventsCh() <-chan agent.Event {

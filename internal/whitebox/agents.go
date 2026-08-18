@@ -265,6 +265,17 @@ func parseNuclei(out, url string, id func() string, src string) []Finding {
 		if !strings.Contains(low, "http") && !strings.Contains(low, "cve") {
 			continue
 		}
+		// Skip nuclei metadata / empty-scan lines.
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "[NUCLEI —") {
+			continue
+		}
+		if strings.Contains(low, "scan complete") ||
+			strings.Contains(low, "no vulnerabilities found") ||
+			strings.Contains(low, "no matches") ||
+			strings.Contains(low, "no results") {
+			continue
+		}
 		if strings.Contains(low, "[info]") && !strings.Contains(low, "cve") {
 			continue // skip pure informational matchers
 		}
@@ -286,10 +297,14 @@ func parseNuclei(out, url string, id func() string, src string) []Finding {
 		if cve != "" {
 			title = cve
 		}
+		cls := classFromNuclei(line)
+		if cls == "" {
+			continue
+		}
 		out2 = append(out2, Finding{
 			ID:       id(),
 			Title:    title,
-			Class:    classFromNuclei(line),
+			Class:    cls,
 			Severity: sev,
 			Target:   url,
 			Location: firstURL(line),
@@ -316,7 +331,7 @@ func classFromNuclei(line string) string {
 	case strings.Contains(low, "idor") || strings.Contains(low, "access-control") || strings.Contains(low, "authz"):
 		return "authz"
 	default:
-		return "injection"
+		return ""
 	}
 }
 

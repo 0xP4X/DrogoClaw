@@ -20,6 +20,7 @@ services:
       - ./data:/app/data
       - ./skills:/app/skills
       - ./reports:/app/reports
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - drogonclaw-network
     restart: unless-stopped

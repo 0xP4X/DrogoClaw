@@ -1,0 +1,260 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "runs": [
+    {
+      "results": [
+        {
+          "ruleId": "injection",
+          "level": "warning",
+          "message": {
+            "text": "Nuclei match"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http://localhost:3000"
+                },
+                "region": {
+                  "snippet": {
+                    "text": "[NUCLEI — http://localhost:3000]"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "poc": "nuclei -u http://localhost:3000 -silent",
+            "severity": "medium",
+            "source": "recon",
+            "verified": false
+          }
+        },
+        {
+          "ruleId": "injection",
+          "level": "warning",
+          "message": {
+            "text": "Nuclei match"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http://localhost:3000"
+                },
+                "region": {
+                  "snippet": {
+                    "text": "[\u001b[92mprometheus-metrics\u001b[0m] [\u001b[94mhttp\u001b[0m] [\u001b[33mmedium\u001b[0m] http://localhost:3000/metrics"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "poc": "nuclei -u http://localhost:3000 -silent",
+            "severity": "medium",
+            "source": "recon",
+            "verified": false
+          }
+        },
+        {
+          "ruleId": "injection",
+          "level": "warning",
+          "message": {
+            "text": "Nuclei match"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http://localhost:3000"
+                },
+                "region": {
+                  "snippet": {
+                    "text": "[nuclei] Scan complete on http://localhost:3000 — No vulnerabilities found matching severity: critical,high,medium"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "poc": "nuclei -u http://localhost:3000 -silent",
+            "severity": "medium",
+            "source": "dast",
+            "verified": false
+          }
+        },
+        {
+          "ruleId": "injection",
+          "level": "warning",
+          "message": {
+            "text": "Nuclei match"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http://localhost:3000"
+                },
+                "region": {
+                  "snippet": {
+                    "text": "[nuclei] Scan complete on http://localhost:3000 — No vulnerabilities found matching severity: critical,high,medium"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "poc": "nuclei -u http://localhost:3000 -silent",
+            "severity": "medium",
+            "source": "dast",
+            "verified": false
+          }
+        },
+        {
+          "ruleId": "injection",
+          "level": "warning",
+          "message": {
+            "text": "Nuclei match"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http://localhost:3000"
+                },
+                "region": {
+                  "snippet": {
+                    "text": "[nuclei] Scan complete on http://localhost:3000 — No vulnerabilities found matching severity: critical,high,medium"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "poc": "nuclei -u http://localhost:3000 -silent",
+            "severity": "medium",
+            "source": "dast",
+            "verified": false
+          }
+        },
+        {
+          "ruleId": "injection",
+          "level": "warning",
+          "message": {
+            "text": "Nuclei match"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http://localhost:3000"
+                },
+                "region": {
+                  "snippet": {
+                    "text": "[nuclei] Scan complete on http://localhost:3000 — No vulnerabilities found matching severity: critical,high,medium"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "poc": "nuclei -u http://localhost:3000 -silent",
+            "severity": "medium",
+            "source": "dast",
+            "verified": false
+          }
+        },
+        {
+          "ruleId": "authn",
+          "level": "error",
+          "message": {
+            "text": "Authentication weakness from auth_bypass_scan"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http://localhost:3000"
+                },
+                "region": {
+                  "snippet": {
+                    "text": "Starting Auth Bypass \u0026 Logic Flaw Scan on http://localhost:3000\n\n==\u003e [1] SQLi in common login parameters\nNo obvious SQLi\n\n==\u003e [2] SQLi in JSON login payload\nNo obvious JSON SQLi\n\n==\u003e [3] Parameter Pollution (duplicate admin/role)\nNo parameter pollution admin reflection\n\n==\u003e [4] Password Reset Poisoning (Host Header Injection)\nNo Host header reflection found\n\n==\u003e [5] Basic Default Credentials Test "
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "poc": "auth_bypass_scan against http://localhost:3000",
+            "severity": "critical",
+            "source": "dast",
+            "verified": false
+          }
+        },
+        {
+          "ruleId": "injection",
+          "level": "warning",
+          "message": {
+            "text": "Nuclei match"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http://localhost:3000"
+                },
+                "region": {
+                  "snippet": {
+                    "text": "[nuclei] Scan complete on http://localhost:3000 — No vulnerabilities found matching severity: critical,high,medium"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "poc": "nuclei -u http://localhost:3000 -silent",
+            "severity": "medium",
+            "source": "dast",
+            "verified": false
+          }
+        },
+        {
+          "ruleId": "injection",
+          "level": "warning",
+          "message": {
+            "text": "Nuclei match"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http://localhost:3000"
+                },
+                "region": {
+                  "snippet": {
+                    "text": "[nuclei] Scan complete on http://localhost:3000 — No vulnerabilities found matching severity: critical,high,medium"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "poc": "nuclei -u http://localhost:3000 -silent",
+            "severity": "medium",
+            "source": "dast",
+            "verified": false
+          }
+        }
+      ],
+      "tool": {
+        "driver": {
+          "informationUri": "https://github.com/0xP4X/drogonclaw",
+          "name": "DrogonClaw WhiteBox",
+          "version": "whitebox-0.1"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}

@@ -63,7 +63,7 @@ go build -o drogonclaw ./cmd/drogonclaw/
 
 Once built, run `./drogonclaw` to launch the terminal interface.
 
-*(Note: DrogonClaw is a pure Go project — there is no separate TypeScript/Node.js version.)*
+*(Note: DrogonClaw is built with a Go control plane — it compiles directly to a native Linux binary.)*
 
 ### Install (From npm)
 
