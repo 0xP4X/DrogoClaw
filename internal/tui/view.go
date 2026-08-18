@@ -34,18 +34,26 @@ func (m Model) View() string {
 
 	mainPaneContentWidth := max(8, layout.mainWidth-MainPaneStyle.GetHorizontalFrameSize())
 
+	// Subtract the style's own vertical frame (padding/border) so the
+	// *outer* rendered height equals layout.mainHeight exactly. Without
+	// this the view overflows by GetVerticalFrameSize() rows every frame,
+	// causing the terminal to scroll and leave ghost status-bar rows.
+	mainPaneInnerHeight := max(1, layout.mainHeight-MainPaneStyle.GetVerticalFrameSize())
+
 	var mainPane string
 	if m.lines == nil || len(m.lines) == 0 {
-		mainPane = MainPaneStyle.Width(mainPaneContentWidth).Height(layout.mainHeight).Render(
+		mainPane = MainPaneStyle.Width(mainPaneContentWidth).Height(mainPaneInnerHeight).Render(
 			m.renderWelcome(),
 		)
 	} else {
-		mainPane = MainPaneStyle.Width(mainPaneContentWidth).Height(layout.mainHeight).Render(output.View())
+		mainPane = MainPaneStyle.Width(mainPaneContentWidth).Height(mainPaneInnerHeight).Render(output.View())
 	}
 
 	var sidebar string
 	if layout.sidebarWidth > 0 {
-		sidebar = m.renderSidebar(layout.sidebarWidth, layout.mainHeight)
+		// Pass the inner height (outer = mainHeight) to renderSidebar.
+		sidebarInnerHeight := max(1, layout.mainHeight-SidebarPaneStyle.GetVerticalFrameSize())
+		sidebar = m.renderSidebar(layout.sidebarWidth, sidebarInnerHeight)
 	}
 
 	var headerBar string
