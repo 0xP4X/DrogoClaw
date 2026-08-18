@@ -22,6 +22,26 @@ func (m Model) View() string {
 
 	var sb strings.Builder
 
+	// Render header banner at the top if output buffer is clean
+	if len(m.lines) == 0 {
+		sb.WriteString(m.renderWelcome())
+		sb.WriteString("\n\n")
+	} else {
+		// Display recent output lines fitted cleanly to terminal height
+		maxVisibleLines := max(3, m.height-5)
+		if m.executing {
+			maxVisibleLines = max(3, m.height-6)
+		}
+		startIdx := 0
+		if len(m.lines) > maxVisibleLines {
+			startIdx = len(m.lines) - maxVisibleLines
+		}
+		for i := startIdx; i < len(m.lines); i++ {
+			sb.WriteString(m.lines[i])
+			sb.WriteString("\n")
+		}
+	}
+
 	// Render command autocomplete hints if user is typing a slash command
 	if len(m.hints) > 0 {
 		sb.WriteString(m.renderHints())
@@ -558,7 +578,6 @@ func (m *Model) appendLine(raw string) {
 	clean := stripXMLTags(raw)
 	if clean == "" {
 		m.lines = append(m.lines, "")
-		fmt.Println()
 		return
 	}
 
@@ -569,7 +588,6 @@ func (m *Model) appendLine(raw string) {
 
 	for _, line := range lines {
 		m.lines = append(m.lines, line)
-		fmt.Println(line)
 	}
 	if len(m.lines) > maxOutputLines {
 		m.lines = truncateOutput(m.lines)
