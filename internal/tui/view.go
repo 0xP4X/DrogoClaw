@@ -551,7 +551,18 @@ func (m *Model) updateViewportContent() {
 
 func (m *Model) appendLine(raw string) {
 	clean := stripXMLTags(raw)
-	for _, line := range strings.Split(clean, "\n") {
+	if clean == "" {
+		m.lines = append(m.lines, "")
+		m.updateViewportContent()
+		return
+	}
+
+	lines := strings.Split(clean, "\n")
+	if len(lines) > 1 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+
+	for _, line := range lines {
 		m.lines = append(m.lines, truncateLine(line))
 	}
 	if len(m.lines) > maxOutputLines {
@@ -566,11 +577,17 @@ func (m Model) renderAgentResponseString(content string) string {
 	if err != nil || rendered == "" {
 		rendered = strings.TrimRight(clean, "\n")
 	}
-	var lines []string
-	for _, line := range strings.Split(rendered, "\n") {
-		lines = append(lines, truncateLine(line))
+	
+	lines := strings.Split(rendered, "\n")
+	for len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
 	}
-	return strings.Join(lines, "\n")
+
+	var processed []string
+	for _, line := range lines {
+		processed = append(processed, truncateLine(line))
+	}
+	return strings.Join(processed, "\n")
 }
 
 func (m Model) renderGraphSummary(graph *memory.Graph) string {
