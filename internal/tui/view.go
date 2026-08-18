@@ -23,15 +23,10 @@ func (m Model) View() string {
 	var sb strings.Builder
 
 	// Render header banner at the top if output buffer is clean
-	if len(m.lines) == 0 {
+	if !m.bannerShown {
+		m.bannerShown = true
 		sb.WriteString(m.renderWelcome())
 		sb.WriteString("\n\n")
-	} else {
-		// Render output buffer lines cleanly so standard terminal scrollback is preserved
-		for i := 0; i < len(m.lines); i++ {
-			sb.WriteString(m.lines[i])
-			sb.WriteString("\n")
-		}
 	}
 
 	// Render command autocomplete hints if user is typing a slash command
@@ -570,6 +565,7 @@ func (m *Model) appendLine(raw string) {
 	clean := stripXMLTags(raw)
 	if clean == "" {
 		m.lines = append(m.lines, "")
+		fmt.Println()
 		return
 	}
 
@@ -580,6 +576,7 @@ func (m *Model) appendLine(raw string) {
 
 	for _, line := range lines {
 		m.lines = append(m.lines, line)
+		fmt.Println(line)
 	}
 	if len(m.lines) > maxOutputLines {
 		m.lines = truncateOutput(m.lines)
