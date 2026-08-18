@@ -20,12 +20,27 @@ func (m Model) View() string {
 		return "Loading DrogonClaw..."
 	}
 
+	// First pass: get widths with placeholder heights so we can measure
+	// the actual rendered heights of the header and input area.
 	layout := calculateLayout(m.width, m.height, 0)
 	mainWidth := layout.mainWidth
 
+	// Measure header: HeaderBarBorderStyle has a bottom border, making it
+	// 2 lines tall — not 1. We measure rather than hard-code so any future
+	// style change is automatically accounted for.
+	headerWidth := m.width
+	if layout.sidebarWidth > 0 {
+		headerWidth = layout.mainWidth + layout.sidebarWidth + 1
+	}
+	headerBar := m.renderHeader(headerWidth)
+	headerBarHeight := lipgloss.Height(headerBar)
+
+	// Measure input area (includes top border from InputPaneStyle).
 	inputArea := m.renderInputArea(mainWidth)
 	inputHeight := lipgloss.Height(inputArea)
-	layout = calculateLayout(m.width, m.height, inputHeight)
+
+	// Second pass: recalculate layout with the true measured heights.
+	layout = calculateLayout(m.width, m.height, inputHeight+headerBarHeight)
 
 	vpWidth, vpHeight := m.viewportDimensions()
 	output := m.viewport
@@ -56,12 +71,12 @@ func (m Model) View() string {
 		sidebar = m.renderSidebar(layout.sidebarWidth, sidebarInnerHeight)
 	}
 
-	var headerBar string
+	// Re-render header with correct widths from second-pass layout.
+	headerWidth = m.width
 	if layout.sidebarWidth > 0 {
-		headerBar = m.renderHeader(layout.mainWidth + layout.sidebarWidth + 1)
-	} else {
-		headerBar = m.renderHeader(m.width)
+		headerWidth = layout.mainWidth + layout.sidebarWidth + 1
 	}
+	headerBar = m.renderHeader(headerWidth)
 
 	statusBar := m.renderStatusBar()
 
@@ -128,14 +143,22 @@ func (m Model) renderWelcome() string {
 }
 
 func (m Model) viewportDimensions() (width, height int) {
-	layout := calculateLayout(m.width, m.height, 4)
+	// First pass to get widths.
+	layout := calculateLayout(m.width, m.height, 0)
+
+	// Measure the same way View() does so the two stay in sync.
+	headerBar := m.renderHeader(m.width)
+	headerBarHeight := lipgloss.Height(headerBar)
 	inputHeight := lipgloss.Height(m.renderInputArea(layout.mainWidth))
-	layout = calculateLayout(m.width, m.height, inputHeight)
+	fixedHeight := inputHeight + headerBarHeight
+
+	layout = calculateLayout(m.width, m.height, fixedHeight)
 
 	vpWidth := max(8, layout.mainWidth-MainPaneStyle.GetHorizontalFrameSize()-OutputPaneStyle.GetHorizontalFrameSize())
 	vpHeight := max(3, layout.mainHeight-MainPaneStyle.GetVerticalFrameSize())
 	return vpWidth, vpHeight
 }
+
 
 func (m Model) renderHeader(width int) string {
 	if width <= 0 {
