@@ -481,6 +481,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	var vpCmd tea.Cmd
 	m.viewport, vpCmd = m.viewport.Update(msg)
+	m.userScrolledUp = !m.viewport.AtBottom()
 	cmds = append(cmds, vpCmd)
 
 	return m, tea.Batch(cmds...)

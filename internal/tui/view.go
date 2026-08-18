@@ -544,9 +544,18 @@ func (m *Model) updateViewportContent() {
 	m.viewport.Width = vpWidth
 	m.viewport.Height = vpHeight
 	m.viewport.SetContent(base)
+
+	// Clamp scroll offset so it never points past the end of content
+	// (content can shrink when lines re-wrap to a wider terminal).
+	maxOffset := max(0, m.viewport.TotalLineCount()-m.viewport.Height)
+	if m.viewport.YOffset > maxOffset {
+		m.viewport.YOffset = maxOffset
+	}
+
 	if !m.userScrolledUp {
 		m.viewport.GotoBottom()
 	}
+	m.userScrolledUp = !m.viewport.AtBottom()
 }
 
 func (m *Model) appendLine(raw string) {
