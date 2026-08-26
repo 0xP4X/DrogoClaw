@@ -194,12 +194,9 @@ func (m *Model) renderContentArea() string {
 
 	if base := m.viewport.View(); base != "" {
 		content.WriteString(base)
-	} else if !m.bannerShown {
+	} else {
 		m.bannerShown = true
 		content.WriteString(m.renderWelcome())
-	} else {
-		m.viewport.SetContent(m.renderWelcome())
-		content.WriteString(m.viewport.View())
 	}
 
 	return lipgloss.NewStyle().
