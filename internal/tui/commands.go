@@ -31,7 +31,7 @@ var needSetup bool
 // NeedSetup reports whether the operator requested /setup from inside the TUI.
 func NeedSetup() bool { return needSetup }
 
-func (m *Model) handleSlashCommand(raw string) (Model, tea.Cmd) {
+func (m *Model) handleSlashCommand(raw string) (*Model, tea.Cmd) {
 	parts := strings.Fields(raw)
 	cmd := strings.ToLower(parts[0])
 	args := ""
@@ -41,7 +41,7 @@ func (m *Model) handleSlashCommand(raw string) (Model, tea.Cmd) {
 
 	switch cmd {
 	case "/exit", "/quit":
-		return *m, tea.Quit
+		return m, tea.Quit
 
 	case "/clear":
 		m.lines = nil
@@ -103,7 +103,7 @@ func (m *Model) handleSlashCommand(raw string) (Model, tea.Cmd) {
 	case "/setup":
 		needSetup = true
 		m.appendLine(InfoStyle.Render("  [i] Launching setup wizard — DrogonClaw will restart afterward."))
-		return *m, tea.Quit
+		return m, tea.Quit
 
 	case "/report":
 		m.phase = "planning"
@@ -254,7 +254,7 @@ func (m *Model) handleSlashCommand(raw string) (Model, tea.Cmd) {
 		if healthWidth <= 0 {
 			healthWidth = m.width - 4
 		}
-		return *m, tea.Batch(m.spinner.Tick, func() tea.Msg {
+		return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
 			return HealthResultMsg{Output: health.RunDiagnosticsWithWidth(ctx, m.sandbox, healthWidth)}
 		})
 
@@ -288,6 +288,9 @@ func (m *Model) handleSlashCommand(raw string) (Model, tea.Cmd) {
 	case "/benchmarks":
 		m.appendLine(m.renderBenchmarks())
 
+	case "/timeline":
+		m.appendLine(m.renderTimeline())
+
 	case "/help":
 		m.appendLine(renderHelp())
 
@@ -296,9 +299,9 @@ func (m *Model) handleSlashCommand(raw string) (Model, tea.Cmd) {
 	}
 
 	if m.executing && m.activeEvents != nil {
-		return *m, tea.Batch(m.spinner.Tick, waitForEvent(m.activeEvents))
+		return m, tea.Batch(m.spinner.Tick, waitForEvent(m.activeEvents))
 	}
-	return *m, nil
+	return m, nil
 }
 
 func (m *Model) handleModeCommand(args string) {

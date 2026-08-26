@@ -85,7 +85,7 @@ create_skill, update_directive, install_tool, github_download, write_and_run_scr
 save_document, catch_shell, shell_session_exec, auth_bypass_scan, auto_privesc, fuzz_endpoint,
 analyze_source_code, establish_persistence, route_traffic, aws_dump_s3, aws_enum_iam, aws_escalate_privs,
 binary_recon, binary_gdb_run, binary_ret2libc, generate_fud_payload, generate_phish_email,
-send_phish, setup_phish_domain, deploy_pivot, run_ad_template, run_exploit
+send_phish, setup_phish_domain, deploy_pivot, run_ad_template, run_exploit, run_metasploit, run_msfvenom
 If you need to run Python code, use shell_execute with python3 or python as the command.
 --- OPERATIONAL DIRECTIVES ---
 1. CONVERSATIONAL INTELLIGENCE: If %s is chatting, saying hi, or asking general questions - engage directly. Do NOT invoke tools for conversational messages.

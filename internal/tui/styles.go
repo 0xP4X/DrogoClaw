@@ -5,407 +5,466 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Color Palette — Dark Security Theme
-// ─────────────────────────────────────────────────────────────────────────────
+// Theme holds all color definitions for the TUI
+type Theme struct {
+	// Primary colors
+	Primary   lipgloss.Color
+	Secondary lipgloss.Color
+	Accent    lipgloss.Color
 
+	// Status colors
+	Success lipgloss.Color
+	Warning lipgloss.Color
+	Error   lipgloss.Color
+	Info    lipgloss.Color
+
+	// Text colors
+	Text      lipgloss.Color
+	TextMuted lipgloss.Color
+	TextDim   lipgloss.Color
+
+	// Background colors
+	Background        lipgloss.Color
+	BackgroundPanel   lipgloss.Color
+	BackgroundSurface lipgloss.Color
+
+	// Border colors
+	Border       lipgloss.Color
+	BorderActive lipgloss.Color
+	BorderSubtle lipgloss.Color
+}
+
+// DefaultTheme is the dark theme matching OpenCode's style
+var DefaultTheme = Theme{
+	Primary:   lipgloss.Color("#58a6ff"),
+	Secondary: lipgloss.Color("#238636"),
+	Accent:    lipgloss.Color("#39c5cf"),
+
+	Success: lipgloss.Color("#238636"),
+	Warning: lipgloss.Color("#bf8700"),
+	Error:   lipgloss.Color("#da3633"),
+	Info:    lipgloss.Color("#58a6ff"),
+
+	Text:      lipgloss.Color("#f0f6fc"),
+	TextMuted: lipgloss.Color("#7d8590"),
+	TextDim:   lipgloss.Color("#484f58"),
+
+	Background:        lipgloss.Color("#0d1117"),
+	BackgroundPanel:   lipgloss.Color("#161b22"),
+	BackgroundSurface: lipgloss.Color("#21262d"),
+
+	Border:       lipgloss.Color("#30363d"),
+	BorderActive: lipgloss.Color("#58a6ff"),
+	BorderSubtle: lipgloss.Color("#21262d"),
+}
+
+// Style helpers
+func (t Theme) HeaderStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(t.Primary).
+		Bold(true)
+}
+
+func (t Theme) PanelStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(t.Border).
+		Padding(0, 1)
+}
+
+// Legacy color variables for backward compatibility
 var (
-	// Background tones
-	ColorBg        = lipgloss.Color("#101010")
-	ColorBgPanel   = lipgloss.Color("#171717")
-	ColorBgSurface = lipgloss.Color("#202124")
-	ColorBgAccent  = lipgloss.Color("#2a2b2e")
-	ColorBgInput   = lipgloss.Color("#161616")
+	ColorBg        = DefaultTheme.Background
+	ColorBgPanel   = DefaultTheme.BackgroundPanel
+	ColorBgSurface = DefaultTheme.BackgroundSurface
+	ColorBgAccent  = lipgloss.Color("#30363d")
 
-	// Text hierarchy
-	ColorBright = lipgloss.Color("#f1f3f4")
-	ColorWhite  = lipgloss.Color("#d7dadc")
-	ColorSubtle = lipgloss.Color("#a6adb4")
-	ColorMuted  = lipgloss.Color("#858b91")
-	ColorDim    = lipgloss.Color("#62686f")
-	ColorGhost  = lipgloss.Color("#3a3f44")
+	ColorBright = DefaultTheme.Text
+	ColorWhite  = lipgloss.Color("#e6edf3")
+	ColorSubtle = DefaultTheme.TextMuted
+	ColorMuted  = lipgloss.Color("#656d76")
+	ColorDim    = DefaultTheme.TextDim
+	ColorGhost  = DefaultTheme.BorderSubtle
 
-	// Primary accents
-	ColorAccent  = lipgloss.Color("#2dd4bf")
-	ColorAccent2 = lipgloss.Color("#22c55e")
+	ColorAccent  = DefaultTheme.Primary
+	ColorAccent2 = DefaultTheme.Secondary
+	ColorAccent3 = lipgloss.Color("#a5a5a5")
 
-	// Semantic colors
-	ColorSuccess = lipgloss.Color("#3fb950")
-	ColorDanger  = lipgloss.Color("#f85149")
-	ColorWarning = lipgloss.Color("#f59e0b")
-	ColorGold    = lipgloss.Color("#f59e0b")
-	ColorCyan    = lipgloss.Color("#38bdf8")
-	ColorPurple  = lipgloss.Color("#c084fc")
+	ColorSuccess = DefaultTheme.Success
+	ColorDanger  = DefaultTheme.Error
+	ColorWarning = DefaultTheme.Warning
+	ColorGold    = lipgloss.Color("#e3b341")
+	ColorCyan    = DefaultTheme.Accent
+	ColorPurple  = lipgloss.Color("#bc8cff")
+	ColorOrange  = lipgloss.Color("#ff7b72")
 
-	// Output severity
-	ColorOutputInfo    = lipgloss.Color("#a6adb4")
-	ColorOutputDebug   = lipgloss.Color("#62686f")
-	ColorOutputSuccess = lipgloss.Color("#3fb950")
-	ColorOutputError   = lipgloss.Color("#f85149")
-	ColorOutputWarn    = lipgloss.Color("#f59e0b")
-	ColorOutputSignal  = lipgloss.Color("#2dd4bf")
+	ColorOutputInfo    = DefaultTheme.TextMuted
+	ColorOutputDebug   = lipgloss.Color("#656d76")
+	ColorOutputSuccess = DefaultTheme.Secondary
+	ColorOutputError   = lipgloss.Color("#ff7b72")
+	ColorOutputWarn    = lipgloss.Color("#e3b341")
+	ColorOutputSignal  = DefaultTheme.Primary
 
-	// Border color
-	ColorBorder = lipgloss.Color("#3a3f44")
+	ColorBorder     = DefaultTheme.Border
+	ColorBorderSoft = DefaultTheme.BorderSubtle
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Header & Status Bar
-// ─────────────────────────────────────────────────────────────────────────────
-
 var (
-	HeaderBarStyle = lipgloss.NewStyle().
-			Background(ColorBgSurface).
-			Foreground(ColorWhite).
-			Bold(true).
-			Padding(0, 1)
-
-	HeaderBarBorderStyle = lipgloss.NewStyle().
-				Border(lipgloss.NormalBorder(), false, false, true, false).
-				BorderForeground(ColorBorder).
-				Background(ColorBgSurface)
-
 	HeaderBrandStyle = lipgloss.NewStyle().
-				Foreground(ColorAccent).
-				Bold(true)
+		Foreground(ColorAccent).
+		Bold(true)
 
 	HeaderSepStyle = lipgloss.NewStyle().
-			Foreground(ColorDim)
+		Foreground(ColorBorder).
+		Bold(true)
 
 	HeaderInfoStyle = lipgloss.NewStyle().
-			Foreground(ColorSubtle)
+		Foreground(ColorSubtle)
 
 	HeaderDimStyle = lipgloss.NewStyle().
-			Foreground(ColorDim)
-
-	StatusBarStyle = lipgloss.NewStyle().
-			Background(ColorBgSurface).
-			Foreground(ColorMuted).
-			Padding(0, 0)
+		Foreground(ColorDim)
 
 	StatusLabelStyle = lipgloss.NewStyle().
-				Foreground(ColorMuted).
-				Background(ColorBgSurface)
+		Foreground(ColorDim)
 
 	StatusOnStyle = lipgloss.NewStyle().
-			Foreground(ColorSuccess).
-			Bold(true)
+		Foreground(ColorSuccess).
+		Bold(true)
 
 	StatusOffStyle = lipgloss.NewStyle().
-			Foreground(ColorDim)
+		Foreground(ColorDim)
 
 	StatusNodeStyle = lipgloss.NewStyle().
-			Foreground(ColorAccent).
-			Bold(true)
+		Foreground(ColorAccent).
+		Bold(true)
 
 	StatusAlertStyle = lipgloss.NewStyle().
-				Foreground(ColorDanger).
-				Bold(true)
-)
+		Foreground(ColorDanger).
+		Bold(true)
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Phase Indicators
-// ─────────────────────────────────────────────────────────────────────────────
+	HeaderBarStyle = lipgloss.NewStyle().
+		Foreground(ColorSubtle)
+
+	StatusBarStyle = lipgloss.NewStyle().
+		Foreground(ColorSubtle)
+)
 
 var (
 	PhaseIdleStyle = lipgloss.NewStyle().
-			Foreground(ColorDim).
-			Bold(true)
+		Foreground(ColorDim).
+		Bold(true)
 
 	PhasePlanningStyle = lipgloss.NewStyle().
-				Foreground(ColorCyan).
-				Bold(true)
+		Foreground(ColorCyan).
+		Bold(true)
 
 	PhaseReasoningStyle = lipgloss.NewStyle().
-				Foreground(ColorPurple).
-				Bold(true)
+		Foreground(ColorPurple).
+		Bold(true)
 
 	PhaseExecutingStyle = lipgloss.NewStyle().
-				Foreground(ColorWarning).
-				Bold(true)
+		Foreground(ColorWarning).
+		Bold(true)
 
 	PhaseVerifyingStyle = lipgloss.NewStyle().
-				Foreground(ColorAccent2).
-				Bold(true)
+		Foreground(ColorAccent2).
+		Bold(true)
 
 	PhaseCompleteStyle = lipgloss.NewStyle().
-				Foreground(ColorSuccess).
-				Bold(true)
+		Foreground(ColorSuccess).
+		Bold(true)
 
 	PhaseErrorStyle = lipgloss.NewStyle().
-			Foreground(ColorDanger).
-			Bold(true)
+		Foreground(ColorDanger).
+		Bold(true)
 
 	PhaseHitLStyle = lipgloss.NewStyle().
-			Foreground(ColorWarning).
-			Bold(true)
+		Foreground(ColorWarning).
+		Bold(true)
 )
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Output Pane & Viewport
-// ─────────────────────────────────────────────────────────────────────────────
 
 var (
 	OutputPaneStyle = lipgloss.NewStyle().
-			PaddingLeft(2).
-			PaddingRight(2)
+		PaddingLeft(1)
 
 	LineNumberStyle = lipgloss.NewStyle().
-			Foreground(ColorDim).
-			Italic(true)
+		Foreground(ColorDim).
+		Width(4).
+		Align(lipgloss.Right)
 
 	ActivityDimStyle = lipgloss.NewStyle().
-				Foreground(ColorDim)
+		Foreground(ColorDim)
 
-	MainPaneStyle = lipgloss.NewStyle().
-			Padding(1, 1).
-			Background(ColorBg)
+	MainPaneStyle = lipgloss.NewStyle()
+
+	SidebarPaneStyle = lipgloss.NewStyle()
 )
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Agent Response
-// ─────────────────────────────────────────────────────────────────────────────
 
 var (
 	AgentTextStyle = lipgloss.NewStyle().
-			Foreground(ColorWhite)
+		Foreground(ColorWhite)
+
+	AgentHeaderStyle = lipgloss.NewStyle().
+		Foreground(ColorAccent).
+		Bold(true)
+
+	AgentSubheaderStyle = lipgloss.NewStyle().
+		Foreground(ColorAccent2).
+		Bold(true)
+
+	AgentListStyle = lipgloss.NewStyle().
+		Foreground(ColorSubtle).
+		MarginLeft(2)
+
+	AgentQuoteStyle = lipgloss.NewStyle().
+		Foreground(ColorDim).
+		Italic(true).
+		BorderLeft(true).
+		BorderForeground(ColorBorder).
+		PaddingLeft(2).
+		MarginLeft(1)
+
+	CodeBlockStyle = lipgloss.NewStyle().
+		Foreground(ColorBright).
+		Background(ColorBgAccent).
+		Padding(1, 2).
+		MarginTop(1).
+		MarginBottom(1)
+
+	InlineCodeStyle = lipgloss.NewStyle().
+		Foreground(ColorOrange).
+		Background(ColorBgAccent).
+		Padding(0, 1)
+
+	KeywordStyle = lipgloss.NewStyle().
+		Foreground(ColorPurple).
+		Bold(true)
+
+	StringStyle = lipgloss.NewStyle().
+		Foreground(ColorAccent2)
+
+	CommentStyle = lipgloss.NewStyle().
+		Foreground(ColorDim).
+		Italic(true)
 
 	AgentResponseStyle = lipgloss.NewStyle().
-				Foreground(ColorWhite).
-				PaddingLeft(1)
+		Foreground(ColorWhite).
+		PaddingLeft(1)
 
 	AgentDividerStyle = lipgloss.NewStyle().
-				Foreground(ColorBorder)
+		Foreground(ColorBorder)
 )
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Tool Execution Styles
-// ─────────────────────────────────────────────────────────────────────────────
 
 var (
+	ToolStartStyle = lipgloss.NewStyle().
+		Foreground(ColorCyan).
+		Bold(true).
+		MarginTop(1)
+
+	ToolBorderStyle = lipgloss.NewStyle().
+		Foreground(ColorBorder)
+
+	ToolErrorStyle = lipgloss.NewStyle().
+		Foreground(ColorDanger).
+		Bold(true).
+		MarginTop(1)
+
 	ToolDoneStyle = lipgloss.NewStyle().
-			Foreground(ColorSuccess)
+		Foreground(ColorSuccess).
+		Bold(true).
+		MarginTop(1)
 
 	ToolArgsStyle = lipgloss.NewStyle().
-			Foreground(ColorMuted).
-			Italic(true)
+		Foreground(ColorSubtle).
+		Italic(true).
+		MarginLeft(2)
 
 	ToolOutputStyle = lipgloss.NewStyle().
-			Foreground(ColorOutputInfo)
+		Foreground(ColorOutputInfo).
+		MarginLeft(2)
 
 	ToolOutputSuccessStyle = lipgloss.NewStyle().
-				Foreground(ColorOutputSuccess)
+		Foreground(ColorOutputSuccess).
+		MarginLeft(2)
 
 	ToolOutputErrorStyle = lipgloss.NewStyle().
-				Foreground(ColorOutputError)
+		Foreground(ColorOutputError).
+		MarginLeft(2)
 )
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Prompt & Input Area
-// ─────────────────────────────────────────────────────────────────────────────
 
 var (
 	PromptBorderStyle = lipgloss.NewStyle().
-				Foreground(ColorAccent).
-				Bold(true)
+		Foreground(ColorAccent).
+		Bold(true)
 
 	PromptAliasStyle = lipgloss.NewStyle().
-				Foreground(ColorAccent).
-				Bold(true)
+		Foreground(ColorAccent).
+		Bold(true)
 
 	PromptAtStyle = lipgloss.NewStyle().
-			Foreground(ColorDim)
+		Foreground(ColorDim)
 
 	PromptAgentStyle = lipgloss.NewStyle().
-				Foreground(ColorAccent2)
+		Foreground(ColorAccent2)
 
 	PromptSessionStyle = lipgloss.NewStyle().
-				Foreground(ColorDim).
-				Italic(true)
+		Foreground(ColorDim).
+		Italic(true)
 
 	PromptUserStyle = lipgloss.NewStyle().
-			Foreground(ColorBright).
-			Bold(true)
+		Foreground(ColorBright).
+		Bold(true)
 
 	PromptGlyphStyle = lipgloss.NewStyle().
-				Foreground(ColorAccent).
-				Bold(true)
+		Foreground(ColorAccent).
+		Bold(true).
+		MarginRight(1)
 
-	InputPaneStyle = lipgloss.NewStyle()
+	InputPaneStyle = lipgloss.NewStyle().
+		Padding(0, 1)
 )
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Command Hints & Autocomplete
-// ─────────────────────────────────────────────────────────────────────────────
 
 var (
 	HintBorderStyle = lipgloss.NewStyle().
-			Foreground(ColorDim)
+		Foreground(ColorDim)
 
 	HintCmdStyle = lipgloss.NewStyle().
-			Foreground(ColorAccent).
-			Bold(true)
+		Foreground(ColorAccent).
+		Bold(true)
 
 	HintDescStyle = lipgloss.NewStyle().
-			Foreground(ColorMuted)
+		Foreground(ColorMuted)
 
 	HintSelectedStyle = lipgloss.NewStyle().
-				Foreground(ColorBright).
-				Bold(true)
+		Foreground(ColorBright).
+		Bold(true)
 )
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Severity & Alert Styles
-// ─────────────────────────────────────────────────────────────────────────────
 
 var (
 	ErrorStyle = lipgloss.NewStyle().
-			Foreground(ColorDanger).
-			Bold(true)
+		Foreground(ColorDanger).
+		Bold(true)
 
 	WarningStyle = lipgloss.NewStyle().
-			Foreground(ColorWarning)
+		Foreground(ColorWarning)
 
 	InfoStyle = lipgloss.NewStyle().
-			Foreground(ColorCyan)
+		Foreground(ColorCyan)
 
 	SpinnerStyle = lipgloss.NewStyle().
-			Foreground(ColorAccent)
+		Foreground(ColorAccent)
 
-	// ── Prompt Queue ─────────────────────────────────────────────────────
 	QueueStyle = lipgloss.NewStyle().
-			Foreground(ColorPurple).
-			Bold(true)
+		Foreground(ColorPurple).
+		Bold(true)
 
 	QueueItemStyle = lipgloss.NewStyle().
-			Foreground(ColorSubtle)
+		Foreground(ColorSubtle)
 
-	// ── Status / Thinking stream lines ───────────────────────────────────
 	StatusLineStyle = lipgloss.NewStyle().
-			Foreground(ColorSubtle).
-			Italic(true)
+		Foreground(ColorSubtle).
+		Italic(true)
 
 	SignalLineStyle = lipgloss.NewStyle().
-			Foreground(ColorAccent).
-			Bold(true)
+		Foreground(ColorAccent).
+		Bold(true)
 
 	DividerStyle = lipgloss.NewStyle().
-			Foreground(ColorGhost)
+		Foreground(ColorGhost)
 
 	SessionStyle = lipgloss.NewStyle().
-			Foreground(ColorDim)
+		Foreground(ColorDim)
 )
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Evidence & Facts
-// ─────────────────────────────────────────────────────────────────────────────
 
 var (
 	EvidenceStyle = lipgloss.NewStyle().
-			Foreground(ColorCyan).
-			Italic(true)
+		Foreground(ColorCyan).
+		Italic(true)
 
 	FactStyle = lipgloss.NewStyle().
-			Foreground(ColorWhite)
+		Foreground(ColorWhite)
 
 	FactKeyStyle = lipgloss.NewStyle().
-			Foreground(ColorAccent).
-			Bold(true)
+		Foreground(ColorAccent).
+		Bold(true)
 
 	FactValStyle = lipgloss.NewStyle().
-			Foreground(ColorWhite)
+		Foreground(ColorWhite)
 
 	TruncatedStyle = lipgloss.NewStyle().
-			Foreground(ColorDim).
-			Italic(true)
+		Foreground(ColorDim).
+		Italic(true)
 )
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Tree / Hierarchy
-// ─────────────────────────────────────────────────────────────────────────────
 
 var (
 	TreeBranchStyle = lipgloss.NewStyle().
-			Foreground(ColorGhost)
+		Foreground(ColorGhost)
 
 	TreeItemStyle = lipgloss.NewStyle().
-			Foreground(ColorWhite)
+		Foreground(ColorWhite)
 
 	TreeItemSelectedStyle = lipgloss.NewStyle().
-				Foreground(ColorAccent).
-				Bold(true)
+		Foreground(ColorAccent).
+		Bold(true)
 
 	TreeIndentStyle = lipgloss.NewStyle().
-			Foreground(ColorGhost)
+		Foreground(ColorGhost)
 )
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Welcome Screen
-// ─────────────────────────────────────────────────────────────────────────────
 
 var (
 	WelcomeTitleStyle = lipgloss.NewStyle().
-				Foreground(ColorAccent).
-				Bold(true)
+		Foreground(ColorAccent).
+		Bold(true).
+		MarginBottom(1)
 
 	WelcomeSubtitleStyle = lipgloss.NewStyle().
-				Foreground(ColorSubtle)
+		Foreground(ColorSubtle).
+		Italic(true)
 
 	WelcomeHintStyle = lipgloss.NewStyle().
-				Foreground(ColorDim)
+		Foreground(ColorMuted).
+		MarginTop(1).
+		MarginBottom(1).
+		Italic(true)
 
 	WelcomeBorderStyle = lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(ColorBorder).
-				Padding(1, 3).
-				Foreground(ColorAccent).
-				Bold(true)
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(ColorBorder).
+		Padding(1, 2).
+		Background(ColorBgPanel).
+		MarginTop(1).
+		MarginBottom(1)
 
 	WelcomeQuickStartStyle = lipgloss.NewStyle().
-				Foreground(ColorDim)
+		Foreground(ColorAccent2).
+		Bold(true).
+		MarginTop(1).
+		MarginBottom(1)
 )
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sidebar
-// ─────────────────────────────────────────────────────────────────────────────
 
 var (
-	SidebarPaneStyle = lipgloss.NewStyle().
-				Border(lipgloss.NormalBorder(), false, false, false, true).
-				BorderForeground(ColorBorder).
-				Padding(1, 1).
-				Background(ColorBgPanel)
-
 	SidebarTitleStyle = lipgloss.NewStyle().
-				Foreground(ColorSubtle).
-				Bold(true)
+		Foreground(ColorSubtle).
+		Bold(true)
 
 	SidebarLabelStyle = lipgloss.NewStyle().
-				Foreground(ColorDim)
+		Foreground(ColorDim)
 
 	SidebarValueStyle = lipgloss.NewStyle().
-				Foreground(ColorWhite)
+		Foreground(ColorWhite)
 
 	SidebarRuleStyle = lipgloss.NewStyle().
-				Foreground(ColorGhost)
+		Foreground(ColorGhost)
 )
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Section Headers (used in /status, sidebar, help)
-// ─────────────────────────────────────────────────────────────────────────────
 
 var (
 	SectionHeaderStyle = lipgloss.NewStyle().
-				Foreground(ColorSubtle).
-				Bold(true)
+		Foreground(ColorSubtle).
+		Bold(true)
 
 	SectionRuleStyle = lipgloss.NewStyle().
-				Foreground(ColorGhost)
+		Foreground(ColorGhost)
 )
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Phase Router
-// ─────────────────────────────────────────────────────────────────────────────
 
 func PhaseStyle(phase string) lipgloss.Style {
 	switch phase {
@@ -427,10 +486,6 @@ func PhaseStyle(phase string) lipgloss.Style {
 		return PhaseIdleStyle
 	}
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Huh Form Theme
-// ─────────────────────────────────────────────────────────────────────────────
 
 func CustomHuhTheme() *huh.Theme {
 	t := huh.ThemeBase()

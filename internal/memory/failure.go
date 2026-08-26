@@ -1,7 +1,10 @@
 package memory
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -9,12 +12,12 @@ import (
 
 // FailedAttempt records a failed exploitation attempt.
 type FailedAttempt struct {
-	ID          string
-	Command     string
-	ErrorOutput string
-	Tool        string
-	Target      string
-	Timestamp   time.Time
+	ID          string    `json:"id"`
+	Command     string    `json:"command"`
+	ErrorOutput string    `json:"error_output"`
+	Tool        string    `json:"tool"`
+	Target      string    `json:"target"`
+	Timestamp   time.Time `json:"timestamp"`
 }
 
 // FailureMemory tracks all failed attempts to prevent infinite retry loops.
@@ -22,6 +25,8 @@ type FailureMemory struct {
 	mu       sync.RWMutex
 	failures []FailedAttempt
 	counter  int
+	path     string
+	sessionID string
 }
 
 var GlobalFailures = &FailureMemory{}
@@ -87,6 +92,74 @@ func (f *FailureMemory) All() []FailedAttempt {
 	out := make([]FailedAttempt, len(f.failures))
 	copy(out, f.failures)
 	return out
+}
+
+// NewFailureMemory creates a new FailureMemory with persistence
+func NewFailureMemory(sessionID string) *FailureMemory {
+	fm := &FailureMemory{
+		sessionID: sessionID,
+		path:      filepath.Join("data", fmt.Sprintf("failures_%s.json", sessionID)),
+	}
+	fm.load()
+	return fm
+}
+
+// load reads failures from disk
+func (f *FailureMemory) load() {
+	if f.path == "" {
+		return
+	}
+	
+	data, err := os.ReadFile(f.path)
+	if err != nil {
+		return // File doesn't exist yet, that's OK
+	}
+	
+	var failures []FailedAttempt
+	if err := json.Unmarshal(data, &failures); err != nil {
+		return
+	}
+	
+	f.failures = failures
+	f.counter = len(failures)
+}
+
+// save writes failures to disk
+func (f *FailureMemory) save() {
+	if f.path == "" {
+		return
+	}
+	
+	// Ensure directory exists
+	dir := filepath.Dir(f.path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return
+	}
+	
+	data, err := json.MarshalIndent(f.failures, "", "  ")
+	if err != nil {
+		return
+	}
+	
+	os.WriteFile(f.path, data, 0644)
+}
+
+// Record stores a new failed attempt and persists to disk
+func (f *FailureMemory) RecordPersistent(tool, command, errorOutput, target string) string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.counter++
+	id := fmt.Sprintf("fail_%d", f.counter)
+	f.failures = append(f.failures, FailedAttempt{
+		ID:          id,
+		Command:     command,
+		ErrorOutput: truncate(errorOutput, 500),
+		Tool:        tool,
+		Target:      target,
+		Timestamp:   time.Now(),
+	})
+	f.save() // Persist to disk
+	return id
 }
 
 func normalize(s string) string {

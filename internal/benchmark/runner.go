@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/0xP4X/drogonclaw-go/internal/agent"
+	"github.com/0xP4X/drogonclaw-go/internal/billing"
 	"github.com/0xP4X/drogonclaw-go/internal/config"
 	"github.com/0xP4X/drogonclaw-go/internal/memory"
 	"github.com/0xP4X/drogonclaw-go/internal/opsec"
@@ -91,6 +92,9 @@ func runChallenge(ctx context.Context, ch Challenge, cfg *config.Manager, manife
 	opsecMgr := opsec.NewManager()
 	sysPrompt := agent.BuildSystemPrompt(graph, opsecMgr, "", "benchmark sandbox")
 
+	// Create billing tracker for cost tracking
+	tracker := billing.New(nil)
+
 	tools := agent.NewToolRegistry(manifest, sb, validator, loot, cfg, graph, provider)
 	sessionID := fmt.Sprintf("bench-%s", ch.ID)
 	orch := agent.NewOrchestratorWithJournal(provider, tools, sysPrompt, sessionID, graph, memory.NewActionJournal(sessionID), 100)
@@ -111,6 +115,7 @@ func runChallenge(ctx context.Context, ch Challenge, cfg *config.Manager, manife
 	out.Flag = flag
 	out.Turns = turns
 	out.Duration = elapsed(start)
+	out.CostUSD = tracker.TotalCost() // Populate cost from tracker
 	if !solved && cctx.Err() != nil {
 		out.Err = "challenge timed out or budget exceeded"
 	}

@@ -59,6 +59,11 @@ func (p *Provider) SetUsageCallback(fn func(model string, prompt, completion int
 	p.onUsage = fn
 }
 
+// GetModel returns the model name being used by this provider.
+func (p *Provider) GetModel() string {
+	return p.model
+}
+
 func (p *Provider) recordUsage(prompt, completion int64) {
 	if p.onUsage != nil {
 		p.onUsage(p.model, prompt, completion)

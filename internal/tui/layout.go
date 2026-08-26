@@ -1,14 +1,13 @@
 package tui
 
 const (
-	sidebarMinWidth   = 30
-	sidebarMaxWidth   = 34
-	sidebarBreakpoint = 132
-	contentPadding    = 2
-	headerHeight      = 1
-	footerHeight      = 1
-	inputMinHeight    = 3
-	spacerMinHeight   = 0
+	contentPadding  = 1
+	headerHeight    = 1
+	footerHeight    = 1
+	inputMinHeight  = 1
+	spacerMinHeight = 0
+	sidebarMaxWidth = 30
+	sidebarMinWidth = 20
 )
 
 type tuiLayout struct {
@@ -27,22 +26,10 @@ type tuiLayout struct {
 	isCompact     bool
 }
 
-// calculateLayout computes the TUI geometry.
-//
-// fixedHeight is the sum of all non-main-pane rows already measured:
-//
-//	headerBarHeight  (measured in View — includes border)
-//	+ inputAreaHeight (measured in View — includes border)
-//	+ statusBarHeight (always 1)
-//
-// Passing the measured values keeps mainHeight exact regardless of how
-// individual styles change their borders or padding in the future.
 func calculateLayout(width, height, fixedHeight int) tuiLayout {
 	width = max(1, width)
 	height = max(1, height)
 
-	// When called during the first pass (fixedHeight==0), fall back to
-	// safe defaults so we get correct widths for the measurement phase.
 	if fixedHeight == 0 {
 		fixedHeight = headerHeight + footerHeight + inputMinHeight
 	}
@@ -50,28 +37,55 @@ func calculateLayout(width, height, fixedHeight int) tuiLayout {
 	l := tuiLayout{
 		width:        width,
 		height:       height,
-		hasSidebar:   width >= sidebarBreakpoint,
+		hasSidebar:   false,
 		isCompact:    width < 80,
 		headerHeight: headerHeight,
 		footerHeight: footerHeight,
 		inputHeight:  fixedHeight,
 	}
 
-	if l.hasSidebar {
-		l.sidebarWidth = clamp(width/4, sidebarMinWidth, sidebarMaxWidth)
-		l.mainWidth = width - l.sidebarWidth - 1
-	} else {
-		l.mainWidth = width
-	}
-
+	l.mainWidth = width
 	l.mainHeight = max(1, height-fixedHeight)
-	l.sidebarHeight = l.mainHeight
 	l.contentWidth = max(8, l.mainWidth-contentPadding*2)
 	l.contentHeight = max(3, l.mainHeight)
 
 	return l
 }
 
+func calculateLayoutWithSidebar(width, height int, showSidebar bool) tuiLayout {
+	width = max(1, width)
+	height = max(1, height)
+
+	l := tuiLayout{
+		width:        width,
+		height:       height,
+		hasSidebar:   showSidebar,
+		isCompact:    width < 80,
+		headerHeight: headerHeight,
+		footerHeight: footerHeight,
+		inputHeight:  3, // prompt + input + autocomplete
+	}
+
+	if showSidebar && width >= sidebarMinWidth+20 {
+		// Sidebar takes up to 1/3 of width, max 30 chars
+		l.sidebarWidth = min(sidebarMaxWidth, width/3)
+		l.sidebarHeight = max(1, height-4) // header + status + input + margins
+
+		// Main content takes remaining space
+		l.mainWidth = width - l.sidebarWidth - 1
+		l.mainHeight = max(1, height-4)
+	} else {
+		l.sidebarWidth = 0
+		l.sidebarHeight = 0
+		l.mainWidth = width
+		l.mainHeight = max(1, height-4)
+	}
+
+	l.contentWidth = max(8, l.mainWidth-contentPadding*2)
+	l.contentHeight = max(3, l.mainHeight)
+
+	return l
+}
 
 func clamp(value, minValue, maxValue int) int {
 	if value < minValue {
@@ -88,8 +102,17 @@ func (l tuiLayout) mainPaneBounds() (width, height int) {
 }
 
 func (l tuiLayout) sidebarBounds() (width, height int) {
-	if !l.hasSidebar {
-		return 0, 0
-	}
 	return l.sidebarWidth, l.sidebarHeight
+}
+
+func (l tuiLayout) headerBounds() (width, height int) {
+	return l.width, l.headerHeight
+}
+
+func (l tuiLayout) statusBounds() (width, height int) {
+	return l.width, l.footerHeight
+}
+
+func (l tuiLayout) inputBounds() (width, height int) {
+	return l.width, l.inputHeight
 }

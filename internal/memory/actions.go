@@ -80,7 +80,7 @@ func (j *ActionJournal) ToolFinished(tool, result string) {
 	if j.record == nil {
 		return
 	}
-	j.record.CompletedSteps = append(j.record.CompletedSteps, fmt.Sprintf("%s: %s", tool, truncateActionText(result, 600)))
+	j.record.CompletedSteps = append(j.record.CompletedSteps, fmt.Sprintf("%s: %s", tool, truncateActionText(result, 2000)))
 	j.record.CurrentTool, j.record.CurrentArgs = "", ""
 	j.touchLocked()
 }

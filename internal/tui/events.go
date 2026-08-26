@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -50,6 +51,7 @@ func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 				m.lines = append(m.lines, line)
 			}
 			m.currentResponse = ""
+			m.updateViewportContent()
 		}
 
 		m.activeToolName = ev.Tool
@@ -57,11 +59,21 @@ func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 		m.phase = "executing"
 		m.phaseDetail = ev.Tool
 		m.toolStartTime = time.Now()
+		m.stepCount++
 
+		// Log to session timeline
+		if m.sessionLog != nil {
+			m.sessionLog.LogToolStart(ev.Tool, ev.Args, m.stepCount, m.totalSteps)
+		}
+
+		// Update tool detail panel
+		if m.showToolDetail {
+			m.updateToolDetail(ev.Tool, ev.Args, m.toolStartTime)
+		}
+
+		m.appendLine(ToolStartStyle.Render(fmt.Sprintf("▶ %s", ev.Tool)))
 		if ev.Args != "" {
-			m.appendLine(fmt.Sprintf("  $ %s %s", ev.Tool, ev.Args))
-		} else {
-			m.appendLine(fmt.Sprintf("  $ %s", ev.Tool))
+			m.appendLine(ToolArgsStyle.Render(fmt.Sprintf("  %s", ev.Args)))
 		}
 		m.activeToolLine = len(m.lines) - 1
 
@@ -76,26 +88,48 @@ func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 			strings.Contains(strings.ToLower(ev.Result), "failed") ||
 			strings.Contains(strings.ToLower(ev.Result), "exit status 127")
 
+		// Log to session timeline
+		if m.sessionLog != nil {
+			m.sessionLog.LogToolComplete(ev.Tool, ev.Result, elapsed.Round(time.Millisecond).String(), !isError)
+		}
+
+		// Complete tool detail panel
+		if m.showToolDetail {
+			m.completeToolDetail(ev.Result, elapsed, !isError)
+		}
+
+		// Detect and log findings
+		findings := detectFindings(ev.Result, ev.Tool)
+		for _, finding := range findings {
+			if m.sessionLog != nil {
+				m.sessionLog.LogFinding(finding.Type, finding.Description, finding.Source)
+			}
+		}
+
 		if isError {
-			m.appendLine(ErrorStyle.Render(fmt.Sprintf("  [exit %s] %s", elapsed.Round(10*time.Millisecond), ev.Tool)))
+			m.appendLine(ToolErrorStyle.Render(fmt.Sprintf("✗ %s (%s)", ev.Tool, elapsed.Round(10*time.Millisecond))))
 		} else {
-			m.appendLine(ToolDoneStyle.Render(fmt.Sprintf("  [done] %s  (%s)", ev.Tool, elapsed.Round(10*time.Millisecond))))
+			m.appendLine(ToolDoneStyle.Render(fmt.Sprintf("✓ %s (%s)", ev.Tool, elapsed.Round(10*time.Millisecond))))
 		}
 
 		outputLines := sanitizeToolOutputLines(ev.Result)
-		for _, line := range outputLines {
-			prefix := "    "
-			if !strings.HasPrefix(line, "    ") {
-				prefix = "    │ "
+		if len(outputLines) > 0 {
+			for _, line := range outputLines {
+				line = strings.TrimLeft(line, " \t")
+				styledLine := colorizeOutputLine(truncateLine(stripXMLTags(line)))
+				m.appendLine(styledLine)
 			}
-			m.appendLine(colorizeOutputLine(truncateLine(stripXMLTags(prefix + strings.TrimPrefix(line, "    │ ")))))
 		}
 
 		m.activeToolLine = -1
 
 	case agent.EvToken:
 		m.currentResponse += ev.Content
-		m.updateViewportContent()
+		// Update viewport in real-time for streaming responses (time-based throttle)
+		if time.Since(m.lastStreamTime) >= 100*time.Millisecond {
+			m.updateViewportContent()
+			m.lastStreamTime = time.Now()
+		}
 
 	case agent.EvDone:
 		if m.currentResponse != "" {
@@ -145,7 +179,7 @@ func (m *Model) processQueue(cmds *[]tea.Cmd) {
 	m.promptQueue = m.promptQueue[1:]
 	m.appendLine(QueueStyle.Render(fmt.Sprintf("  ▶ Running queued task (%d remaining): %s", len(m.promptQueue), next)))
 	mm, cmd := m.handleInput(next)
-	*m = mm
+	*m = *mm
 	if cmd != nil {
 		*cmds = append(*cmds, cmd)
 	}
@@ -205,4 +239,104 @@ func waitForEvent(events <-chan agent.Event) tea.Cmd {
 		}
 		return AgentEventMsg{Event: ev}
 	}
+}
+
+// Finding represents a detected finding
+type Finding struct {
+	Type        string
+	Description string
+	Source      string
+}
+
+// Finding patterns
+var (
+	// Vulnerability patterns
+	vulnPatterns = []*regexp.Regexp{
+		regexp.MustCompile(`(?i)(sql\s*injection|xss|cross.site|csrf|ssrf|xxe|lfi|rfi)`),
+		regexp.MustCompile(`(?i)(vulnerability|cve-\d{4}-\d+)`),
+		regexp.MustCompile(`(?i)(critical|high|medium|low)\s*(severity|risk|vulnerability)`),
+		regexp.MustCompile(`(?i)(exploitable|exploit)`),
+	}
+
+	// Credential patterns
+	credPatterns = []*regexp.Regexp{
+		regexp.MustCompile(`(?i)(password|passwd|pwd)\s*[:=]\s*\S+`),
+		regexp.MustCompile(`(?i)(api[_-]?key|apikey)\s*[:=]\s*\S+`),
+		regexp.MustCompile(`(?i)(token|secret)\s*[:=]\s*\S+`),
+		regexp.MustCompile(`(?i)(admin|root)\s*[:=]\s*\S+`),
+		regexp.MustCompile(`(?i)(credential|login)\s*(found|discovered|extracted)`),
+	}
+
+	// Flag patterns
+	flagPatterns = []*regexp.Regexp{
+		regexp.MustCompile(`(?i)(flag|ctf|htb|picoctf)\{[^\}]+\}`),
+		regexp.MustCompile(`(?i)flag\s*[:=]\s*\S+`),
+	}
+
+	// Info patterns
+	infoPatterns = []*regexp.Regexp{
+		regexp.MustCompile(`(?i)(port|service|version)\s+\d+`),
+		regexp.MustCompile(`(?i)(open|closed|filtered)\s+port`),
+		regexp.MustCompile(`(?i)(host|target)\s+(up|down|reachable)`),
+	}
+)
+
+// detectFindings detects findings in tool output
+func detectFindings(output, tool string) []Finding {
+	var findings []Finding
+	
+	// Check for vulnerabilities
+	for _, pattern := range vulnPatterns {
+		if matches := pattern.FindStringSubmatch(output); matches != nil {
+			findings = append(findings, Finding{
+				Type:        "vulnerability",
+				Description: matches[0],
+				Source:      tool,
+			})
+		}
+	}
+	
+	// Check for credentials
+	for _, pattern := range credPatterns {
+		if matches := pattern.FindStringSubmatch(output); matches != nil {
+			// Redact actual credentials
+			desc := redactCredential(matches[0])
+			findings = append(findings, Finding{
+				Type:        "credential",
+				Description: desc,
+				Source:      tool,
+			})
+		}
+	}
+	
+	// Check for flags
+	for _, pattern := range flagPatterns {
+		if matches := pattern.FindStringSubmatch(output); matches != nil {
+			findings = append(findings, Finding{
+				Type:        "flag",
+				Description: matches[0],
+				Source:      tool,
+			})
+		}
+	}
+	
+	// Check for info
+	for _, pattern := range infoPatterns {
+		if matches := pattern.FindStringSubmatch(output); matches != nil {
+			findings = append(findings, Finding{
+				Type:        "info",
+				Description: matches[0],
+				Source:      tool,
+			})
+		}
+	}
+	
+	return findings
+}
+
+// redactCredential redacts sensitive parts of credentials
+func redactCredential(s string) string {
+	// Redact passwords, API keys, tokens
+	re := regexp.MustCompile(`(?i)(password|passwd|pwd|api[_-]?key|apikey|token|secret)\s*[:=]\s*(\S+)`)
+	return re.ReplaceAllString(s, "${1}=[REDACTED]")
 }

@@ -17,18 +17,13 @@ func TestCalculateLayoutPreservesMainPaneOnNarrowTerminals(t *testing.T) {
 	}
 
 	wide := calculateLayout(140, 40, inputMinHeight)
-	if wide.sidebarWidth != 34 {
-		t.Fatalf("wide layout should reserve a sidebar: %#v", wide)
+	if wide.sidebarWidth != 0 || wide.mainWidth != 140 {
+		t.Fatalf("wide layout should not reserve a sidebar: %#v", wide)
 	}
 
-	nearThreshold := calculateLayout(131, 24, inputMinHeight)
-	if nearThreshold.sidebarWidth != 0 || nearThreshold.mainWidth != 131 {
-		t.Fatalf("terminal below sidebar threshold should stay single-pane: %#v", nearThreshold)
-	}
-
-	minimumWide := calculateLayout(132, 24, inputMinHeight)
-	if minimumWide.sidebarWidth != 33 {
-		t.Fatalf("wide layouts should reserve a permanent sidebar: %#v", minimumWide)
+	minimumWide := calculateLayout(200, 40, inputMinHeight)
+	if minimumWide.sidebarWidth != 0 || minimumWide.mainWidth != 200 {
+		t.Fatalf("wide layouts should not reserve a sidebar: %#v", minimumWide)
 	}
 }
 

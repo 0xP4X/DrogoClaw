@@ -12,6 +12,7 @@ import (
 	"github.com/0xP4X/drogonclaw-go/internal/config"
 	"github.com/0xP4X/drogonclaw-go/internal/core"
 	"github.com/0xP4X/drogonclaw-go/internal/intel"
+	"github.com/0xP4X/drogonclaw-go/internal/logging"
 	"github.com/0xP4X/drogonclaw-go/internal/memory"
 	"github.com/0xP4X/drogonclaw-go/internal/opsec"
 	"github.com/0xP4X/drogonclaw-go/internal/sandbox"
@@ -83,11 +84,43 @@ type Model struct {
 	pendingApprovalTool string
 	pendingApprovalEst  string
 	tracker             *billing.Tracker
+
+	// Sidebar and timeline
+	showSidebar      bool
+	showToolDetail   bool
+	sessionLog       *logging.SessionTimeline
+	lastStreamTime   time.Time
+	stepCount        int
+	totalSteps       int
+	activeToolDetail *ToolDetail
+
+	// New redesign state
+	theme      Theme
+	layout     tuiLayout
+	leader     LeaderState
+	modelName  string
+	startTime  time.Time
+	lastPhase  string
+	toolCount  int
+	findingCount int
+	entityCount  int
+	relationCount int
+	totalTokens  int
+	totalCost    float64
+	recentTools  []string
+	findings     []string
 }
 
 type cmdHint struct {
 	cmd  string
 	desc string
+}
+
+// LeaderState holds the state for leader key handling
+type LeaderState struct {
+	Active    bool
+	Timeout   time.Duration
+	StartTime time.Time
 }
 
 func New(
@@ -124,6 +157,9 @@ func New(
 
 	sessionID := orch.SessionID
 
+	// Initialize session logger
+	sessionLog, _ := logging.NewSessionLogger(sessionID)
+
 	m := &Model{
 		viewport:       vp,
 		input:          ta,
@@ -141,6 +177,14 @@ func New(
 		phase:          "idle",
 		recovery:       orch.Recovery(),
 		targetAnalyzer: &intel.TargetAnalyzer{},
+		sessionLog:     sessionLog,
+		lastStreamTime: time.Now(),
+		// New redesign state
+		theme: DefaultTheme,
+		leader: LeaderState{
+			Timeout: 2 * time.Second,
+		},
+		startTime: time.Now(),
 	}
 
 	return m, nil
@@ -156,7 +200,7 @@ func (m Model) Init() tea.Cmd {
 
 type showBannerMsg struct{}
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
@@ -204,6 +248,71 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.appendLine(msgStr)
 			}
 			return m, cmd
+		}
+
+		// Ctrl+B toggles sidebar
+		if msg.String() == "ctrl+b" {
+			m.showSidebar = !m.showSidebar
+			return m, nil
+		}
+
+		// Ctrl+T toggles tool detail panel
+		if msg.String() == "ctrl+t" {
+			m.showToolDetail = !m.showToolDetail
+			return m, nil
+		}
+
+		// Leader key handling
+		if msg.String() == "ctrl+x" {
+			m.leader.Active = true
+			m.leader.StartTime = time.Now()
+			return m, nil
+		}
+
+		// Handle leader key commands
+		if m.leader.Active {
+			// Check for timeout
+			if time.Since(m.leader.StartTime) > m.leader.Timeout {
+				m.leader.Active = false
+			} else {
+				switch msg.String() {
+				case "b":
+					m.showSidebar = !m.showSidebar
+					m.leader.Active = false
+					return m, nil
+				case "n":
+					// New session
+					m.leader.Active = false
+					return m, m.newSession()
+				case "l":
+					// List sessions
+					m.leader.Active = false
+					return m, m.listSessions()
+				case "m":
+					// List models
+					m.leader.Active = false
+					return m, m.listModels()
+				case "t":
+					// List themes
+					m.leader.Active = false
+					return m, m.listThemes()
+				case "e":
+					// Open editor
+					m.leader.Active = false
+					return m, m.openEditor()
+				case "x":
+					// Export session
+					m.leader.Active = false
+					return m, m.exportSession()
+				case "q":
+					// Exit
+					m.leader.Active = false
+					return m, tea.Quit
+				default:
+					// Unknown leader command
+					m.leader.Active = false
+				}
+			}
 		}
 
 		if m.pendingConfirm != "" {
@@ -487,7 +596,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m *Model) handleInput(raw string) (Model, tea.Cmd) {
+func (m *Model) handleInput(raw string) (*Model, tea.Cmd) {
 	op := m.graph.GetOperatorProfile()
 	ag := m.graph.GetAgentProfile()
 	opName := "Unknown"
@@ -551,7 +660,7 @@ func (m *Model) handleInput(raw string) (Model, tea.Cmd) {
 
 	go runFn()
 
-	return *m, tea.Batch(m.spinner.Tick, waitForEvent(events))
+	return m, tea.Batch(m.spinner.Tick, waitForEvent(events))
 }
 
 func phaseFromStatus(status, fallback string) string {
@@ -694,10 +803,6 @@ func truncateVisible(line string, width int) string {
 	return ansi.Truncate(line, width, truncationSuffix)
 }
 
-func truncateStyled(line string, width int) string {
-	return truncateVisible(line, width)
-}
-
 func truncateOutput(lines []string) []string {
 	if len(lines) <= maxOutputLines {
 		return lines
@@ -826,4 +931,70 @@ func (m *Model) switchSection(sectionID string) {
 	m.bannerShown = false
 	m.appendBanner()
 	m.appendLine(InfoStyle.Render(fmt.Sprintf("  [§] Switched to section %s", target)))
+}
+
+// Leader key helper functions
+func (m *Model) newSession() tea.Cmd {
+	return func() tea.Msg {
+		m.orch.NewSession()
+		m.graph.Reset()
+		m.recovery = nil
+		m.sessionID = m.orch.SessionID
+		m.lines = nil
+		m.viewport.SetContent("")
+		m.lastTool = ""
+		m.activeToolName = ""
+		m.phase = "idle"
+		m.phaseDetail = ""
+		m.lastPlan = nil
+		m.lastObjective = ""
+		m.bannerShown = false
+		m.stepCount = 0
+		m.totalSteps = 0
+		m.toolCount = 0
+		m.findingCount = 0
+		m.recentTools = nil
+		m.findings = nil
+		return nil
+	}
+}
+
+func (m *Model) listSessions() tea.Cmd {
+	return func() tea.Msg {
+		// This would open a session list view
+		// For now, just show a message
+		return nil
+	}
+}
+
+func (m *Model) listModels() tea.Cmd {
+	return func() tea.Msg {
+		// This would open a model list view
+		// For now, just show a message
+		return nil
+	}
+}
+
+func (m *Model) listThemes() tea.Cmd {
+	return func() tea.Msg {
+		// This would open a theme list view
+		// For now, just show a message
+		return nil
+	}
+}
+
+func (m *Model) openEditor() tea.Cmd {
+	return func() tea.Msg {
+		// This would open an external editor
+		// For now, just show a message
+		return nil
+	}
+}
+
+func (m *Model) exportSession() tea.Cmd {
+	return func() tea.Msg {
+		// This would export the session
+		// For now, just show a message
+		return nil
+	}
 }
