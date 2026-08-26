@@ -56,10 +56,6 @@ func (m *Model) View() string {
 		sb.WriteString(content)
 	}
 
-	if len(m.hints) > 0 {
-		sb.WriteString(m.renderHints())
-	}
-
 	sb.WriteString(hline())
 	sb.WriteString("\n")
 	sb.WriteString(statusBar)
@@ -201,6 +197,10 @@ func (m *Model) renderContentArea() string {
 	} else {
 		m.bannerShown = true
 		base = m.renderWelcome()
+	}
+
+	if len(m.hints) > 0 {
+		base += "\n" + m.renderHints()
 	}
 
 	return lipgloss.NewStyle().
