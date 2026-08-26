@@ -357,6 +357,8 @@ func (m Model) renderWelcome() string {
 		mode = "default"
 	}
 
+	sb.WriteString("\n")
+
 	sep := lipgloss.NewStyle().Foreground(m.theme.Border).Render(strings.Repeat("─", min(width-4, 52)))
 	sb.WriteString(sep)
 	sb.WriteString("\n\n")
