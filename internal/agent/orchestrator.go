@@ -61,6 +61,9 @@ type Orchestrator struct {
 	missionPlanner *core.MissionPlanner
 	actions        *memory.ActionJournal
 	graph          *memory.Graph
+
+	// SubagentManager enables parallel task execution (inspired by Hermes Agent)
+	subagents *SubagentManager
 }
 
 const maxHistoryMessages = 24
@@ -130,6 +133,7 @@ func NewOrchestratorWithJournal(provider *Provider, tools *ToolRegistry, sysProm
 		missionPlanner: core.NewMissionPlanner(provider, graph),
 		actions:        actions,
 		graph:          graph,
+		subagents:      NewSubagentManager(provider, tools, 5),
 	}
 }
 
@@ -139,6 +143,18 @@ func (o *Orchestrator) GetProvider() *Provider {
 
 func (o *Orchestrator) GetTools() *ToolRegistry {
 	return o.tools
+}
+
+// GetSubagents returns the subagent manager for parallel execution.
+func (o *Orchestrator) GetSubagents() *SubagentManager {
+	return o.subagents
+}
+
+// ExecuteParallelTasks runs multiple independent tasks concurrently and merges
+// the results. This is the primary way to speed up recon and scanning.
+func (o *Orchestrator) ExecuteParallelTasks(ctx context.Context, tasks []SubagentTask, events chan<- Event) string {
+	results := o.subagents.ExecuteParallel(ctx, tasks, events)
+	return FormatResultsForLLM(results)
 }
 
 // UpdateSystemPrompt hot-swaps the system prompt (e.g., after /persona or /stealth).
@@ -217,7 +233,26 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 	if o.graph != nil {
 		memoryCtx = o.graph.Snapshot()
 	}
-	messages := BuildMessages(o.sysPrompt, memoryCtx, o.history, userMsg)
+
+	// Inject learned attack patterns from previous successes
+	learnedCtx := ""
+	if o.tools != nil && o.tools.skillLearner != nil {
+		target := extractTargetFromMessage(userMsg)
+		if target != "" {
+			learnedCtx = o.tools.GetLearnedContext(target)
+		}
+	}
+
+	combinedCtx := memoryCtx
+	if learnedCtx != "" {
+		if combinedCtx != "" {
+			combinedCtx += "\n\n" + learnedCtx
+		} else {
+			combinedCtx = learnedCtx
+		}
+	}
+
+	messages := BuildMessages(o.sysPrompt, combinedCtx, o.history, userMsg)
 
 	// Inject mission plan into context so the LLM can follow it
 	if err == nil && plan != nil && plan.IsValidMission && len(plan.Steps) > 0 {
@@ -493,4 +528,19 @@ func sanitizeToolOutput(output string) string {
 		}
 	}
 	return output
+}
+
+// extractTargetFromMessage attempts to extract a target host/domain/IP from a user message.
+func extractTargetFromMessage(msg string) string {
+	// Look for IP addresses
+	reIP := regexp.MustCompile(`\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b`)
+	if m := reIP.FindString(msg); m != "" {
+		return m
+	}
+	// Look for domain-like patterns
+	reDomain := regexp.MustCompile(`\b([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z]{2,})\b`)
+	if m := reDomain.FindString(msg); m != "" {
+		return m
+	}
+	return ""
 }

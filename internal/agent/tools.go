@@ -113,6 +113,10 @@ type ToolRegistry struct {
 	// short time window so the agent cannot burn iterations re-running
 	// commands that already returned the same data.
 	recentCommands map[string]recentCmd
+
+	// SkillLearner learns from successful attacks (inspired by Hermes Agent).
+	// After a verified success, the technique is saved as a reusable skill.
+	skillLearner *SkillLearner
 }
 
 const shellDedupWindow = 60 * time.Second
@@ -142,6 +146,7 @@ func NewToolRegistry(manifest *skills.Manifest, sb *sandbox.Docker, val *Evidenc
 		oracle:         NewSuccessOracle(""),
 		builtins:       make(map[string]BuiltinFn),
 		recentCommands: make(map[string]recentCmd),
+		skillLearner:   NewSkillLearner("data"),
 	}
 	r.registerBuiltins()
 	return r
@@ -321,6 +326,25 @@ func (r *ToolRegistry) RecordVerifiedFinding() {
 		severity = "high"
 	}
 	_ = r.lootDb.InsertVulnerability(r.lastTarget, cve, desc, severity)
+
+	// Teach the skill learner from this verified success
+	if r.skillLearner != nil {
+		r.skillLearner.ObserveExecution(tr.ToolName, nil, tr.Stdout, true)
+	}
+}
+
+// GetSkillLearner returns the skill learner for external access.
+func (r *ToolRegistry) GetSkillLearner() *SkillLearner {
+	return r.skillLearner
+}
+
+// GetLearnedContext returns learned attack patterns relevant to a target,
+// formatted for injection into the LLM context.
+func (r *ToolRegistry) GetLearnedContext(target string) string {
+	if r.skillLearner == nil {
+		return ""
+	}
+	return r.skillLearner.FormatForLLM(target)
 }
 
 // Definitions returns the OpenAI-format tool definitions for the LLM.
