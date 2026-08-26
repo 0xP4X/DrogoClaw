@@ -161,6 +161,7 @@ func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 		m.appendLine(ErrorStyle.Render(fmt.Sprintf("  [error] %s", ev.Content)))
 		m.executing = false
 		m.cancelFn = nil
+		m.updateViewportContent()
 		m.processQueue(&cmds)
 		return cmds
 	}

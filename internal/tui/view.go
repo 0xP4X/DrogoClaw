@@ -185,21 +185,21 @@ func (m Model) renderExecutingLine() string {
 }
 
 func (m *Model) renderContentArea() string {
-	// Update viewport dimensions
 	m.viewport.Width = m.layout.contentWidth
 	m.viewport.Height = m.layout.contentHeight
 
 	var content strings.Builder
 
-	// Add viewport content
 	if base := m.viewport.View(); base != "" {
 		content.WriteString(base)
 	} else if !m.bannerShown {
 		m.bannerShown = true
 		content.WriteString(m.renderWelcome())
+	} else {
+		m.viewport.SetContent(m.renderWelcome())
+		content.WriteString(m.viewport.View())
 	}
 
-	// Pad content to exact mainWidth
 	return lipgloss.NewStyle().
 		Width(m.layout.mainWidth).
 		Render(content.String())
