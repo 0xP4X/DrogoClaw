@@ -12,14 +12,32 @@ func RunLoadingSteps(stepLabels []string, execute func(int) error) error {
 	s.Spinner = spinner.Dot
 	s.Style = SpinnerStyle
 
-	logo := HeaderBrandStyle.Render("  ___              _          _           _ _   ") + "\n" +
-		HeaderBrandStyle.Render(" |   \\ _ _ __ _ _| |_ __ _  | | __ _ _ _| (_)__ ___ __") + "\n" +
-		HeaderBrandStyle.Render(" | |) | '_/ _` |  _/ _` | | |/ _` | '_| | / _` \\ V / _ |") + "\n" +
-		HeaderBrandStyle.Render(" |___/|_| \\__,_|\\__\\__,_| |_|\\__,_|_| |_|_|\\__,_\\_/ \\_,_|")
+	claw := []string{
+		"                  /\\          /\\",
+		"                 /  \\   /\\   /  \\",
+		"                /    \\ /  \\ /    \\",
+		"               /  D   V    V   R  \\",
+		"              /    \\  |    |  /    \\",
+		"             /  G   \\ |    | /  C   \\",
+		"            /    O   \\|    |/   L   \\",
+		"           /_______W__\\____/___A____\\",
+		"                 \\    /    \\    /",
+		"                  \\  /  /\\  \\  /",
+		"                   \\/  /  \\  \\/",
+		"                    | /    \\ |",
+		"                    |/  ||  \\|",
+		"                     \\  ||  /",
+		"                      \\ || /",
+		"                       \\||/",
+		"                        \\/",
+	}
 
 	fmt.Println()
-	fmt.Println(logo)
-	fmt.Println(HintDescStyle.Render("  Autonomous AI Security Testing Platform"))
+	for _, line := range claw {
+		fmt.Println(HeaderBrandStyle.Render("  " + line))
+	}
+	fmt.Println()
+	fmt.Println(HintDescStyle.Render("                    Autonomous AI Security Testing"))
 	fmt.Println()
 
 	for i, label := range stepLabels {

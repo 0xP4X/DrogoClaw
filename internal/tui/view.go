@@ -17,7 +17,8 @@ import (
 
 func (m *Model) View() string {
 	if m.width == 0 {
-		return ""
+		splash := m.renderSplash()
+		return splash
 	}
 
 	m.layout = calculateLayoutWithSidebar(m.width, m.height, m.showSidebar)
@@ -364,12 +365,30 @@ func (m Model) renderWelcome() string {
 	subStyle := lipgloss.NewStyle().
 		Foreground(m.theme.TextMuted)
 
-	logo := logoStyle.Render("  ___              _          _           _ _   ") + "\n" +
-		logoStyle.Render(" |   \\ _ _ __ _ _| |_ __ _  | | __ _ _ _| (_)__ ___ __") + "\n" +
-		logoStyle.Render(" | |) | '_/ _` |  _/ _` | | |/ _` | '_| | / _` \\ V / _ |") + "\n" +
-		logoStyle.Render(" |___/|_| \\__,_|\\__\\__,_| |_|\\__,_|_| |_|_|\\__,_\\_/ \\_,_|") + "\n"
+	claw := []string{
+		"                  /\\          /\\",
+		"                 /  \\   /\\   /  \\",
+		"                /    \\ /  \\ /    \\",
+		"               /  D   V    V   R  \\",
+		"              /    \\  |    |  /    \\",
+		"             /  G   \\ |    | /  C   \\",
+		"            /    O   \\|    |/   L   \\",
+		"           /_______W__\\____/___A____\\",
+		"                 \\    /    \\    /",
+		"                  \\  /  /\\  \\  /",
+		"                   \\/  /  \\  \\/",
+		"                    | /    \\ |",
+		"                    |/  ||  \\|",
+		"                     \\  ||  /",
+		"                      \\ || /",
+		"                       \\||/",
+		"                        \\/",
+	}
 
-	sb.WriteString(logo)
+	for _, line := range claw {
+		sb.WriteString("  " + logoStyle.Render(line) + "\n")
+	}
+	sb.WriteString("\n")
 	sb.WriteString(subStyle.Render("  Autonomous AI Security Testing Platform\n"))
 
 	sep := lipgloss.NewStyle().Foreground(m.theme.Border).Render(strings.Repeat("─", min(width-4, 52)))
@@ -1233,4 +1252,77 @@ func ColorizeElapsed(elapsed string) string {
 	default:
 		return StatusOnStyle.Render("● " + elapsed)
 	}
+}
+
+func (m *Model) renderSplash() string {
+	w := max(60, m.width)
+	if w <= 0 {
+		w = 80
+	}
+
+	logoStyle := lipgloss.NewStyle().
+		Foreground(m.theme.Primary).
+		Bold(true)
+	subStyle := lipgloss.NewStyle().
+		Foreground(m.theme.TextMuted)
+	dimStyle := lipgloss.NewStyle().
+		Foreground(m.theme.TextDim)
+
+	claw := []string{
+		"                  /\\          /\\",
+		"                 /  \\   /\\   /  \\",
+		"                /    \\ /  \\ /    \\",
+		"               /  D   V    V   R  \\",
+		"              /    \\  |    |  /    \\",
+		"             /  G   \\ |    | /  C   \\",
+		"            /    O   \\|    |/   L   \\",
+		"           /_______W__\\____/___A____\\",
+		"                 \\    /    \\    /",
+		"                  \\  /  /\\  \\  /",
+		"                   \\/  /  \\  \\/",
+		"                    | /    \\ |",
+		"                    |/  ||  \\|",
+		"                     \\  ||  /",
+		"                      \\ || /",
+		"                       \\||/",
+		"                        \\/",
+	}
+
+	textLine := "D r o g o n C l a w"
+	subLine := "Autonomous AI Security Testing"
+	dimLine := "Initializing..."
+
+	var sb strings.Builder
+
+	totalHeight := len(claw) + 5
+	padTop := max(0, (m.height-totalHeight)/2)
+	for i := 0; i < padTop; i++ {
+		sb.WriteString("\n")
+	}
+
+	for _, line := range claw {
+		centered := lipgloss.NewStyle().Width(w).Align(lipgloss.Center).Render(logoStyle.Render(line))
+		sb.WriteString(centered)
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("\n")
+	centeredText := lipgloss.NewStyle().Width(w).Align(lipgloss.Center).Render(
+		logoStyle.Render(textLine),
+	)
+	sb.WriteString(centeredText)
+	sb.WriteString("\n")
+
+	centeredSub := lipgloss.NewStyle().Width(w).Align(lipgloss.Center).Render(
+		subStyle.Render(subLine),
+	)
+	sb.WriteString(centeredSub)
+	sb.WriteString("\n\n")
+
+	centeredDim := lipgloss.NewStyle().Width(w).Align(lipgloss.Center).Render(
+		dimStyle.Render(dimLine),
+	)
+	sb.WriteString(centeredDim)
+
+	return sb.String()
 }
