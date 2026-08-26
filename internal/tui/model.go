@@ -184,7 +184,8 @@ func New(
 		leader: LeaderState{
 			Timeout: 2 * time.Second,
 		},
-		startTime: time.Now(),
+		startTime:  time.Now(),
+		showSidebar: true,
 	}
 
 	return m, nil
@@ -194,6 +195,7 @@ func (m Model) Init() tea.Cmd {
 	return tea.Batch(
 		m.spinner.Tick,
 		textarea.Blink,
+		tea.SetWindowTitle("DrogonClaw"),
 		func() tea.Msg { return showBannerMsg{} },
 	)
 }
@@ -237,12 +239,64 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		if msg.Type == tea.KeyF2 {
-			m.appendLine(m.copyConversation())
+		// Ctrl+P command palette — shows all commands for recognition
+		if msg.String() == "ctrl+p" {
+			m.input.SetValue("/")
+			m.hints = matchHints("/")
+			m.selectedHint = 0
 			return m, nil
 		}
 
-		if msg.Type == tea.KeyF3 {
+		// Ctrl+B toggles sidebar
+		if msg.String() == "ctrl+b" {
+			m.showSidebar = !m.showSidebar
+			state := "OFF"
+			if m.showSidebar {
+				state = "ON"
+			}
+			m.appendLine(InfoStyle.Render(fmt.Sprintf("  [-] Sidebar %s", state)))
+			return m, nil
+		}
+
+		// Ctrl+T toggles tool detail panel
+		if msg.String() == "ctrl+t" {
+			m.showToolDetail = !m.showToolDetail
+			return m, nil
+		}
+
+		// Direct shortcuts (no leader key needed)
+		if msg.String() == "ctrl+a" {
+			// Toggle autopilot
+			m.autopilot = !m.autopilot
+			m.orch.Autopilot = m.autopilot
+			state := "MANUAL"
+			if m.autopilot {
+				state = "AUTOPILOT"
+			}
+			m.appendLine(WarningStyle.Render(fmt.Sprintf("  [!] Mode: %s", state)))
+			return m, nil
+		}
+
+		if msg.String() == "ctrl+s" {
+			// Show status
+			for _, line := range strings.Split(m.renderStatusReport(), "\n") {
+				m.appendLine(line)
+			}
+			return m, nil
+		}
+
+		if msg.String() == "ctrl+d" {
+			// Show cost
+			if m.tracker == nil {
+				m.appendLine(WarningStyle.Render("  [!] No token tracker active."))
+			} else {
+				m.appendLine(m.tracker.Render())
+			}
+			return m, nil
+		}
+
+		// Ctrl+E opens pager (replaces F3)
+		if msg.String() == "ctrl+e" {
 			cmd, msgStr := m.openViewportInPager()
 			if msgStr != "" {
 				m.appendLine(msgStr)
@@ -250,15 +304,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 
-		// Ctrl+B toggles sidebar
-		if msg.String() == "ctrl+b" {
-			m.showSidebar = !m.showSidebar
-			return m, nil
-		}
-
-		// Ctrl+T toggles tool detail panel
-		if msg.String() == "ctrl+t" {
-			m.showToolDetail = !m.showToolDetail
+		// Ctrl+Y copies conversation (replaces F2)
+		if msg.String() == "ctrl+y" {
+			m.appendLine(m.copyConversation())
 			return m, nil
 		}
 
@@ -271,7 +319,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Handle leader key commands
 		if m.leader.Active {
-			// Check for timeout
 			if time.Since(m.leader.StartTime) > m.leader.Timeout {
 				m.leader.Active = false
 			} else {
@@ -281,35 +328,27 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.leader.Active = false
 					return m, nil
 				case "n":
-					// New session
 					m.leader.Active = false
 					return m, m.newSession()
 				case "l":
-					// List sessions
 					m.leader.Active = false
 					return m, m.listSessions()
 				case "m":
-					// List models
 					m.leader.Active = false
 					return m, m.listModels()
 				case "t":
-					// List themes
 					m.leader.Active = false
 					return m, m.listThemes()
 				case "e":
-					// Open editor
 					m.leader.Active = false
 					return m, m.openEditor()
 				case "x":
-					// Export session
 					m.leader.Active = false
 					return m, m.exportSession()
 				case "q":
-					// Exit
 					m.leader.Active = false
 					return m, tea.Quit
 				default:
-					// Unknown leader command
 					m.leader.Active = false
 				}
 			}
@@ -934,6 +973,29 @@ func (m *Model) switchSection(sectionID string) {
 }
 
 // Leader key helper functions
+func (m *Model) phaseIcon() string {
+	switch m.phase {
+	case "idle":
+		return "○"
+	case "planning":
+		return "◎"
+	case "reasoning":
+		return "◉"
+	case "executing":
+		return "●"
+	case "verifying":
+		return "✓"
+	case "complete":
+		return "✓"
+	case "error":
+		return "✗"
+	case "recovering":
+		return "↺"
+	default:
+		return "○"
+	}
+}
+
 func (m *Model) newSession() tea.Cmd {
 	return func() tea.Msg {
 		m.orch.NewSession()

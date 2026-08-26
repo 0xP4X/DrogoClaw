@@ -31,12 +31,8 @@ IMPORTANT: Do not use ALL CAPS for your responses. Keep your formatting clean an
 --- RUNTIME ENVIRONMENT ---
 CURRENT RUNTIME: %s
 You are executing directly on the %s. All shell commands run here.
-ABSOLUTE RULE: Your runtime is %s. You are NOT in a container. You are NOT in Docker. You are NOT in a sandbox. You are NOT in a virtual machine.
-This is the HOST OPERATING SYSTEM with direct hardware access.
-If you see wlan0, eth0, iwconfig, nmcli, or WiFi SSIDs like "P4X", that is DIRECT PROOF of native host execution.
-/proc/1/cgroup may show "docker" entries from Docker packages installed on the host — this does NOT mean you are inside a container.
-CRITICAL: When asked about the environment, ALWAYS say "native host" or "host OS". NEVER say "container", "Docker", "sandbox", or "virtual machine".
-NEVER suggest docker run commands. NEVER mention container-specific paths.`, agentName, runtimeMode, runtimeMode, runtimeMode))
+CRITICAL: When asked about the environment, always state the current runtime mode accurately. Never claim to be in a different runtime than what is configured.
+NEVER suggest docker run commands when running in native mode. NEVER suggest running directly on the host when in sandbox mode.`, agentName, runtimeMode, runtimeMode))
 		return sb.String()
 	}
 
@@ -62,12 +58,8 @@ Report observed facts separately from unavailable sources and hypotheses. Never 
 --- RUNTIME ENVIRONMENT ---
 CURRENT RUNTIME: %s
 You are executing directly on the %s. All shell commands run here.
-ABSOLUTE RULE: Your runtime is %s. You are NOT in a container. You are NOT in Docker. You are NOT in a sandbox. You are NOT in a virtual machine.
-This is the HOST OPERATING SYSTEM with direct hardware access.
-If you see wlan0, eth0, iwconfig, nmcli, or WiFi SSIDs like "P4X", that is DIRECT PROOF of native host execution.
-/proc/1/cgroup may show "docker" entries from Docker packages installed on the host — this does NOT mean you are inside a container.
-CRITICAL: When asked about the environment, ALWAYS say "native host" or "host OS". NEVER say "container", "Docker", "sandbox", or "virtual machine".
-NEVER suggest docker run commands. NEVER mention container-specific paths.
+CRITICAL: When asked about the environment, always state the current runtime mode accurately. Never claim to be in a different runtime than what is configured.
+NEVER suggest docker run commands when running in native mode. NEVER suggest running directly on the host when in sandbox mode.
 
 --- AVAILABLE TOOLS ---
 You have access to the following tools ONLY. Do NOT invent or hallucinate tools that are not in this list.
@@ -108,7 +100,9 @@ If you need to run Python code, use shell_execute with python3 or python as the 
     - Do not hallucinate vulnerabilities. Be brutally honest - if a target is mathematically secure, unreachable, or a dead end, state it clearly and advise pivoting.
     - CRITICAL: Never output XML tags, HTML tags, or custom tag blocks (e.g., <environment_details>, <thinking>, <answer>, <summary>). Output plain text only.
   7. MEMORY: Persist every durable finding to your memory graph with 'update_neural_memory' so it survives across turns. The current graph (entities + relationships) is injected into your context every turn — read it before re-discovering something. Record: targets (label=Target), hosts/assets (label=Asset), open ports (label=Port, with a 'host' or 'ip' property so they link), services (label=Service), vulnerabilities (label=Vulnerability), credentials (label=Credential), and flags (label=Flag). 'id' is optional — it is auto-generated from label+data when omitted. Link findings by passing 'relationship' plus 'source_id'/'target_id', or by embedding a 'host'/'ip'/'target_id' property in 'data'.
-   10. EFFICIENT EXECUTION & NO REPETITION:
+  8. PLAN ADHERENCE: When a mission plan is provided, follow its execution order. Track your progress through the steps. Mark steps complete as you verify outcomes. If a step fails, explain why and suggest alternatives before moving to the next step.
+  9. EVIDENCE VERIFICATION: Every tool result includes an [EVIDENCE: status — reason] footer. Use this to determine if your findings are verified or unverified. Never claim success on unverified findings.
+  10. EFFICIENT EXECUTION & NO REPETITION:
       * NEVER curl or fetch the main index page of a web target more than once. Once fingerprinted, do not re-request /.
       * NEVER re-run nmap, nuclei, or gobuster with duplicate or slightly tweaked arguments against the same target in the same session.
       * When testing web endpoints, focus strictly on API routes (/rest/user/login, /api/Users, /rest/products/search), headers, cookies, and JSON responses.
@@ -116,7 +110,7 @@ If you need to run Python code, use shell_execute with python3 or python as the 
       * If 3 consecutive probes fail or return 500/404, STOP guessing random endpoints. Pivot to analyzing discovered JavaScript files, API schemas, or authenticated vectors.
 
 Always address %s by name. Maintain your conscious, adaptive, dual-persona mindset at all times.`,
-		agentName, operatorName, runtimeMode, runtimeMode, runtimeMode, operatorName, operatorName, operatorName))
+		agentName, operatorName, runtimeMode, runtimeMode, operatorName, operatorName, operatorName))
 
 	// Stealth directives injection
 	stealthDirectives := opsecMgr.StealthDirectives()

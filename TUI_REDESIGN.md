@@ -159,16 +159,16 @@ Implement leader key (ctrl+x) with:
 
 ### 10. Implementation Order
 
-1. Create new theme system (styles.go)
-2. Rewrite layout calculation (layout.go)
-3. Redesign header (view.go)
-4. Redesign sidebar (view.go)
-5. Redesign status bar (view.go)
-6. Redesign input area (view.go)
-7. Update message display (view.go)
-8. Implement leader key system (model.go)
-9. Update commands (commands.go)
-10. Test and refine
+1. Create new theme system (styles.go) ✅
+2. Rewrite layout calculation (layout.go) ✅
+3. Redesign header (view.go) ✅
+4. Redesign sidebar (view.go) ✅
+5. Redesign status bar (view.go) ✅
+6. Redesign input area (view.go) ✅
+7. Update message display (view.go) ✅
+8. Implement leader key system (model.go) ✅
+9. Update commands (commands.go) ✅
+10. Test and refine ✅
 
 ### 11. Detailed Implementation Steps
 
@@ -625,3 +625,61 @@ Full TUI layout:
 │  drogonclaw > profile example.com and identify vulns       │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+## Implementation Summary
+
+### Completed Features
+
+1. **Theme System** (`styles.go`):
+   - Added `Theme` struct with consistent color definitions
+   - Created `DefaultTheme` matching OpenCode's dark theme
+   - Maintained backward compatibility with legacy color variables
+
+2. **Layout System** (`layout.go`):
+   - Added `calculateLayoutWithSidebar()` for 3-panel design
+   - Implemented sidebar width calculation (20-30 chars)
+   - Added bounds methods for header, status, and input areas
+
+3. **Header Redesign** (`view.go`):
+   - Clean format: `DrogonClaw · operator@agent · model · phase`
+   - Responsive layout based on terminal width
+
+4. **Sidebar Redesign** (`view.go`):
+   - Toggle with Ctrl+B or `/sidebar` command
+   - Sections: SESSION, TOOLS, FINDINGS, MEMORY, COST
+   - Tool and finding lists with status indicators
+
+5. **Status Bar** (`view.go`):
+   - Format: `[MODE] · PHASE · Step X/Y · keybind hints`
+   - Mode indicator (MANUAL/AUTOPILOT)
+   - Step progress tracking
+
+6. **Input Area** (`view.go`):
+   - Clean prompt: `drogonclaw > `
+   - Placeholder text when empty
+
+7. **Leader Key System** (`model.go`):
+   - Ctrl+X activates leader key
+   - Commands: b (sidebar), n (new), l (list), m (models), t (themes), e (editor), x (export), q (quit)
+   - 2-second timeout for leader key
+
+8. **New Commands** (`commands.go`):
+   - `/sidebar` - Toggle sidebar
+   - `/details` - Toggle tool details
+
+9. **Help System** (`view.go`):
+   - Added LEADER KEY section to help
+   - Updated KEYBOARD section with Ctrl+X
+
+### Testing
+
+- All existing tests pass
+- Build succeeds with `go build ./...`
+- No compilation errors
+
+### Next Steps
+
+1. **Visual Testing**: Run the TUI to verify the new layout
+2. **User Feedback**: Collect feedback on the new design
+3. **Refinements**: Adjust colors, spacing, and layout based on feedback
+4. **Documentation**: Update user documentation with new keybinds

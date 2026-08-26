@@ -291,6 +291,22 @@ func (m *Model) handleSlashCommand(raw string) (*Model, tea.Cmd) {
 	case "/timeline":
 		m.appendLine(m.renderTimeline())
 
+	case "/sidebar":
+		m.showSidebar = !m.showSidebar
+		state := "OFF"
+		if m.showSidebar {
+			state = "ON"
+		}
+		m.appendLine(InfoStyle.Render(fmt.Sprintf("  [-sidebar] Sidebar %s", state)))
+
+	case "/details":
+		m.showToolDetail = !m.showToolDetail
+		state := "OFF"
+		if m.showToolDetail {
+			state = "ON"
+		}
+		m.appendLine(InfoStyle.Render(fmt.Sprintf("  [details] Tool details %s", state)))
+
 	case "/help":
 		m.appendLine(renderHelp())
 

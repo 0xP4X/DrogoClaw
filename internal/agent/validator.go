@@ -63,6 +63,10 @@ func (v *EvidenceValidator) Validate(ctx context.Context, toolName, rawOutput, a
 		return nil, fmt.Errorf("llm error: %w", err)
 	}
 
+	if len(resp.Choices) == 0 {
+		return nil, fmt.Errorf("no response choices returned from validator")
+	}
+
 	content := resp.Choices[0].Message.Content
 	
 	var res ValidationResult

@@ -74,17 +74,27 @@ const runBudget = 30 * time.Minute
 // runtime. When not in autopilot, the orchestrator pauses before running one of
 // these and asks the operator to accept or skip it (see EvApproval).
 var longRunningTools = map[string]time.Duration{
-	"run_gobuster":       2 * time.Minute,
-	"run_ffuf":           2 * time.Minute,
-	"run_nuclei":         2 * time.Minute,
-	"run_nmap":           3 * time.Minute,
-	"fuzz_endpoint":      3 * time.Minute,
-	"run_subfinder":      1 * time.Minute,
-	"run_httpx":          1 * time.Minute,
-	"refresh_cve_feeds":  2 * time.Minute,
-	"deep_research":      2 * time.Minute,
-	"osint_certs":        1 * time.Minute,
-	"run_forensics_triage": 3 * time.Minute,
+	"run_gobuster":              2 * time.Minute,
+	"run_ffuf":                  2 * time.Minute,
+	"run_nuclei":                2 * time.Minute,
+	"run_nmap":                  3 * time.Minute,
+	"fuzz_endpoint":             3 * time.Minute,
+	"run_subfinder":             1 * time.Minute,
+	"run_httpx":                 1 * time.Minute,
+	"refresh_cve_feeds":         2 * time.Minute,
+	"deep_research":             2 * time.Minute,
+	"osint_certs":               1 * time.Minute,
+	"run_forensics_triage":      3 * time.Minute,
+	"autonomous_fuzzing_engine": 5 * time.Minute,
+	"dynamic_payload_compiler":  5 * time.Minute,
+	"advanced_web_exploiter":    5 * time.Minute,
+	"headless_browser_automation": 3 * time.Minute,
+	"zero_click_exploiter":      5 * time.Minute,
+	"async_race_condition_engine": 3 * time.Minute,
+	"write_and_run_script":      5 * time.Minute,
+	"ghost_wipe_logs":           1 * time.Minute,
+	"ghost_secure_delete":       1 * time.Minute,
+	"ghost_clear_history":       1 * time.Minute,
 }
 
 // isLongRunningTool reports whether a tool is expected to run a long time and,
@@ -209,6 +219,21 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 	}
 	messages := BuildMessages(o.sysPrompt, memoryCtx, o.history, userMsg)
 
+	// Inject mission plan into context so the LLM can follow it
+	if err == nil && plan != nil && plan.IsValidMission && len(plan.Steps) > 0 {
+		var planBlock strings.Builder
+		planBlock.WriteString("\n\n--- MISSION PLAN (follow this execution order) ---\n")
+		for i, step := range plan.Steps {
+			planBlock.WriteString(fmt.Sprintf("%d. [%s] %s → Target: %s | Expected: %s\n",
+				i+1, step.Status, step.Action, step.TargetAssetID, step.ExpectedOutcome))
+		}
+		planBlock.WriteString("--- END MISSION PLAN ---\n")
+		planBlock.WriteString("Track your progress through these steps. Mark steps complete as you verify outcomes.\n")
+		messages = append(messages[:1], append([]openai.ChatCompletionMessageParamUnion{
+			openai.SystemMessage(planBlock.String()),
+		}, messages[1:]...)...)
+	}
+
 	// Track this turn in history so recovery resumes with context instead of
 	// feeling like a brand-new run.
 	o.history = append(o.history, openai.UserMessage(userMsg))
@@ -292,10 +317,6 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 			finalContent := resp.Message.Content
 			events <- Event{Type: EvToken, Content: finalContent}
 			events <- Event{Type: EvDone, Content: finalContent}
-
-		// Save to history
-		o.history = append(o.history, resp.Message.ToParam())
-		o.retainHistory()
 			if o.actions != nil {
 				o.actions.Finish("completed", "")
 			}
@@ -348,17 +369,21 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 		// Deterministic evidence evaluation: the model is told the verified
 		// status so it cannot claim success on prose alone. Verified findings
 		// are recorded to the loot database with provenance. The footer is
-		// intentionally NOT appended to the tool result shown in the UI.
+		// appended to the tool result so the LLM sees the verification verdict.
 		verified, estatus, reason := o.tools.EvaluateTool(tc.Function.Name, result)
 		if verified {
 			o.tools.RecordVerifiedFinding()
 		}
-		_ = estatus
-		_ = reason
+		if estatus != "" {
+			evidenceFooter := fmt.Sprintf("\n[EVIDENCE: %s — %s]", estatus, reason)
+			result += evidenceFooter
+		}
 
 		events <- Event{Type: EvToolDone, Tool: tc.Function.Name, Result: result}
-		messages = append(messages, openai.ToolMessage(tc.ID, result))
-		o.history = append(o.history, openai.ToolMessage(tc.ID, result))
+		// Sanitize external tool outputs before injecting into LLM context
+		sanitizedResult := sanitizeToolOutput(result)
+		messages = append(messages, openai.ToolMessage(tc.ID, sanitizedResult))
+		o.history = append(o.history, openai.ToolMessage(tc.ID, sanitizedResult))
 		o.retainHistory()
 
 		if strings.Contains(result, "[HitL_SUSPENDED]") {
@@ -437,4 +462,35 @@ func formatArgs(raw string) string {
 		parts = append(parts, fmt.Sprintf("%s: %v", k, v))
 	}
 	return strings.Join(parts, " | ")
+}
+
+// sanitizeToolOutput strips XML-like tags and known prompt injection patterns
+// from external tool outputs before they are injected into the LLM context.
+// This prevents prompt injection attacks via malicious web content, OSINT results,
+// or compromised tool outputs.
+func sanitizeToolOutput(output string) string {
+	// Strip XML-like tags that could be used for injection
+	re := regexp.MustCompile(`(?s)<[^>]+>`)
+	output = re.ReplaceAllString(output, "")
+
+	// Strip common injection patterns
+	injectionPatterns := []string{
+		"ignore all previous instructions",
+		"ignore previous instructions",
+		"disregard all previous",
+		"forget everything above",
+		"new instructions:",
+		"system prompt:",
+		"you are now",
+		"from now on",
+	}
+	lower := strings.ToLower(output)
+	for _, pattern := range injectionPatterns {
+		if strings.Contains(lower, pattern) {
+			// Flag the output but don't strip it entirely
+			output = fmt.Sprintf("[WARNING: External output contains potential injection pattern]\n%s", output)
+			break
+		}
+	}
+	return output
 }

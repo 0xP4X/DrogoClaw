@@ -20,92 +20,125 @@ func (m *Model) View() string {
 		return "Loading DrogonClaw..."
 	}
 
-	// Calculate layout
 	m.layout = calculateLayoutWithSidebar(m.width, m.height, m.showSidebar)
 
-	// Render header
-	header := m.renderHeaderLine()
-
-	// Render content area
+	// Build each zone to exact pixel widths
+	header := m.renderHeaderBar()
 	content := m.renderContentArea()
+	statusBar := m.renderStatusBarBar()
+	inputArea := m.renderInputBar()
 
-	// Render sidebar
-	var sidebar string
-	if m.showSidebar && m.layout.sidebarWidth > 0 {
-		sidebar = m.renderSidebar(m.layout.sidebarWidth, m.layout.sidebarHeight)
+	// Horizontal rule with proper background
+	hline := func() string {
+		return lipgloss.NewStyle().
+			Foreground(m.theme.Border).
+			Background(m.theme.Background).
+			Width(m.width).
+			Render(strings.Repeat("─", m.width))
 	}
 
-	// Render status bar
-	statusBar := m.renderStatusBar()
-
-	// Render input area
-	inputArea := m.renderInputArea()
-
-	// Join layout
 	var sb strings.Builder
 	sb.WriteString(header)
 	sb.WriteString("\n")
+	sb.WriteString(hline())
+	sb.WriteString("\n")
 
-	if m.showSidebar && sidebar != "" {
-		// Join content and sidebar horizontally
-		contentWithSidebar := lipgloss.JoinHorizontal(
-			lipgloss.Top,
-			content,
-			sidebar,
-		)
-		sb.WriteString(contentWithSidebar)
+	if m.showSidebar && m.layout.sidebarWidth > 0 {
+		sidebar := m.renderSidebar(m.layout.sidebarWidth, m.layout.sidebarHeight)
+		sb.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, content, sidebar))
 	} else {
 		sb.WriteString(content)
 	}
 
 	sb.WriteString("\n")
+
+	if len(m.hints) > 0 {
+		sb.WriteString(m.renderHints())
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString(hline())
+	sb.WriteString("\n")
 	sb.WriteString(statusBar)
+	sb.WriteString("\n")
+	sb.WriteString(hline())
 	sb.WriteString("\n")
 	sb.WriteString(inputArea)
 
 	return sb.String()
 }
 
+func (m *Model) renderHeaderBar() string {
+	inner := m.renderHeaderLine()
+	return lipgloss.NewStyle().
+		Background(m.theme.BackgroundSurface).
+		Foreground(m.theme.Text).
+		Width(m.width).
+		Padding(0, 1).
+		Render(inner)
+}
+
+func (m *Model) renderStatusBarBar() string {
+	inner := m.renderStatusBar()
+	return lipgloss.NewStyle().
+		Background(m.theme.BackgroundSurface).
+		Foreground(m.theme.Text).
+		Width(m.width).
+		Padding(0, 1).
+		Render(inner)
+}
+
+func (m *Model) renderInputBar() string {
+	inner := m.renderInputArea()
+	return lipgloss.NewStyle().
+		Background(m.theme.BackgroundSurface).
+		Foreground(m.theme.Text).
+		Width(m.width).
+		Padding(0, 1).
+		Render(inner)
+}
+
 func (m Model) renderHeaderLine() string {
+	var parts []string
+
+	// Brand
+	brandStyle := lipgloss.NewStyle().
+		Foreground(m.theme.Primary).
+		Bold(true)
+	parts = append(parts, brandStyle.Render("DrogonClaw"))
+
+	// Separator
+	sep := lipgloss.NewStyle().Foreground(m.theme.Border)
+
+	// Operator@Agent (show on medium+ screens)
 	op := m.graph.GetOperatorProfile()
-	opName := "operator"
-	if op != nil && op.Name != "" {
-		opName = op.Name
-	}
 	ag := m.graph.GetAgentProfile()
-	agName := "drogonclaw"
-	if ag != nil && ag.Name != "" {
-		agName = strings.ToLower(ag.Name)
-	}
-	runtime := m.sandbox.RuntimeLabel()
-	phase, _ := renderPhaseBadge(m.phase)
-
-	sep := HeaderSepStyle.Render("·")
-
-	parts := []string{HeaderBrandStyle.Render("DrogonClaw")}
-	if m.width >= 40 {
-		parts = append(parts, HeaderInfoStyle.Render(fmt.Sprintf("%s@%s", opName, agName)))
-	}
-	if m.width >= 70 {
-		parts = append(parts, HeaderDimStyle.Render(runtime))
-	}
-	parts = append(parts, phase)
-
-	line := strings.Join(parts, sep)
-	if lipgloss.Width(line) > m.width {
-		line = HeaderBrandStyle.Render("DrogonClaw") + sep + truncateVisible(runtime, max(8, m.width-16))
+	if op != nil && ag != nil && m.width >= 50 {
+		infoStyle := lipgloss.NewStyle().Foreground(m.theme.TextMuted)
+		parts = append(parts, sep.Render("·"))
+		parts = append(parts, infoStyle.Render(fmt.Sprintf("%s@%s", op.Name, ag.Name)))
 	}
 
-	return HeaderInfoStyle.Render(line)
+	// Model name (show on large screens)
+	if m.modelName != "" && m.width >= 70 {
+		parts = append(parts, sep.Render("·"))
+		modelStyle := lipgloss.NewStyle().Foreground(m.theme.Accent)
+		parts = append(parts, modelStyle.Render(m.modelName))
+	}
+
+	// Phase badge
+	phaseIcon := m.phaseIcon()
+	parts = append(parts, sep.Render("·"))
+	_, phaseStyle := renderPhaseBadge(m.phase)
+	parts = append(parts, phaseStyle.Render(phaseIcon))
+
+	return lipgloss.JoinHorizontal(lipgloss.Center, parts...)
 }
 
 func (m Model) renderExecutingLine() string {
 	tool := m.activeToolName
 	if tool == "" {
 		tool = m.lastTool
-	}
-	if tool == "" {
-		tool = "thinking"
 	}
 
 	elapsed := ""
@@ -119,31 +152,41 @@ func (m Model) renderExecutingLine() string {
 	}
 	_, phaseStyle := renderPhaseBadge(phase)
 
-	parts := []string{
-		m.spinner.View() + " ",
-		phaseStyle.Render(strings.ToUpper(phase)),
-		HeaderDimStyle.Render(elapsed),
+	// Compact format: spinner PHASE · elapsed · steps · tool
+	sep := lipgloss.NewStyle().Foreground(m.theme.Border).Render("·")
+	var parts []string
+	parts = append(parts, m.spinner.View())
+	parts = append(parts, phaseStyle.Render(strings.ToUpper(phase)))
+
+	if elapsed != "" {
+		parts = append(parts, sep)
+		parts = append(parts, lipgloss.NewStyle().Foreground(m.theme.TextDim).Render(elapsed))
 	}
 
-	// Add step progress if available
 	if m.stepCount > 0 {
-		stepInfo := fmt.Sprintf("Step %d", m.stepCount)
-		if m.totalSteps > 0 {
-			stepInfo = fmt.Sprintf("Step %d/%d", m.stepCount, m.totalSteps)
-		}
-		parts = append(parts, HeaderInfoStyle.Render(stepInfo))
+		stepStyle := lipgloss.NewStyle().Foreground(m.theme.TextMuted)
+		stepInfo := fmt.Sprintf("%d/%d", m.stepCount, m.totalSteps)
+		parts = append(parts, sep)
+		parts = append(parts, stepStyle.Render(stepInfo))
 	}
 
 	if tool != "" {
-		parts = append(parts, HeaderInfoStyle.Render("tool: "+truncateVisible(tool, max(8, m.width/3))))
+		toolStyle := lipgloss.NewStyle().Foreground(m.theme.Accent)
+		parts = append(parts, sep)
+		parts = append(parts, toolStyle.Render(truncateVisible(tool, max(8, m.width/4))))
 	}
 
-	line := strings.Join(parts, " ")
+	line := lipgloss.JoinHorizontal(lipgloss.Center, parts...)
+
+	// Truncate if too wide
 	if lipgloss.Width(line) > m.width {
 		line = m.spinner.View() + " " + phaseStyle.Render(strings.ToUpper(phase))
 	}
 
-	return HeaderInfoStyle.Render(line)
+	return lipgloss.NewStyle().
+		Foreground(m.theme.Text).
+		Width(m.width).
+		Render(line)
 }
 
 func (m *Model) renderContentArea() string {
@@ -151,19 +194,32 @@ func (m *Model) renderContentArea() string {
 	m.viewport.Width = m.layout.contentWidth
 	m.viewport.Height = m.layout.contentHeight
 
-	// Render viewport content
+	var content strings.Builder
+
+	// Add viewport content
 	if base := m.viewport.View(); base != "" {
-		return base
+		content.WriteString(base)
 	} else if !m.bannerShown {
 		m.bannerShown = true
-		return m.renderWelcome()
+		content.WriteString(m.renderWelcome())
 	}
 
-	return ""
+	// Pad content to exact mainWidth
+	return lipgloss.NewStyle().
+		Width(m.layout.mainWidth).
+		Render(content.String())
 }
 
 func (m *Model) renderStatusBar() string {
 	var parts []string
+
+	// Executing animation (highest priority)
+	if m.executing {
+		anim := m.renderExecutingLine()
+		if anim != "" {
+			return anim
+		}
+	}
 
 	// Mode indicator
 	mode := "MANUAL"
@@ -183,11 +239,9 @@ func (m *Model) renderStatusBar() string {
 	_, phaseStyle := renderPhaseBadge(m.phase)
 	parts = append(parts, phaseStyle.Render(strings.ToUpper(m.phase)))
 
-	// Separator
-	parts = append(parts, sep.Render("·"))
-
-	// Step progress
-	if m.stepCount > 0 {
+	// Step progress (show on medium+ screens)
+	if m.stepCount > 0 && m.width >= 50 {
+		parts = append(parts, sep.Render("·"))
 		stepStyle := lipgloss.NewStyle().Foreground(m.theme.TextMuted)
 		stepInfo := fmt.Sprintf("Step %d", m.stepCount)
 		if m.totalSteps > 0 {
@@ -196,37 +250,54 @@ func (m *Model) renderStatusBar() string {
 		parts = append(parts, stepStyle.Render(stepInfo))
 	}
 
-	// Keybind hints (right-aligned)
-	hintStyle := lipgloss.NewStyle().Foreground(m.theme.TextDim)
-	hints := []string{
-		hintStyle.Render("Ctrl+B sidebar"),
-		hintStyle.Render("/help"),
+	// Keybind hints (right-aligned, show on large screens)
+	if m.width >= 60 {
+		hintStyle := lipgloss.NewStyle().Foreground(m.theme.TextDim)
+		hints := []string{
+			hintStyle.Render("Ctrl+P palette"),
+			hintStyle.Render("Ctrl+A autopilot"),
+			hintStyle.Render("Ctrl+B sidebar"),
+		}
+		if !m.executing {
+			hints = append(hints, hintStyle.Render("/help"))
+		}
+		rightPart := lipgloss.JoinHorizontal(lipgloss.Right, hints...)
+		parts = append(parts, rightPart)
 	}
-	rightPart := lipgloss.JoinHorizontal(lipgloss.Right, hints...)
-	parts = append(parts, rightPart)
 
 	return lipgloss.JoinHorizontal(lipgloss.Center, parts...)
 }
 
 func (m *Model) renderInputArea() string {
-	var parts []string
+	// Manage textarea dimensions
+	agName := "drogonclaw"
+	glyph, _ := m.promptGlyph(agName)
+	taWidth := max(1, m.width-lipgloss.Width(glyph)-1)
+	m.input.SetWidth(taWidth)
 
-	// Prompt glyph
+	text := m.input.Value()
+	if text == "" {
+		m.input.SetHeight(1)
+	} else {
+		lines := strings.Split(text, "\n")
+		totalLines := 0
+		for _, line := range lines {
+			runeCount := utf8.RuneCountInString(line)
+			if runeCount == 0 {
+				totalLines++
+			} else {
+				totalLines += (runeCount + taWidth - 1) / taWidth
+			}
+		}
+		m.input.SetHeight(clamp(totalLines, 1, 6))
+	}
+
 	promptStyle := lipgloss.NewStyle().
 		Foreground(m.theme.Primary).
 		Bold(true)
-	parts = append(parts, promptStyle.Render("drogonclaw > "))
+	prompt := promptStyle.Render("drogonclaw > ")
 
-	// Input text
-	if m.input.Value() == "" {
-		placeholderStyle := lipgloss.NewStyle().Foreground(m.theme.TextDim)
-		parts = append(parts, placeholderStyle.Render("Type a message..."))
-	} else {
-		inputStyle := lipgloss.NewStyle().Foreground(m.theme.Text)
-		parts = append(parts, inputStyle.Render(m.input.Value()))
-	}
-
-	return lipgloss.JoinHorizontal(lipgloss.Left, parts...)
+	return prompt + m.input.View()
 }
 
 func (m Model) renderInputLine() string {
@@ -339,111 +410,11 @@ func (m Model) renderWelcome() string {
 }
 
 func (m Model) viewportDimensions() (width, height int) {
-	layout := calculateLayout(m.width, m.height, 0)
-	headerHeight := lipgloss.Height(m.renderHeaderLine())
-	inputHeight := lipgloss.Height(m.renderInputLine())
-	fixedHeight := headerHeight + inputHeight
+	layout := calculateLayoutWithSidebar(m.width, m.height, m.showSidebar)
 
-	layout = calculateLayout(m.width, m.height, fixedHeight)
-
-	vpWidth := max(8, layout.contentWidth-OutputPaneStyle.GetHorizontalFrameSize())
-	vpHeight := max(3, layout.contentHeight-MainPaneStyle.GetVerticalFrameSize())
+	vpWidth := max(8, layout.contentWidth)
+	vpHeight := max(3, layout.contentHeight)
 	return vpWidth, vpHeight
-}
-
-func (m Model) renderHeader(width int) string {
-	if width <= 0 {
-		return ""
-	}
-	op := m.graph.GetOperatorProfile()
-	opName := "operator"
-	if op != nil && op.Name != "" {
-		opName = op.Name
-	}
-	ag := m.graph.GetAgentProfile()
-	agName := "drogonclaw"
-	if ag != nil && ag.Name != "" {
-		agName = strings.ToLower(ag.Name)
-	}
-	runtime := m.sandbox.RuntimeLabel()
-
-	sep := HeaderSepStyle.Render("·")
-
-	parts := []string{HeaderBrandStyle.Render("DROGONCLAW")}
-
-	if width >= 40 {
-		parts = append(parts, HeaderInfoStyle.Render(fmt.Sprintf("%s@%s", opName, agName)))
-	}
-	if width >= 70 {
-		parts = append(parts, HeaderDimStyle.Render(runtime))
-	}
-
-	line := strings.Join(parts, sep)
-	if lipgloss.Width(line) > width {
-		line = HeaderBrandStyle.Render("DROGONCLAW") + sep + HeaderInfoStyle.Render(truncateVisible(runtime, max(8, width-16)))
-	}
-
-	return HeaderBarStyle.Width(width).Render(line)
-}
-
-func (m Model) renderStatusBar() string {
-	phase, _ := renderPhaseBadge(m.phase)
-	mode := m.activeMode
-	if mode == "" {
-		mode = "default"
-	}
-	elapsed := "idle"
-	if !m.execStartTime.IsZero() && m.executing {
-		elapsed = time.Since(m.execStartTime).Round(time.Second).String()
-	}
-	tool := m.activeToolName
-	if tool == "" {
-		tool = m.lastTool
-	}
-	if tool == "" {
-		tool = "ready"
-	}
-
-	anim := ""
-	if m.executing {
-		anim = m.spinner.View() + " "
-	}
-
-	left := fmt.Sprintf("%s%s %s", anim, phase, HeaderDimStyle.Render(elapsed))
-	centerValue := lipgloss.NewStyle().Foreground(ColorWhite).Render(truncateVisible(tool, max(8, m.width/3)))
-	center := fmt.Sprintf("tool:%s", centerValue)
-
-	scrollIndicator := ""
-	if m.userScrolledUp {
-		scrollIndicator = WarningStyle.Render(" ▲ ")
-	}
-	queueIndicator := ""
-	if len(m.promptQueue) > 0 {
-		queueIndicator = QueueStyle.Render(fmt.Sprintf("⏳ %d", len(m.promptQueue))) + " "
-	}
-	rightHint := "/help"
-	if m.width < 70 {
-		rightHint = ""
-	}
-	right := scrollIndicator + queueIndicator + HeaderDimStyle.Render(rightHint)
-
-	statusWidth := m.width
-	if statusWidth <= 0 {
-		statusWidth = 80
-	}
-
-	leftW := lipgloss.Width(left)
-	rightW := lipgloss.Width(right)
-	centerW := max(0, statusWidth-leftW-rightW-2)
-
-	var sb strings.Builder
-	sb.WriteString(left)
-	if centerW > 0 {
-		sb.WriteString(lipgloss.NewStyle().Width(centerW).Render(center))
-	}
-	sb.WriteString(right)
-
-	return StatusBarStyle.Width(statusWidth).Render(sb.String())
 }
 
 func (m Model) renderSidebar(width, height int) string {
@@ -451,10 +422,13 @@ func (m Model) renderSidebar(width, height int) string {
 		return ""
 	}
 
+	// Inner content width (subtract padding)
+	innerWidth := max(8, width-sidebarPadX*2-2)
+
 	var sb strings.Builder
 
 	row := func(label, value string) {
-		valueWidth := max(4, width-14)
+		valueWidth := max(4, innerWidth-14)
 		labelStyled := lipgloss.NewStyle().
 			Foreground(m.theme.TextDim).
 			Render(fmt.Sprintf("%-10s", label))
@@ -469,10 +443,10 @@ func (m Model) renderSidebar(width, height int) string {
 		titleStyled := lipgloss.NewStyle().
 			Foreground(m.theme.TextMuted).
 			Bold(true).
-			Render("▎" + title)
-		sb.WriteString(" " + titleStyled + "\n")
+			Render(title)
 		ruleStyle := lipgloss.NewStyle().Foreground(m.theme.BorderSubtle)
-		sb.WriteString(" " + ruleStyle.Render(strings.Repeat("─", max(4, width-3))) + "\n")
+		sb.WriteString(titleStyled + "\n")
+		sb.WriteString(ruleStyle.Render(strings.Repeat("─", max(4, innerWidth-1))) + "\n")
 	}
 
 	section("SESSION")
@@ -485,14 +459,14 @@ func (m Model) renderSidebar(width, height int) string {
 		elapsed = time.Since(m.execStartTime).Round(time.Second).String()
 	}
 
-	sessionId := truncateVisible(m.sessionID, max(4, width-14))
+	sessionId := truncateVisible(m.sessionID, max(4, innerWidth-14))
 	row("Session", HeaderInfoStyle.Render(sessionId))
-	row("Workflow", SidebarValueStyle.Render(truncate(activeMode, max(1, width-14))))
+	row("Workflow", SidebarValueStyle.Render(truncate(activeMode, max(1, innerWidth-14))))
 	row("Runtime", ColorizeElapsed(elapsed))
 	row("Phase", renderSidebarPhase(m.phase))
 
 	if m.lastObjective != "" {
-		objective := truncate(m.lastObjective, max(1, width-14))
+		objective := truncate(m.lastObjective, max(1, innerWidth-14))
 		row("Objective", HintDescStyle.Render(objective))
 	}
 
@@ -527,10 +501,24 @@ func (m Model) renderSidebar(width, height int) string {
 		row("Rate limit", StatusOffStyle.Render("○ OFF"))
 	}
 
+	section("KEYBINDS")
+	keyStyle := lipgloss.NewStyle().Foreground(m.theme.Accent)
+	descStyle := lipgloss.NewStyle().Foreground(m.theme.TextDim)
+	keys := []struct{ key, desc string }{
+		{"Ctrl+P", "Command palette"},
+		{"Ctrl+B", "Toggle sidebar"},
+		{"Ctrl+A", "Autopilot"},
+		{"Ctrl+D", "Cost"},
+		{"Ctrl+E", "Pager"},
+	}
+	for _, k := range keys {
+		sb.WriteString(fmt.Sprintf("  %s %s\n", keyStyle.Render(k.key), descStyle.Render(k.desc)))
+	}
+
 	if m.lastPlan != nil {
 		section("EXECUTION PLAN")
 		row("Steps", SidebarValueStyle.Render(fmt.Sprintf("%d", len(m.lastPlan.Steps))))
-		row("Detail", HintDescStyle.Render(truncate(m.phaseDetail, max(1, width-14))))
+		row("Detail", HintDescStyle.Render(truncate(m.phaseDetail, max(1, innerWidth-14))))
 	}
 
 	if m.tracker != nil {
@@ -550,7 +538,7 @@ func (m Model) renderSidebar(width, height int) string {
 			limit = 3
 		}
 		for i := 0; i < limit; i++ {
-			row(fmt.Sprintf("%d.", i+1), truncate(m.promptQueue[i], max(1, width-16)))
+			row(fmt.Sprintf("%d.", i+1), truncate(m.promptQueue[i], max(1, innerWidth-16)))
 		}
 		if len(m.promptQueue) > 3 {
 			row("…", fmt.Sprintf("+%d more", len(m.promptQueue)-3))
@@ -567,7 +555,7 @@ func (m Model) renderSidebar(width, height int) string {
 		for i := 0; i < limit; i++ {
 			tool := m.recentTools[i]
 			toolStyle := lipgloss.NewStyle().Foreground(m.theme.Accent)
-			sb.WriteString(" " + toolStyle.Render("▶") + " " + truncate(tool, max(1, width-6)) + "\n")
+			sb.WriteString(" " + toolStyle.Render("▶") + " " + truncate(tool, max(1, innerWidth-6)) + "\n")
 		}
 		if len(m.recentTools) > 5 {
 			sb.WriteString(" " + lipgloss.NewStyle().Foreground(m.theme.TextDim).Render(fmt.Sprintf("... +%d more", len(m.recentTools)-5)) + "\n")
@@ -591,7 +579,7 @@ func (m Model) renderSidebar(width, height int) string {
 			} else {
 				findingStyle = lipgloss.NewStyle().Foreground(m.theme.Success)
 			}
-			sb.WriteString(" " + findingStyle.Render("●") + " " + truncate(finding, max(1, width-6)) + "\n")
+			sb.WriteString(" " + findingStyle.Render("●") + " " + truncate(finding, max(1, innerWidth-6)) + "\n")
 		}
 		if len(m.findings) > 5 {
 			sb.WriteString(" " + lipgloss.NewStyle().Foreground(m.theme.TextDim).Render(fmt.Sprintf("... +%d more", len(m.findings)-5)) + "\n")
@@ -599,7 +587,13 @@ func (m Model) renderSidebar(width, height int) string {
 	}
 
 	content := strings.TrimSuffix(sb.String(), "\n")
-	return SidebarPaneStyle.Width(max(8, width-SidebarPaneStyle.GetHorizontalFrameSize())).Height(height).Render(content)
+
+	// Build sidebar with background panel — no forced height, top-aligned
+	return lipgloss.NewStyle().
+		Background(m.theme.BackgroundPanel).
+		Width(width).
+		Padding(1, sidebarPadX, 0, sidebarPadX).
+		Render(content)
 }
 
 func (m Model) renderStatusReport() string {
@@ -1031,15 +1025,60 @@ func (m Model) renderHints() string {
 	if len(m.hints) == 0 {
 		return ""
 	}
-	var lines []string
-	for i, h := range m.hints {
-		prefix := "  "
-		if i == m.selectedHint {
-			prefix = " >"
-		}
-		lines = append(lines, fmt.Sprintf("%s %-12s %s", prefix, HintCmdStyle.Render(h.cmd), HintDescStyle.Render(h.desc)))
+
+	// Max visible hints
+	maxVisible := 6
+	hints := m.hints
+	if len(hints) > maxVisible {
+		hints = hints[:maxVisible]
 	}
-	return strings.Join(lines, "\n")
+
+	// Calculate scroll offset to keep selected hint visible
+	startIdx := 0
+	if m.selectedHint >= maxVisible {
+		startIdx = m.selectedHint - maxVisible + 1
+	}
+
+	// Header
+	headerStyle := lipgloss.NewStyle().
+		Foreground(m.theme.TextMuted).
+		Bold(true)
+	content := headerStyle.Render("COMMANDS") + "\n"
+
+	// Navigation hint
+	navHint := lipgloss.NewStyle().Foreground(m.theme.TextDim).Render("↑↓ select · Tab accept")
+	content += navHint + "\n\n"
+
+	var lines []string
+	for i := startIdx; i < len(hints) && i-startIdx < maxVisible; i++ {
+		h := hints[i]
+		prefix := "  "
+		cmdStr := HintCmdStyle.Render(h.cmd)
+		descStr := HintDescStyle.Render(truncateVisible(h.desc, max(20, m.width-30)))
+		if i == m.selectedHint {
+			prefix = lipgloss.NewStyle().
+				Foreground(m.theme.Primary).
+				Bold(true).
+				Render(" ▸")
+			cmdStr = lipgloss.NewStyle().
+				Foreground(m.theme.Primary).
+				Bold(true).
+				Render(h.cmd)
+		}
+		lines = append(lines, fmt.Sprintf("%s %s  %s", prefix, cmdStr, descStr))
+	}
+
+	content += strings.Join(lines, "\n")
+
+	// Wrap in a bordered panel
+	panel := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(m.theme.BorderActive).
+		Background(m.theme.BackgroundPanel).
+		Padding(0, 1).
+		Width(min(m.width, 72))
+
+	return panel.Render(content)
 }
 
 func matchHints(input string) []cmdHint {
@@ -1051,10 +1090,11 @@ func matchHints(input string) []cmdHint {
 	for _, h := range allHints {
 		if strings.HasPrefix(h.cmd, query) {
 			out = append(out, h)
-			if len(out) >= 5 {
-				break
-			}
 		}
+	}
+	// Return all matches up to maxVisible (now 6)
+	if len(out) > 6 {
+		out = out[:6]
 	}
 	return out
 }
@@ -1106,6 +1146,8 @@ func renderHelp() string {
 			{"/new", "Clear session memory and start clean"},
 			{"/resume", "Resume interrupted execution checkpoint"},
 			{"/copy", "Copy full transcript to clipboard / file"},
+			{"/sidebar", "Toggle sidebar panel"},
+			{"/details", "Toggle tool detail panel"},
 			{"F3", "View output in pager (select & copy any part)"},
 			{"/clear", "Clear terminal output screen"},
 			{"/help", "Show command reference"},
@@ -1114,6 +1156,17 @@ func renderHelp() string {
 		"KEYBOARD": {
 			{"Ctrl+B", "Toggle sidebar panel"},
 			{"Ctrl+T", "Toggle tool detail panel"},
+			{"Ctrl+X", "Leader key (then press key for action)"},
+		},
+		"LEADER KEY (Ctrl+X)": {
+			{"b", "Toggle sidebar"},
+			{"n", "New session"},
+			{"l", "List sessions"},
+			{"m", "List models"},
+			{"t", "List themes"},
+			{"e", "Open editor"},
+			{"x", "Export session"},
+			{"q", "Exit"},
 		},
 	}
 
@@ -1127,8 +1180,20 @@ func renderHelp() string {
 	}
 
 	sb.WriteString("  " + SectionHeaderStyle.Render("KEYBOARD CONTROLS") + "\n")
-	sb.WriteString("  " + HintDescStyle.Render("  ↑/↓ scroll output · Alt+↑/↓ history · PgUp/PgDn page · Tab accept suggestion · Ctrl+C abort") + "\n")
-	sb.WriteString("  " + HintDescStyle.Render("  While running, type a new objective to queue it · type y/n at an approval prompt to accept/skip") + "\n\n")
+	sb.WriteString("  " + HintDescStyle.Render("  Ctrl+P  Command palette") + "\n")
+	sb.WriteString("  " + HintDescStyle.Render("  Ctrl+B  Toggle sidebar") + "\n")
+	sb.WriteString("  " + HintDescStyle.Render("  Ctrl+T  Toggle tool details") + "\n")
+	sb.WriteString("  " + HintDescStyle.Render("  Ctrl+A  Toggle autopilot") + "\n")
+	sb.WriteString("  " + HintDescStyle.Render("  Ctrl+S  Show status") + "\n")
+	sb.WriteString("  " + HintDescStyle.Render("  Ctrl+D  Show cost") + "\n")
+	sb.WriteString("  " + HintDescStyle.Render("  Ctrl+E  View in pager") + "\n")
+	sb.WriteString("  " + HintDescStyle.Render("  Ctrl+Y  Copy transcript") + "\n")
+	sb.WriteString("  " + HintDescStyle.Render("  Ctrl+C  Cancel/Quit") + "\n")
+	sb.WriteString("  " + HintDescStyle.Render("  ↑/↓     Scroll output") + "\n")
+	sb.WriteString("  " + HintDescStyle.Render("  Alt+↑/↓ History") + "\n")
+	sb.WriteString("  " + HintDescStyle.Render("  PgUp/Dn Page scroll") + "\n")
+	sb.WriteString("  " + HintDescStyle.Render("  Tab     Accept suggestion") + "\n")
+	sb.WriteString("  " + HintDescStyle.Render("  Enter   Submit") + "\n\n")
 
 	return sb.String()
 }

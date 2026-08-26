@@ -6,8 +6,10 @@ const (
 	footerHeight    = 1
 	inputMinHeight  = 1
 	spacerMinHeight = 0
-	sidebarMaxWidth = 30
-	sidebarMinWidth = 20
+	sidebarMaxWidth = 36
+	sidebarMinWidth = 24
+	sidebarPadX     = 1
+	sidebarGap      = 1
 )
 
 type tuiLayout struct {
@@ -66,19 +68,22 @@ func calculateLayoutWithSidebar(width, height int, showSidebar bool) tuiLayout {
 		inputHeight:  3, // prompt + input + autocomplete
 	}
 
-	if showSidebar && width >= sidebarMinWidth+20 {
-		// Sidebar takes up to 1/3 of width, max 30 chars
-		l.sidebarWidth = min(sidebarMaxWidth, width/3)
-		l.sidebarHeight = max(1, height-4) // header + status + input + margins
+	// Reserve: header(1) + separator(1) + status(1) + separator(1) + input(3) = 7
+ reservedLines := 7
 
-		// Main content takes remaining space
-		l.mainWidth = width - l.sidebarWidth - 1
-		l.mainHeight = max(1, height-4)
+	if showSidebar && width >= sidebarMinWidth+20 {
+		// Sidebar: inner content width + 2 padding + 1 border
+		l.sidebarWidth = min(sidebarMaxWidth, width/3) + sidebarPadX*2 + 1
+		l.sidebarHeight = max(1, height-reservedLines)
+
+		// Main content takes remaining space, minus gap
+		l.mainWidth = width - l.sidebarWidth - sidebarGap
+		l.mainHeight = max(1, height-reservedLines)
 	} else {
 		l.sidebarWidth = 0
 		l.sidebarHeight = 0
 		l.mainWidth = width
-		l.mainHeight = max(1, height-4)
+		l.mainHeight = max(1, height-reservedLines)
 	}
 
 	l.contentWidth = max(8, l.mainWidth-contentPadding*2)

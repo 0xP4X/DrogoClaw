@@ -20,6 +20,7 @@ import (
 	"github.com/0xP4X/drogonclaw-go/internal/c2"
 	"github.com/0xP4X/drogonclaw-go/internal/cloud"
 	"github.com/0xP4X/drogonclaw-go/internal/mitre"
+	"github.com/0xP4X/drogonclaw-go/internal/shellutil"
 	"github.com/openai/openai-go"
 )
 
@@ -100,7 +101,7 @@ func (r *ToolRegistry) registerToolWrappers() {
 			ports = "-"
 		}
 		flags := buildNmapFlags(mode, ports)
-		cmd := fmt.Sprintf("nmap %s %s 2>&1", flags, target)
+		cmd := fmt.Sprintf("nmap %s %s 2>&1", flags, shellutil.Quote(target))
 		out, err := r.sandbox.Execute(ctx, cmd)
 		if err != nil {
 			return fmt.Sprintf("[nmap Error] %v\nOutput: %s", err, out)
@@ -120,7 +121,7 @@ func (r *ToolRegistry) registerToolWrappers() {
 		if severity == "" {
 			severity = "critical,high,medium"
 		}
-		cmd := fmt.Sprintf("nuclei -u %s -severity %s -silent -timeout 10 -retries 2", target, severity)
+		cmd := fmt.Sprintf("nuclei -u %s -severity %s -silent -timeout 10 -retries 2", shellutil.Quote(target), shellutil.Quote(severity))
 		if dast {
 			cmd += " -dast"
 		}
@@ -153,7 +154,7 @@ func (r *ToolRegistry) registerToolWrappers() {
 		if wordlist == "" {
 			wordlist = "/usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt"
 		}
-		cmd := fmt.Sprintf("gobuster %s -u %s -w %s -t 40 -q --no-error", mode, target, wordlist)
+		cmd := fmt.Sprintf("gobuster %s -u %s -w %s -t 40 -q --no-error", mode, shellutil.Quote(target), shellutil.Quote(wordlist))
 		if extensions != "" && mode == "dir" {
 			cmd += fmt.Sprintf(" -x %s", extensions)
 		}
@@ -185,10 +186,10 @@ func (r *ToolRegistry) registerToolWrappers() {
 			target += "/FUZZ"
 		}
 		cmd := fmt.Sprintf("ffuf -u %s -w %s -X %s -mc 200,204,301,302,307,401,403 -t 40 -ac -s 2>&1",
-			target, wordlist, method)
+			shellutil.Quote(target), shellutil.Quote(wordlist), shellutil.Quote(method))
 		if mode == "parameter" {
 			cmd = fmt.Sprintf("ffuf -u %s -w %s -X %s -mc 200,204,301,302 -t 20 -ac -s 2>&1",
-				target, wordlist, method)
+				shellutil.Quote(target), shellutil.Quote(wordlist), shellutil.Quote(method))
 		}
 		out, err := r.sandbox.Execute(ctx, cmd)
 		if err != nil {
@@ -216,7 +217,7 @@ func (r *ToolRegistry) registerToolWrappers() {
 			risk = 2
 		}
 		cmd := fmt.Sprintf("sqlmap -u %s --batch --level %d --risk %d --threads 4 --timeout 30 --output-dir=/workspace/sqlmap_output",
-			target, level, risk)
+			shellutil.Quote(target), level, risk)
 		if data != "" {
 			cmd += fmt.Sprintf(" --data=%q", data)
 		}
@@ -238,7 +239,7 @@ func (r *ToolRegistry) registerToolWrappers() {
 		if domain == "" {
 			return "[Error] domain is required"
 		}
-		cmd := fmt.Sprintf("subfinder -d %s -silent -timeout 30", domain)
+		cmd := fmt.Sprintf("subfinder -d %s -silent -timeout 30", shellutil.Quote(domain))
 		if allSources {
 			cmd += " -all"
 		}
@@ -265,7 +266,7 @@ func (r *ToolRegistry) registerToolWrappers() {
 			return fmt.Sprintf("[httpx Error] %v", err)
 		}
 		cmd := fmt.Sprintf("echo %s | %s -silent -tech-detect -status-code -title -server -content-length -follow-redirects -timeout 10 2>&1",
-			target, bin)
+			shellutil.Quote(target), bin)
 		out, err := r.sandbox.Execute(ctx, cmd)
 		if err != nil {
 			return fmt.Sprintf("[httpx Error] %v\nOutput: %s", err, out)
@@ -313,16 +314,16 @@ ldd %s 2>/dev/null | head -20
 			passlist = "/usr/share/wordlists/rockyou.txt"
 		}
 
-		uFlag := fmt.Sprintf("-L %s", userlist)
+		uFlag := fmt.Sprintf("-L %s", shellutil.Quote(userlist))
 		if singleUser != "" {
-			uFlag = fmt.Sprintf("-l %s", singleUser)
+			uFlag = fmt.Sprintf("-l %s", shellutil.Quote(singleUser))
 		}
-		pFlag := fmt.Sprintf("-P %s", passlist)
+		pFlag := fmt.Sprintf("-P %s", shellutil.Quote(passlist))
 		if singlePass != "" {
-			pFlag = fmt.Sprintf("-p %s", singlePass)
+			pFlag = fmt.Sprintf("-p %s", shellutil.Quote(singlePass))
 		}
 
-		cmd := fmt.Sprintf("hydra -t 4 -f -q %s %s %s %s 2>&1", uFlag, pFlag, target, service)
+		cmd := fmt.Sprintf("hydra -t 4 -f -q %s %s %s %s 2>&1", uFlag, pFlag, shellutil.Quote(target), shellutil.Quote(service))
 		out, err := r.sandbox.Execute(ctx, cmd)
 		if err != nil {
 			return fmt.Sprintf("[hydra Error] %v\nOutput: %s", err, out)

@@ -98,6 +98,9 @@ type ToolRegistry struct {
 	// Built-in tools not in the manifest
 	builtins map[string]BuiltinFn
 
+	// Cached tool definitions (computed once, reused on every LLM call)
+	cachedDefs []openai.ChatCompletionToolParam
+
 	// Recent successful observations used by the evidence gate.
 	recentEvidence []toolEvidence
 
@@ -322,6 +325,11 @@ func (r *ToolRegistry) RecordVerifiedFinding() {
 
 // Definitions returns the OpenAI-format tool definitions for the LLM.
 func (r *ToolRegistry) Definitions() []openai.ChatCompletionToolParam {
+	// Return cached definitions if available
+	if r.cachedDefs != nil {
+		return r.cachedDefs
+	}
+
 	var defs []openai.ChatCompletionToolParam
 
 	// Phase 2: Structured tool wrapper definitions
@@ -879,6 +887,8 @@ func (r *ToolRegistry) Definitions() []openai.ChatCompletionToolParam {
 		},
 	})
 
+	// Cache the definitions for reuse
+	r.cachedDefs = defs
 	return defs
 }
 

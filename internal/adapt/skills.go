@@ -120,6 +120,24 @@ var dangerousPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)shutdown`),
 	regexp.MustCompile(`(?i)reboot`),
 	regexp.MustCompile(`(?i)halt`),
+	// Reverse shell and backconnect patterns
+	regexp.MustCompile(`(?i)bash\s+-i\s+>&\s+/dev/tcp`),
+	regexp.MustCompile(`(?i)nc\s+-[el]`),
+	regexp.MustCompile(`(?i)ncat\s+-[el]`),
+	regexp.MustCompile(`(?i)/dev/tcp/`),
+	// Dangerous file operations
+	regexp.MustCompile(`(?i)chmod\s+777`),
+	regexp.MustCompile(`(?i)chmod\s+\+s`),
+	regexp.MustCompile(`(?i)chown\s+root`),
+	// Network attack tools
+	regexp.MustCompile(`(?i)curl.*\|\s*sh`),
+	regexp.MustCompile(`(?i)curl.*\|\s*bash`),
+	regexp.MustCompile(`(?i)wget.*\|\s*sh`),
+	regexp.MustCompile(`(?i)wget.*\|\s*bash`),
+	// System modification
+	regexp.MustCompile(`(?i)echo\s+.*>\s*/etc/`),
+	regexp.MustCompile(`(?i)crontab\s+-e`),
+	regexp.MustCompile(`(?i)iptables\s+-F`),
 }
 
 func isDangerousCommand(cmd string) bool {

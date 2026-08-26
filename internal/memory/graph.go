@@ -295,7 +295,7 @@ func (g *Graph) save() {
 	}
 	// Write then rename so a crash can leave at most the previous complete
 	// graph, never a partially written JSON document.
-	tmp := g.dbPath + ".tmp"
+	tmp := g.dbPath + fmt.Sprintf(".tmp.%d", time.Now().UnixNano())
 	if err := os.WriteFile(tmp, b, 0600); err == nil {
 		_ = os.Rename(tmp, g.dbPath)
 	}

@@ -140,7 +140,7 @@ func (m *MissionPlanner) GeneratePlan(ctx context.Context, objective string) (*M
 		return m.fallbackPlan(objective), nil
 	}
 
-	re := regexp.MustCompile(`(?s)\{.*\}`)
+	re := regexp.MustCompile(`(?s)\{.*?\}`)
 	match := re.FindString(content)
 	if match != "" {
 		content = match

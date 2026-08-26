@@ -37,17 +37,17 @@ type Theme struct {
 // DefaultTheme is the dark theme matching OpenCode's style
 var DefaultTheme = Theme{
 	Primary:   lipgloss.Color("#58a6ff"),
-	Secondary: lipgloss.Color("#238636"),
-	Accent:    lipgloss.Color("#39c5cf"),
+	Secondary: lipgloss.Color("#3fb950"),
+	Accent:    lipgloss.Color("#79c0ff"),
 
-	Success: lipgloss.Color("#238636"),
-	Warning: lipgloss.Color("#bf8700"),
-	Error:   lipgloss.Color("#da3633"),
+	Success: lipgloss.Color("#3fb950"),
+	Warning: lipgloss.Color("#d29922"),
+	Error:   lipgloss.Color("#f85149"),
 	Info:    lipgloss.Color("#58a6ff"),
 
-	Text:      lipgloss.Color("#f0f6fc"),
-	TextMuted: lipgloss.Color("#7d8590"),
-	TextDim:   lipgloss.Color("#484f58"),
+	Text:      lipgloss.Color("#c9d1d9"),
+	TextMuted: lipgloss.Color("#8b949e"),
+	TextDim:   lipgloss.Color("#6e7681"),
 
 	Background:        lipgloss.Color("#0d1117"),
 	BackgroundPanel:   lipgloss.Color("#161b22"),
