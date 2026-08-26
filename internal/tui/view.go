@@ -360,40 +360,7 @@ func (m Model) renderWelcome() string {
 		mode = "default"
 	}
 
-	logoStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#f85149")).
-		Bold(true)
-	subStyle := lipgloss.NewStyle().
-		Foreground(m.theme.TextMuted)
-
-	claw := []string{
-		"                    .=#%%+::",
-		"                .:-*%@@*=+**",
-		"              .=*##%@%:=***=",
-		"            =-#%#*=.*+==++-.",
-		"          +%#*@%*#%=--=..",
-		"       :=-===%#-*@+-*+=",
-		"   : =*#=:+#=.-*==+-.:#%:",
-		"  +#:-===*%=-.%%=:*-:*+##.",
-		" .%*= --+**+ =%*=.   :*=-=%.",
-		"++=+ .@%.:: :*=-=      :-+*.",
-		"#+#  =@+*   %@*=       #++#",
-		"+#.  ++*=   *###       =*%-",
-		".#  =%-+    -++:      .*+.",
-		"  . -@=*    +@=:      -.",
-		"     ##.    .%*.",
-		"     .#=     -@:",
-		"       =      :-",
-	}
-
-	for _, line := range claw {
-		sb.WriteString("  " + logoStyle.Render(line) + "\n")
-	}
-	sb.WriteString("\n")
-	sb.WriteString(subStyle.Render("  Autonomous AI Security Testing Platform\n"))
-
 	sep := lipgloss.NewStyle().Foreground(m.theme.Border).Render(strings.Repeat("─", min(width-4, 52)))
-	sb.WriteString("\n")
 	sb.WriteString(sep)
 	sb.WriteString("\n\n")
 
