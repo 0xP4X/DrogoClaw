@@ -578,10 +578,10 @@ func (m Model) renderSidebar(width, height int) string {
 
 	content := strings.TrimSuffix(sb.String(), "\n")
 
-	// Build sidebar with background panel — no forced height, top-aligned
 	return lipgloss.NewStyle().
 		Background(m.theme.BackgroundPanel).
 		Width(width).
+		Height(height).
 		Padding(1, sidebarPadX, 0, sidebarPadX).
 		Render(content)
 }
