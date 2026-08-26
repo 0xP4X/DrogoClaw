@@ -65,18 +65,15 @@ func calculateLayoutWithSidebar(width, height int, showSidebar bool) tuiLayout {
 		isCompact:    width < 80,
 		headerHeight: headerHeight,
 		footerHeight: footerHeight,
-		inputHeight:  3, // prompt + input + autocomplete
+		inputHeight:  1,
 	}
 
-	// Reserve: header(1) + separator(1) + status(1) + separator(1) + input(3) = 7
- reservedLines := 7
+	// View() layout: header(1) + hline(1) + content + hline(1) + status(1) + hline(1) + input(1) = 6 fixed lines
+	reservedLines := 6
 
 	if showSidebar && width >= sidebarMinWidth+20 {
-		// Sidebar: inner content width + 2 padding + 1 border
 		l.sidebarWidth = min(sidebarMaxWidth, width/3) + sidebarPadX*2 + 1
 		l.sidebarHeight = max(1, height-reservedLines)
-
-		// Main content takes remaining space, minus gap
 		l.mainWidth = width - l.sidebarWidth - sidebarGap
 		l.mainHeight = max(1, height-reservedLines)
 	} else {
