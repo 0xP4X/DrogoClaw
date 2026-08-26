@@ -17,7 +17,7 @@ import (
 
 func (m *Model) View() string {
 	if m.width == 0 {
-		return "Loading DrogonClaw..."
+		return ""
 	}
 
 	m.layout = calculateLayoutWithSidebar(m.width, m.height, m.showSidebar)

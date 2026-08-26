@@ -12,9 +12,14 @@ func RunLoadingSteps(stepLabels []string, execute func(int) error) error {
 	s.Spinner = spinner.Dot
 	s.Style = SpinnerStyle
 
+	logo := HeaderBrandStyle.Render("  ___              _          _           _ _   ") + "\n" +
+		HeaderBrandStyle.Render(" |   \\ _ _ __ _ _| |_ __ _  | | __ _ _ _| (_)__ ___ __") + "\n" +
+		HeaderBrandStyle.Render(" | |) | '_/ _` |  _/ _` | | |/ _` | '_| | / _` \\ V / _ |") + "\n" +
+		HeaderBrandStyle.Render(" |___/|_| \\__,_|\\__\\__,_| |_|\\__,_|_| |_|_|\\__,_\\_/ \\_,_|")
+
 	fmt.Println()
-	fmt.Println(HeaderBrandStyle.Render("  DrogonClaw"))
-	fmt.Println(HintDescStyle.Render("  Initializing workspace and dependencies..."))
+	fmt.Println(logo)
+	fmt.Println(HintDescStyle.Render("  Autonomous AI Security Testing Platform"))
 	fmt.Println()
 
 	for i, label := range stepLabels {
