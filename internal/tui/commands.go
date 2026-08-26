@@ -292,7 +292,9 @@ func (m *Model) handleSlashCommand(raw string) (*Model, tea.Cmd) {
 		m.appendLine(m.renderTimeline())
 
 	case "/sidebar":
-		m.showSidebar = !m.showSidebar
+		if m.showSidebar || m.width >= sidebarMinWidth+20 {
+			m.showSidebar = !m.showSidebar
+		}
 		state := "OFF"
 		if m.showSidebar {
 			state = "ON"

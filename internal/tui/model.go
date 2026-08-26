@@ -210,9 +210,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		// The textarea width is finalized inside renderInputArea() (which
-		// subtracts the pane frame and prompt glyph), so just trigger a render.
 		m.input.SetWidth(max(8, msg.Width-InputPaneStyle.GetHorizontalFrameSize()-8))
+		if msg.Width < sidebarMinWidth+20 {
+			m.showSidebar = false
+		}
+		m.layout = calculateLayoutWithSidebar(m.width, m.height, m.showSidebar)
+		m.updateViewportContent()
+		if m.mdRenderer != nil {
+			m.mdRenderer, _ = glamour.NewTermRenderer(
+				glamour.WithAutoStyle(),
+				glamour.WithWordWrap(max(1, m.layout.contentWidth-2)),
+			)
+		}
 
 	case showBannerMsg:
 		m.appendBanner()
@@ -249,7 +258,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Ctrl+B toggles sidebar
 		if msg.String() == "ctrl+b" {
-			m.showSidebar = !m.showSidebar
+			if m.showSidebar || m.width >= sidebarMinWidth+20 {
+				m.showSidebar = !m.showSidebar
+			}
 			state := "OFF"
 			if m.showSidebar {
 				state = "ON"
@@ -324,7 +335,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				switch msg.String() {
 				case "b":
-					m.showSidebar = !m.showSidebar
+					if m.showSidebar || m.width >= sidebarMinWidth+20 {
+						m.showSidebar = !m.showSidebar
+					}
 					m.leader.Active = false
 					return m, nil
 				case "n":
@@ -613,18 +626,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.QuitMsg:
 		return m, tea.Quit
-	}
-
-	if m.width > 0 {
-		contentWidth, contentHeight := m.viewportDimensions()
-		m.viewport.Width = contentWidth
-		m.viewport.Height = contentHeight
-		if _, resized := msg.(tea.WindowSizeMsg); resized && m.mdRenderer != nil {
-			m.mdRenderer, _ = glamour.NewTermRenderer(
-				glamour.WithAutoStyle(),
-				glamour.WithWordWrap(max(1, contentWidth-2)),
-			)
-		}
 	}
 
 	var vpCmd tea.Cmd
