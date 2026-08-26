@@ -5,43 +5,12 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/lipgloss"
 )
 
 func RunLoadingSteps(stepLabels []string, execute func(int) error) error {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = SpinnerStyle
-
-	red := HeaderBrandStyle.Foreground(lipgloss.Color("#f85149"))
-
-	claw := []string{
-		"                    .=#%%+::",
-		"                .:-*%@@*=+**",
-		"              .=*##%@%:=***=",
-		"            =-#%#*=.*+==++-.",
-		"          +%#*@%*#%=--=..",
-		"       :=-===%#-*@+-*+=",
-		"   : =*#=:+#=.-*==+-.:#%:",
-		"  +#:-===*%=-.%%=:*-:*+##.",
-		" .%*= --+**+ =%*=.   :*=-=%.",
-		"++=+ .@%.:: :*=-=      :-+*.",
-		"#+#  =@+*   %@*=       #++#",
-		"+#.  ++*=   *###       =*%-",
-		".#  =%-+    -++:      .*+.",
-		"  . -@=*    +@=:      -.",
-		"     ##.    .%*.",
-		"     .#=     -@:",
-		"       =      :-",
-	}
-
-	fmt.Println()
-	for _, line := range claw {
-		fmt.Println(red.Render("  " + line))
-	}
-	fmt.Println()
-	fmt.Println(HintDescStyle.Render("        Autonomous AI Security Testing"))
-	fmt.Println()
 
 	for i, label := range stepLabels {
 		if err := execute(i); err != nil {

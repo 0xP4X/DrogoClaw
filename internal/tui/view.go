@@ -13,6 +13,7 @@ import (
 	"github.com/0xP4X/drogonclaw-go/internal/memory"
 	"github.com/0xP4X/drogonclaw-go/internal/skills"
 	"github.com/charmbracelet/lipgloss"
+	"golang.org/x/term"
 )
 
 func (m *Model) View() string {
@@ -1255,9 +1256,13 @@ func ColorizeElapsed(elapsed string) string {
 }
 
 func (m *Model) renderSplash() string {
-	w := max(40, m.width)
+	w := m.width
 	if w <= 0 {
-		w = 80
+		if tw, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && tw > 0 {
+			w = tw
+		} else {
+			w = 80
+		}
 	}
 
 	logoStyle := lipgloss.NewStyle().
