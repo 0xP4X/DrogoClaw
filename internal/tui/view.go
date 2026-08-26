@@ -673,35 +673,6 @@ func (m Model) promptGlyph(agName string) (string, int) {
 	}
 }
 
-func (m *Model) appendBanner() {
-	if m.bannerShown {
-		return
-	}
-	m.bannerShown = true
-
-	cfg := m.cfg
-	provider := cfg.GetProvider()
-	model := cfg.GetModel()
-
-	op := m.graph.GetOperatorProfile()
-	opName := "Operator"
-	if op != nil && op.Name != "" {
-		opName = op.Name
-	}
-
-	m.appendLine("")
-	m.appendLine(HeaderBrandStyle.Render("  DrogonClaw v2"))
-	m.appendLine(HintDescStyle.Render(fmt.Sprintf("  Operator: %s  ·  Engine: %s/%s  ·  Runtime: %s", opName, provider, model, m.sandbox.RuntimeLabel())))
-	if m.recovery != nil {
-		tool := m.recovery.CurrentTool
-		if tool == "" {
-			tool = "planning or execution"
-		}
-		m.appendLine(WarningStyle.Render(fmt.Sprintf("  [RECOVERY] Previous mission interrupted at checkpoint: %s. Type /resume to continue.", tool)))
-	}
-	m.appendLine("")
-}
-
 func wrapStyledLine(line string, width int) string {
 	if width <= 0 {
 		return ""

@@ -196,11 +196,8 @@ func (m Model) Init() tea.Cmd {
 		m.spinner.Tick,
 		textarea.Blink,
 		tea.SetWindowTitle("DrogonClaw"),
-		func() tea.Msg { return showBannerMsg{} },
 	)
 }
-
-type showBannerMsg struct{}
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
@@ -222,9 +219,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				glamour.WithWordWrap(max(1, m.layout.contentWidth-2)),
 			)
 		}
-
-	case showBannerMsg:
-		m.appendBanner()
 
 	case tea.KeyMsg:
 		if msg.Type == tea.KeyCtrlC {
@@ -969,7 +963,6 @@ func (m *Model) switchSection(sectionID string) {
 	m.lastPlan = nil
 	m.lastObjective = ""
 	m.bannerShown = false
-	m.appendBanner()
 	m.appendLine(InfoStyle.Render(fmt.Sprintf("  [§] Switched to section %s", target)))
 }
 
