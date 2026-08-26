@@ -50,11 +50,8 @@ func (m *Model) View() string {
 		sb.WriteString(content)
 	}
 
-	sb.WriteString("\n")
-
 	if len(m.hints) > 0 {
 		sb.WriteString(m.renderHints())
-		sb.WriteString("\n")
 	}
 
 	sb.WriteString(hline())
@@ -101,36 +98,37 @@ func (m *Model) renderInputBar() string {
 func (m Model) renderHeaderLine() string {
 	var parts []string
 
-	// Brand
 	brandStyle := lipgloss.NewStyle().
 		Foreground(m.theme.Primary).
 		Bold(true)
 	parts = append(parts, brandStyle.Render("DrogonClaw"))
 
-	// Separator
-	sep := lipgloss.NewStyle().Foreground(m.theme.Border)
+	sep := lipgloss.NewStyle().Foreground(m.theme.BorderSubtle)
 
-	// Operator@Agent (show on medium+ screens)
 	op := m.graph.GetOperatorProfile()
 	ag := m.graph.GetAgentProfile()
 	if op != nil && ag != nil && m.width >= 50 {
-		infoStyle := lipgloss.NewStyle().Foreground(m.theme.TextMuted)
-		parts = append(parts, sep.Render("·"))
-		parts = append(parts, infoStyle.Render(fmt.Sprintf("%s@%s", op.Name, ag.Name)))
+		idStyle := lipgloss.NewStyle().Foreground(m.theme.TextDim)
+		parts = append(parts, sep.Render(" │ "))
+		parts = append(parts, idStyle.Render(fmt.Sprintf("%s@%s", op.Name, ag.Name)))
 	}
 
-	// Model name (show on large screens)
 	if m.modelName != "" && m.width >= 70 {
-		parts = append(parts, sep.Render("·"))
-		modelStyle := lipgloss.NewStyle().Foreground(m.theme.Accent)
+		modelStyle := lipgloss.NewStyle().Foreground(m.theme.TextMuted)
+		parts = append(parts, sep.Render(" │ "))
 		parts = append(parts, modelStyle.Render(m.modelName))
 	}
 
-	// Phase badge
 	phaseIcon := m.phaseIcon()
-	parts = append(parts, sep.Render("·"))
 	_, phaseStyle := renderPhaseBadge(m.phase)
+	parts = append(parts, sep.Render(" │ "))
 	parts = append(parts, phaseStyle.Render(phaseIcon))
+
+	if m.toolCount > 0 && m.width >= 55 {
+		countStyle := lipgloss.NewStyle().Foreground(m.theme.TextDim)
+		parts = append(parts, sep.Render(" │ "))
+		parts = append(parts, countStyle.Render(fmt.Sprintf("%d tools", m.toolCount)))
+	}
 
 	return lipgloss.JoinHorizontal(lipgloss.Center, parts...)
 }
@@ -152,8 +150,7 @@ func (m Model) renderExecutingLine() string {
 	}
 	_, phaseStyle := renderPhaseBadge(phase)
 
-	// Compact format: spinner PHASE · elapsed · steps · tool
-	sep := lipgloss.NewStyle().Foreground(m.theme.Border).Render("·")
+	sep := lipgloss.NewStyle().Foreground(m.theme.BorderSubtle).Render(" │ ")
 	var parts []string
 	parts = append(parts, m.spinner.View())
 	parts = append(parts, phaseStyle.Render(strings.ToUpper(phase)))
@@ -164,10 +161,9 @@ func (m Model) renderExecutingLine() string {
 	}
 
 	if m.stepCount > 0 {
-		stepStyle := lipgloss.NewStyle().Foreground(m.theme.TextMuted)
-		stepInfo := fmt.Sprintf("%d/%d", m.stepCount, m.totalSteps)
+		stepStyle := lipgloss.NewStyle().Foreground(m.theme.TextDim)
 		parts = append(parts, sep)
-		parts = append(parts, stepStyle.Render(stepInfo))
+		parts = append(parts, stepStyle.Render(fmt.Sprintf("step %d/%d", m.stepCount, m.totalSteps)))
 	}
 
 	if tool != "" {
@@ -178,7 +174,6 @@ func (m Model) renderExecutingLine() string {
 
 	line := lipgloss.JoinHorizontal(lipgloss.Center, parts...)
 
-	// Truncate if too wide
 	if lipgloss.Width(line) > m.width {
 		line = m.spinner.View() + " " + phaseStyle.Render(strings.ToUpper(phase))
 	}
@@ -213,7 +208,6 @@ func (m *Model) renderContentArea() string {
 func (m *Model) renderStatusBar() string {
 	var parts []string
 
-	// Executing animation (highest priority)
 	if m.executing {
 		anim := m.renderExecutingLine()
 		if anim != "" {
@@ -221,48 +215,39 @@ func (m *Model) renderStatusBar() string {
 		}
 	}
 
-	// Mode indicator
-	mode := "MANUAL"
+	modeColor := m.theme.TextDim
+	modeIcon := "○"
 	if m.autopilot {
-		mode = "AUTOPILOT"
+		modeColor = m.theme.Warning
+		modeIcon = "●"
 	}
-	modeStyle := lipgloss.NewStyle().
-		Foreground(m.theme.Warning).
-		Bold(true)
-	parts = append(parts, modeStyle.Render(fmt.Sprintf("[%s]", mode)))
+	modeLabel := lipgloss.NewStyle().Foreground(modeColor).Bold(true).Render(fmt.Sprintf("%s %s", modeIcon, "AUTO"))
+	parts = append(parts, modeLabel)
 
-	// Separator
-	sep := lipgloss.NewStyle().Foreground(m.theme.Border)
-	parts = append(parts, sep.Render("·"))
+	sep := lipgloss.NewStyle().Foreground(m.theme.BorderSubtle).Render(" │ ")
+	parts = append(parts, sep)
 
-	// Phase
-	_, phaseStyle := renderPhaseBadge(m.phase)
-	parts = append(parts, phaseStyle.Render(strings.ToUpper(m.phase)))
+	phaseLabel := lipgloss.NewStyle().Foreground(m.theme.TextMuted).Render(strings.ToUpper(m.phase))
+	parts = append(parts, phaseLabel)
 
-	// Step progress (show on medium+ screens)
 	if m.stepCount > 0 && m.width >= 50 {
-		parts = append(parts, sep.Render("·"))
-		stepStyle := lipgloss.NewStyle().Foreground(m.theme.TextMuted)
-		stepInfo := fmt.Sprintf("Step %d", m.stepCount)
-		if m.totalSteps > 0 {
-			stepInfo = fmt.Sprintf("Step %d/%d", m.stepCount, m.totalSteps)
-		}
-		parts = append(parts, stepStyle.Render(stepInfo))
+		parts = append(parts, sep)
+		stepLabel := lipgloss.NewStyle().Foreground(m.theme.TextDim).Render(fmt.Sprintf("step %d/%d", m.stepCount, m.totalSteps))
+		parts = append(parts, stepLabel)
 	}
 
-	// Keybind hints (right-aligned, show on large screens)
 	if m.width >= 60 {
-		hintStyle := lipgloss.NewStyle().Foreground(m.theme.TextDim)
-		hints := []string{
-			hintStyle.Render("Ctrl+P palette"),
-			hintStyle.Render("Ctrl+A autopilot"),
-			hintStyle.Render("Ctrl+B sidebar"),
-		}
+		rightParts := []string{}
+		keyStyle := lipgloss.NewStyle().Foreground(m.theme.TextDim)
+		rightParts = append(rightParts, keyStyle.Render("Ctrl+P cmds"))
+		rightParts = append(rightParts, keyStyle.Render("Ctrl+A auto"))
+		rightParts = append(rightParts, keyStyle.Render("Ctrl+B sidebar"))
 		if !m.executing {
-			hints = append(hints, hintStyle.Render("/help"))
+			rightParts = append(rightParts, keyStyle.Render("/help"))
 		}
-		rightPart := lipgloss.JoinHorizontal(lipgloss.Right, hints...)
-		parts = append(parts, rightPart)
+		rightAligned := lipgloss.JoinHorizontal(lipgloss.Right, rightParts...)
+		parts = append(parts, sep)
+		parts = append(parts, rightAligned)
 	}
 
 	return lipgloss.JoinHorizontal(lipgloss.Center, parts...)
@@ -373,38 +358,52 @@ func (m Model) renderWelcome() string {
 		mode = "default"
 	}
 
-	sb.WriteString(HeaderBrandStyle.Render("  DrogonClaw v2"))
+	logoStyle := lipgloss.NewStyle().
+		Foreground(m.theme.Primary).
+		Bold(true)
+	subStyle := lipgloss.NewStyle().
+		Foreground(m.theme.TextMuted)
+
+	logo := logoStyle.Render("  ___              _          _           _ _   ") + "\n" +
+		logoStyle.Render(" |   \\ _ _ __ _ _| |_ __ _  | | __ _ _ _| (_)__ ___ __") + "\n" +
+		logoStyle.Render(" | |) | '_/ _` |  _/ _` | | |/ _` | '_| | / _` \\ V / _ |") + "\n" +
+		logoStyle.Render(" |___/|_| \\__,_|\\__\\__,_| |_|\\__,_|_| |_|_|\\__,_\\_/ \\_,_|") + "\n"
+
+	sb.WriteString(logo)
+	sb.WriteString(subStyle.Render("  Autonomous AI Security Testing Platform\n"))
+
+	sep := lipgloss.NewStyle().Foreground(m.theme.Border).Render(strings.Repeat("─", min(width-4, 52)))
 	sb.WriteString("\n")
-	sb.WriteString(WelcomeSubtitleStyle.Render("  AI-Powered Security Testing"))
+	sb.WriteString(sep)
 	sb.WriteString("\n\n")
 
-	sb.WriteString(WelcomeBorderStyle.Render(lipgloss.JoinVertical(lipgloss.Left,
-		fmt.Sprintf("%s %s", SidebarLabelStyle.Render("Runtime:"), SidebarValueStyle.Render(runtime)),
-		fmt.Sprintf("%s %s", SidebarLabelStyle.Render("Engine:"), SidebarValueStyle.Render(truncate(provider+"/"+model, max(10, width/2)))),
-		fmt.Sprintf("%s %s", SidebarLabelStyle.Render("Mode:"), SidebarValueStyle.Render(mode)),
-	)))
+	infoItems := []string{
+		fmt.Sprintf("  %-10s  %s", lipgloss.NewStyle().Foreground(m.theme.TextMuted).Render("Runtime"), lipgloss.NewStyle().Foreground(m.theme.Text).Render(runtime)),
+		fmt.Sprintf("  %-10s  %s", lipgloss.NewStyle().Foreground(m.theme.TextMuted).Render("Engine"), lipgloss.NewStyle().Foreground(m.theme.Text).Render(truncate(provider+"/"+model, max(10, width/2)))),
+		fmt.Sprintf("  %-10s  %s", lipgloss.NewStyle().Foreground(m.theme.TextMuted).Render("Mode"), lipgloss.NewStyle().Foreground(m.theme.Text).Render(mode)),
+	}
+	sb.WriteString(strings.Join(infoItems, "\n"))
+	sb.WriteString("\n\n")
+	sb.WriteString(sep)
 	sb.WriteString("\n\n")
 
-	sb.WriteString(WelcomeHintStyle.Render("  Enter a mission objective, for example:"))
-	sb.WriteString("\n")
-	sb.WriteString("  ")
-	sb.WriteString(AgentQuoteStyle.Render("profile example.com and identify the safest next checks"))
+	sb.WriteString(WelcomeHintStyle.Render("  Enter a mission objective to begin, or try a quick command:"))
 	sb.WriteString("\n\n")
 
-	sb.WriteString(WelcomeQuickStartStyle.Render("  Quick Commands"))
-	sb.WriteString("\n\n")
-	sb.WriteString(fmt.Sprintf("    %-12s %s", HintCmdStyle.Render("/health"), HintDescStyle.Render("Verify runtime & dependencies")))
-	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("    %-12s %s", HintCmdStyle.Render("/profile"), HintDescStyle.Render("Build passive target context")))
-	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("    %-12s %s", HintCmdStyle.Render("/mode"), HintDescStyle.Render("Select workflow")))
-	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("    %-12s %s", HintCmdStyle.Render("/skills"), HintDescStyle.Render("Browse loaded attack modules")))
-	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("    %-12s %s", HintCmdStyle.Render("/status"), HintDescStyle.Render("Show session metrics")))
-	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("    %-12s %s", HintCmdStyle.Render("/help"), HintDescStyle.Render("Show all available commands")))
-	sb.WriteString("\n")
+	commands := []struct{ cmd, desc string }{
+		{"/health", "Verify runtime & dependencies"},
+		{"/profile", "Build passive target profile"},
+		{"/mode", "Select workflow methodology"},
+		{"/skills", "Browse available attack modules"},
+		{"/status", "Show session metrics"},
+		{"/help", "Show all available commands"},
+	}
+
+	for _, c := range commands {
+		cmdStr := lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true).Render(fmt.Sprintf("  %-12s", c.cmd))
+		descStr := lipgloss.NewStyle().Foreground(m.theme.TextMuted).Render(c.desc)
+		sb.WriteString(cmdStr + descStr + "\n")
+	}
 
 	return sb.String()
 }
@@ -1026,28 +1025,24 @@ func (m Model) renderHints() string {
 		return ""
 	}
 
-	// Max visible hints
 	maxVisible := 6
 	hints := m.hints
 	if len(hints) > maxVisible {
 		hints = hints[:maxVisible]
 	}
 
-	// Calculate scroll offset to keep selected hint visible
 	startIdx := 0
 	if m.selectedHint >= maxVisible {
 		startIdx = m.selectedHint - maxVisible + 1
 	}
 
-	// Header
 	headerStyle := lipgloss.NewStyle().
 		Foreground(m.theme.TextMuted).
 		Bold(true)
 	content := headerStyle.Render("COMMANDS") + "\n"
 
-	// Navigation hint
 	navHint := lipgloss.NewStyle().Foreground(m.theme.TextDim).Render("↑↓ select · Tab accept")
-	content += navHint + "\n\n"
+	content += navHint + "\n"
 
 	var lines []string
 	for i := startIdx; i < len(hints) && i-startIdx < maxVisible; i++ {
@@ -1070,7 +1065,6 @@ func (m Model) renderHints() string {
 
 	content += strings.Join(lines, "\n")
 
-	// Wrap in a bordered panel
 	panel := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(m.theme.BorderActive).

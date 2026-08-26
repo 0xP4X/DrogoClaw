@@ -227,9 +227,7 @@ var (
 	CodeBlockStyle = lipgloss.NewStyle().
 		Foreground(ColorBright).
 		Background(ColorBgAccent).
-		Padding(1, 2).
-		MarginTop(1).
-		MarginBottom(1)
+		Padding(0, 1)
 
 	InlineCodeStyle = lipgloss.NewStyle().
 		Foreground(ColorOrange).
@@ -414,32 +412,24 @@ var (
 var (
 	WelcomeTitleStyle = lipgloss.NewStyle().
 		Foreground(ColorAccent).
-		Bold(true).
-		MarginBottom(1)
+		Bold(true)
 
 	WelcomeSubtitleStyle = lipgloss.NewStyle().
-		Foreground(ColorSubtle).
-		Italic(true)
+		Foreground(ColorMuted)
 
 	WelcomeHintStyle = lipgloss.NewStyle().
-		Foreground(ColorMuted).
-		MarginTop(1).
-		MarginBottom(1).
+		Foreground(ColorDim).
 		Italic(true)
 
 	WelcomeBorderStyle = lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(ColorBorder).
-		Padding(1, 2).
-		Background(ColorBgPanel).
-		MarginTop(1).
-		MarginBottom(1)
+		Padding(0, 1).
+		Background(ColorBgPanel)
 
 	WelcomeQuickStartStyle = lipgloss.NewStyle().
 		Foreground(ColorAccent2).
-		Bold(true).
-		MarginTop(1).
-		MarginBottom(1)
+		Bold(true)
 )
 
 var (
