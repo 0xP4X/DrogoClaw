@@ -491,20 +491,6 @@ func (m Model) renderSidebar(width, height int) string {
 		row("Rate limit", StatusOffStyle.Render("○ OFF"))
 	}
 
-	section("KEYBINDS")
-	keyStyle := lipgloss.NewStyle().Foreground(m.theme.Accent)
-	descStyle := lipgloss.NewStyle().Foreground(m.theme.TextDim)
-	keys := []struct{ key, desc string }{
-		{"Ctrl+P", "Command palette"},
-		{"Ctrl+B", "Toggle sidebar"},
-		{"Ctrl+A", "Autopilot"},
-		{"Ctrl+D", "Cost"},
-		{"Ctrl+E", "Pager"},
-	}
-	for _, k := range keys {
-		sb.WriteString(fmt.Sprintf("  %s %s\n", keyStyle.Render(k.key), descStyle.Render(k.desc)))
-	}
-
 	if m.lastPlan != nil {
 		section("EXECUTION PLAN")
 		row("Steps", SidebarValueStyle.Render(fmt.Sprintf("%d", len(m.lastPlan.Steps))))
