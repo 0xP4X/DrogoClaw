@@ -190,18 +190,19 @@ func (m *Model) renderContentArea() string {
 	m.viewport.Width = m.layout.contentWidth
 	m.viewport.Height = m.layout.contentHeight
 
-	var content strings.Builder
+	var base string
 
-	if base := m.viewport.View(); base != "" {
-		content.WriteString(base)
+	if vpBase := m.viewport.View(); vpBase != "" {
+		base = vpBase
 	} else {
 		m.bannerShown = true
-		content.WriteString(m.renderWelcome())
+		base = m.renderWelcome()
 	}
 
 	return lipgloss.NewStyle().
 		Width(m.layout.mainWidth).
-		Render(content.String())
+		Height(m.layout.contentHeight).
+		Render(base)
 }
 
 func (m *Model) renderStatusBar() string {
