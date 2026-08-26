@@ -9,20 +9,15 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: ['1.26']
-
     steps:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
-    - name: Set up Go ${{ matrix.go-version }}
+    - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: ${{ matrix.go-version }}
-        cache: true
+        go-version-file: go.mod
 
     - name: Download dependencies
       run: go mod download
@@ -56,13 +51,13 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.26'
-        cache: true
+        go-version-file: go.mod
 
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v6
       with:
-        version: latest
+        version: v1.64.8
+        args: --timeout=5m
       continue-on-error: true
 
   security:
@@ -73,8 +68,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.26'
-        cache: true
+        go-version-file: go.mod
 
     - name: Run govulncheck
       run: |
@@ -95,8 +89,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.26'
-        cache: true
+        go-version-file: go.mod
 
     - name: Build Linux binary
       run: |
