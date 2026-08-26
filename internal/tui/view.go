@@ -188,17 +188,17 @@ func (m Model) renderExecutingLine() string {
 
 func (m *Model) renderContentArea() string {
 	m.viewport.Width = m.layout.contentWidth
+	m.viewport.Height = m.layout.contentHeight
 
 	var content strings.Builder
 
 	if base := m.viewport.View(); base != "" {
-		m.viewport.Height = m.layout.contentHeight
 		content.WriteString(base)
+	} else if !m.bannerShown {
+		m.bannerShown = true
+		content.WriteString(m.renderWelcome())
 	} else {
-		welcome := m.renderWelcome()
-		lines := strings.Count(welcome, "\n") + 1
-		m.viewport.Height = min(m.layout.contentHeight, max(3, lines))
-		m.viewport.SetContent(welcome)
+		m.viewport.SetContent(m.renderWelcome())
 		content.WriteString(m.viewport.View())
 	}
 
@@ -701,11 +701,6 @@ func (m *Model) updateViewportContent() {
 		}
 	}
 
-	if base == "" && !m.bannerShown {
-		m.bannerShown = true
-		base = m.renderWelcome()
-	}
-
 	m.viewport.Width = vpWidth
 	m.viewport.Height = vpHeight
 	m.viewport.SetContent(base)
@@ -742,11 +737,6 @@ func (m *Model) updateViewportWithLayout(layout tuiLayout) {
 		if m.executing && m.currentResponse != "" {
 			base += "\n" + m.renderAgentResponseString(m.currentResponse)
 		}
-	}
-
-	if base == "" && !m.bannerShown {
-		m.bannerShown = true
-		base = m.renderWelcome()
 	}
 
 	m.viewport.Width = vpWidth
