@@ -360,38 +360,29 @@ func (m Model) renderWelcome() string {
 	}
 
 	logoStyle := lipgloss.NewStyle().
-		Foreground(m.theme.Primary).
+		Foreground(lipgloss.Color("#f85149")).
 		Bold(true)
 	subStyle := lipgloss.NewStyle().
 		Foreground(m.theme.TextMuted)
 
 	claw := []string{
-		"                                :*%###*=",
-		"                             .=#@@@@@#-:+*",
-		"                        .:-=*%@@@@%+::*@%+",
-		"                      :+%@@@@@%%%-:=#@#==-",
-		"                     :+=-----+@%%::#*=+##-",
-		"                  =#-%@@@@%+: +@-=* +%*-",
-		"                =%@*=@%@*+++@= - =# =.",
-		"              :#@%+*@%@+=%%@*.##*=",
-		"           :=+-:=.-*%@==%@@* #%-=+:",
-		"       .:=*@*=-.+%* +=.=-:%# -..=%@#:",
-		"    =# -%#*+:::%@+=: -%@# :+#= * +@@*",
-		"   :@#.=.+*+=-%@# +: @@%:* %#: **=+%@+",
-		"  .#%==-    +@%=+#:.+@@*.+..   :*@*-*::#-",
-		"  =%+#*  ***:-=##-  **#-%.       :+-:.#@#",
-		"-%=.*=  -@@@ :-:   +== *#          .=-**=",
-		"##=*+   -%@+--    #@@@::.         .*-=++=",
-		"%++%=   #@%-@-    #%%*+#          :@%:%@-",
-		"+##.   .+*+#*     +@@#@+           +++@=",
-		" %#   :#*-:*      ==-=%-           **%-",
-		" .%.  :@@=++      .*#+:          .##+",
-		"  ..  .%%.%#      =@@-+.        .=-",
-		"       *@=#.      .%%=+",
-		"       .%#+        =@%=",
-		"        -%%.        *@*",
-		"         .#+         +%",
-		"           =.         -:",
+		"                    .=#%%+::",
+		"                .:-*%@@*=+**",
+		"              .=*##%@%:=***=",
+		"            =-#%#*=.*+==++-.",
+		"          +%#*@%*#%=--=..",
+		"       :=-===%#-*@+-*+=",
+		"   : =*#=:+#=.-*==+-.:#%:",
+		"  +#:-===*%=-.%%=:*-:*+##.",
+		" .%*= --+**+ =%*=.   :*=-=%.",
+		"++=+ .@%.:: :*=-=      :-+*.",
+		"#+#  =@+*   %@*=       #++#",
+		"+#.  ++*=   *###       =*%-",
+		".#  =%-+    -++:      .*+.",
+		"  . -@=*    +@=:      -.",
+		"     ##.    .%*.",
+		"     .#=     -@:",
+		"       =      :-",
 	}
 
 	for _, line := range claw {
@@ -1264,13 +1255,13 @@ func ColorizeElapsed(elapsed string) string {
 }
 
 func (m *Model) renderSplash() string {
-	w := max(60, m.width)
+	w := max(40, m.width)
 	if w <= 0 {
 		w = 80
 	}
 
 	logoStyle := lipgloss.NewStyle().
-		Foreground(m.theme.Primary).
+		Foreground(lipgloss.Color("#f85149")).
 		Bold(true)
 	subStyle := lipgloss.NewStyle().
 		Foreground(m.theme.TextMuted)
@@ -1278,32 +1269,23 @@ func (m *Model) renderSplash() string {
 		Foreground(m.theme.TextDim)
 
 	claw := []string{
-		"                                :*%###*=",
-		"                             .=#@@@@@#-:+*",
-		"                        .:-=*%@@@@%+::*@%+",
-		"                      :+%@@@@@%%%-:=#@#==-",
-		"                     :+=-----+@%%::#*=+##-",
-		"                  =#-%@@@@%+: +@-=* +%*-",
-		"                =%@*=@%@*+++@= - =# =.",
-		"              :#@%+*@%@+=%%@*.##*=",
-		"           :=+-:=.-*%@==%@@* #%-=+:",
-		"       .:=*@*=-.+%* +=.=-:%# -..=%@#:",
-		"    =# -%#*+:::%@+=: -%@# :+#= * +@@*",
-		"   :@#.=.+*+=-%@# +: @@%:* %#: **=+%@+",
-		"  .#%==-    +@%=+#:.+@@*.+..   :*@*-*::#-",
-		"  =%+#*  ***:-=##-  **#-%.       :+-:.#@#",
-		"-%=.*=  -@@@ :-:   +== *#          .=-**=",
-		"##=*+   -%@+--    #@@@::.         .*-=++=",
-		"%++%=   #@%-@-    #%%*+#          :@%:%@-",
-		"+##.   .+*+#*     +@@#@+           +++@=",
-		" %#   :#*-:*      ==-=%-           **%-",
-		" .%.  :@@=++      .*#+:          .##+",
-		"  ..  .%%.%#      =@@-+.        .=-",
-		"       *@=#.      .%%=+",
-		"       .%#+        =@%=",
-		"        -%%.        *@*",
-		"         .#+         +%",
-		"           =.         -:",
+		"                    .=#%%+::",
+		"                .:-*%@@*=+**",
+		"              .=*##%@%:=***=",
+		"            =-#%#*=.*+==++-.",
+		"          +%#*@%*#%=--=..",
+		"       :=-===%#-*@+-*+=",
+		"   : =*#=:+#=.-*==+-.:#%:",
+		"  +#:-===*%=-.%%=:*-:*+##.",
+		" .%*= --+**+ =%*=.   :*=-=%.",
+		"++=+ .@%.:: :*=-=      :-+*.",
+		"#+#  =@+*   %@*=       #++#",
+		"+#.  ++*=   *###       =*%-",
+		".#  =%-+    -++:      .*+.",
+		"  . -@=*    +@=:      -.",
+		"     ##.    .%*.",
+		"     .#=     -@:",
+		"       =      :-",
 	}
 
 	textLine := "D r o g o n C l a w"
@@ -1318,28 +1300,27 @@ func (m *Model) renderSplash() string {
 	}
 
 	for _, line := range claw {
-		centered := lipgloss.NewStyle().Width(w).Align(lipgloss.Center).Render(logoStyle.Render(line))
-		sb.WriteString(centered)
+		padLeft := max(0, (w-len(line))/2)
+		sb.WriteString(strings.Repeat(" ", padLeft))
+		sb.WriteString(logoStyle.Render(line))
 		sb.WriteString("\n")
 	}
 
 	sb.WriteString("\n")
-	centeredText := lipgloss.NewStyle().Width(w).Align(lipgloss.Center).Render(
-		logoStyle.Render(textLine),
-	)
-	sb.WriteString(centeredText)
+	textPad := max(0, (w-len(textLine))/2)
+	sb.WriteString(strings.Repeat(" ", textPad))
+	sb.WriteString(logoStyle.Render(textLine))
 	sb.WriteString("\n")
 
-	centeredSub := lipgloss.NewStyle().Width(w).Align(lipgloss.Center).Render(
-		subStyle.Render(subLine),
-	)
-	sb.WriteString(centeredSub)
+	subPad := max(0, (w-len(subLine))/2)
+	sb.WriteString(strings.Repeat(" ", subPad))
+	sb.WriteString(subStyle.Render(subLine))
 	sb.WriteString("\n\n")
 
-	centeredDim := lipgloss.NewStyle().Width(w).Align(lipgloss.Center).Render(
-		dimStyle.Render("Initializing..."),
-	)
-	sb.WriteString(centeredDim)
+	dimText := "Initializing..."
+	dimPad := max(0, (w-len(dimText))/2)
+	sb.WriteString(strings.Repeat(" ", dimPad))
+	sb.WriteString(dimStyle.Render(dimText))
 
 	return sb.String()
 }
