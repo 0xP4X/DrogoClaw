@@ -1,66 +1,92 @@
-# DrogonClaw Enterprise Platform
+# DrogonClaw Platform
 
-DrogonClaw is an autonomous Red Team and Blue Team platform designed to deliver continuous security testing, vulnerability management, and threat hunting across enterprise environments.
+DrogonClaw is an autonomous AI penetration testing platform designed to execute full-chain security assessments against authorized target infrastructure.
 
 ## Architecture
 
-The DrogonClaw engine operates in two primary modes:
-
 ### Red Team (Offensive Operations)
-*   **ReAct Loop Engine**: Uses LLMs to dynamically plan, execute, and adapt to the environment.
-*   **Memory Graph**: Local JSON-backed graph memory storing targets, assets, ports, services, vulnerabilities, credentials, flags, and their relationships as the agent records verified findings.
-*   **Docker Sandbox Execution**: Tools and exploits run through the DrogonClaw sandbox runtime, using a persistent Kali container when sandbox mode is enabled or the host shell when native mode is selected.
-*   **Payload Generation**: Generates Fully Undetectable (FUD) payloads using polymorphic crypters.
-*   **Enterprise Integration**: Findings are mapped to the MITRE ATT&CK framework and scored using CVSS v3.1.
+
+- **ReAct Loop Engine**: Custom Go-based reasoning loop that plans, executes, and adapts to the environment
+- **Mission Planner**: Breaks down objectives into executable steps with expected outcomes
+- **Evidence Validator**: Verifies tool outputs to prevent LLM hallucination
+- **Intelligence Graph**: JSON-backed memory storing targets, assets, ports, services, vulnerabilities, credentials, and flags
+- **Docker Sandbox**: Isolated tool execution with host fallback
+- **Session Management**: Persistent cookie jars per domain with adaptive rate limiting
+- **Skill Learning**: Learns from successful attacks and reuses techniques on similar targets
+- **Parallel Subagents**: Independent tasks run concurrently for faster recon
 
 ### Blue Team (Defensive Operations)
-*   **CIS Benchmark Scanner**: Deterministic shell checks to validate OS hardening on Linux/Windows.
-*   **Threat Hunting**: YARA rule matching and IOC scanning (hashes, malicious IPs, persistence mechanisms).
-*   **Compliance Mapping**: Security findings mapped directly to PCI-DSS, SOC 2, and HIPAA.
-*   **Incident Response**: Automated playbooks and procedural guidance for active intrusions (e.g., Ransomware).
-*   **Vulnerability Lifecycle Management**: Asset-based CVSS patch prioritization.
+
+- **CIS Benchmark Scanner**: Shell-based OS hardening validation
+- **Threat Hunting**: YARA rule matching and IOC scanning
+- **Compliance Mapping**: Findings mapped to PCI-DSS, SOC 2, HIPAA
+- **Incident Response**: Automated playbooks for active intrusions
+- **Vulnerability Lifecycle Management**: Asset-based CVSS patch prioritization
 
 ## Getting Started
 
-DrogonClaw relies on a Go-based architecture and Docker for sandbox execution.
-
 ### Requirements
-*   Go 1.26+
-*   Docker (Daemon must be running)
+
+- Go 1.26+
+- Docker (daemon running)
 
 ### Installation
-1. Compile the binary:
-   ```bash
-   make build
-   ```
-2. (Optional) Start the supporting services (e.g. a local Ollama instance):
-   ```bash
-   make docker-compose
-   ```
-3. Run the interactive setup wizard, which writes your configuration to
-   `~/.drogonclaw/config.json`:
-   ```bash
-   ./drogonclaw setup
-   ```
+
+```bash
+git clone https://github.com/0xP4X/drogonclaw.git
+cd drogonclaw
+go mod tidy
+go build -o drogonclaw ./cmd/drogonclaw/
+```
+
+### Configuration
+
+Run the interactive setup wizard:
+
+```bash
+./drogonclaw setup
+```
+
+The wizard configures:
+1. Authorization scope/compliance acknowledgement
+2. Neural provider (OpenRouter, NVIDIA NIM, OpenAI, Gemini, Ollama)
+3. Provider API credentials
+4. Optional Telegram C2 gateway
+5. Optional secondary API keys (Shodan, VirusTotal, GitHub, etc.)
+
+Configuration is stored in `~/.drogonclaw/config.json` (owner read/write only).
 
 ### Local API
 
-The REST API (`internal/api/server.go`) is an optional, local control-plane
-component. It is not started by the CLI or the Docker image, so it must be
-wired up separately (e.g. by your own process) if you need it. It authenticates
-with a static Bearer token from `DROGONCLAW_API_KEY` and does not implement JWT
-or role-based access control. Use the explicit TLS server entrypoint
-(`StartTLSServerAt`) and a deliberate host binding for any non-loopback
-deployment.
-*   **Authentication**: Static Bearer token via `DROGONCLAW_API_KEY` environment variable.
-*   **Limitations**: No JWT, no RBAC, no TLS by default. The API binds to loopback only unless `StartServerAt` or `StartTLSServerAt` is used with an explicit host.
+The REST API (`internal/api/server.go`) is an optional local control-plane component. It is not started by the CLI or Docker image by default.
 
-### TUI Operational Commands
-*   `/health` runs real toolkit diagnostics against the active sandbox runtime and reports installed/missing tooling.
-*   `/status` prints policy state plus memory graph entity and relationship counts by type.
-*   `/skills` summarizes loaded executable modules by category.
-*   `/skills <term>` searches module names, descriptions, parameters, and inferred categories.
-*   `/skills <exact_name>` shows required parameters and the execution backend for that module.
+- **Authentication**: Static Bearer token via `DROGONCLAW_API_KEY` environment variable
+- **Transport**: No TLS by default — use `StartTLSServerAt` for non-loopback deployment
+- **Authorization**: No RBAC — single-token authentication only
+- **Binding**: Loopback only unless explicitly configured otherwise
+
+### TUI Commands
+
+- `/health` — Run sandbox/toolkit diagnostics
+- `/status` — Print runtime state and memory graph counts
+- `/skills` — Show loaded modules by category
+- `/skills <term>` — Search modules by name or description
+- `/ctf <path>` — Offline CTF triage with flag detection
+- `/auto` — Toggle autopilot mode
+- `/help` — Full command reference
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+P` | Command palette |
+| `Ctrl+A` | Toggle autopilot |
+| `Ctrl+B` | Toggle sidebar |
+| `Ctrl+S` | Show status |
+| `Ctrl+D` | Show cost |
+| `Ctrl+E` | Open pager |
+| `Ctrl+Y` | Copy output |
 
 ## Legal Disclaimer
-DrogonClaw is built for authorized security testing only. Do not deploy offensive capabilities against networks without explicit written consent.
+
+DrogonClaw is built for authorized security testing only. Never deploy offensive capabilities against networks without explicit written consent.

@@ -15,33 +15,58 @@
 
 </div>
 
-> **AI-Driven Offensive & Defensive Security Platform**
-> **Official Website**: [drogonclaw.xyz](https://drogonclaw.xyz)
+> **Autonomous AI-Powered Penetration Testing Platform**
 
-DrogonClaw is a next-generation cyber operations platform. Rather than acting as a simple wrapper for Kali tools, DrogonClaw operates as a **Command-and-Control (C2) Brain**. It understands objectives, plans attack workflows, adapts to new discoveries, and orchestrates a swarm of specialized autonomous agents through a unified intelligence core.
+DrogonClaw is an autonomous AI agent that plans, executes, and adapts penetration tests against target infrastructure. It operates as a **ReAct-based intelligence core** with persistent memory, parallel subagents, learned attack patterns, and sandboxed tool execution.
 
-DrogonClaw focuses on **high-confidence autonomous workflows**, explainable findings, and reproducible evidence, avoiding the hallucinations common in early AI security tools.
+[Quick Start](#quick-start) | [Capabilities](#capabilities) | [Architecture](#architecture) | [Tools](docs/TOOLS.md) | [Commands](#commands) | [Development](#development) | [Setup Guide](docs/setup.md)
 
-[Quick Start](#quick-start) | [Supported Providers](#supported-providers) | [Architecture](#architectural-pillars) | [Commands](#interactive-terminal--commands) | [Development](#development) | [Setup Guide](docs/setup.md) | [Security](#security) | [Disclaimer](#disclaimer)
+---
 
 ## Warning
 
 > [!WARNING]
-> **Linux Only**
-> DrogonClaw is strictly designed and optimized for **Linux-based operating systems** (such as Kali Linux, Ubuntu, or Debian). It relies heavily on Linux-specific networking APIs, native filesystem permissions, and process management. It will **not** function on Windows or macOS.
+> **Linux Only — Authorized Testing Only**
+> DrogonClaw is designed for **Linux-based operating systems** (Kali, Ubuntu, Debian). It relies on Linux-specific networking APIs, filesystem permissions, and process management. **Never** use it against systems without explicit written authorization.
 
-## What Works
+---
 
-- **ReAct orchestration core** — a hand-rolled Go intelligence loop (no Node.js/LangChain overhead) that plans, delegates, and self-corrects.
-- **Persistent intelligence graph** — a JSON-backed memory store of typed entities (targets, assets, ports, services, vulnerabilities, credentials, flags) and their relationships.
-- **Sandboxed tool execution** — commands run in isolated, ephemeral Docker environments with a host fallback that fails closed.
-- **Structured tool wrappers** — typed wrappers for Nmap, Nuclei, Gobuster, FFUF, SQLMap, Subfinder, HTTPX, Checksec, Hydra, and forensics triage.
-- **Verified exploit templates** — pre-compiled chains for known CVEs (EternalBlue, Log4Shell, PrintNightmare, MS08-067, Spring4Shell), validated against known-vulnerable configurations.
-- **Active Directory arsenal** — impacket and BloodHound wrappers (Kerberoasting, Pass-the-Hash, DCSync) for domain pivoting.
-- **7-state exploit parser** — every exploit attempt is classified (e.g. `SUCCESS_SHELL`, `PATCHED`, `FILTERED`, `WRONG_ARCH`) and fed back to the reasoning engine.
-- **Dual-layer CVE intelligence** — a rolling 120-day NVD cache plus an offline database of common CTF/pentest CVEs.
-- **Human-in-the-Loop safety** — dangerous actions halt and require explicit operator approval.
-- **Remote C2** — an optional Telegram gateway for mobile command and a headless daemon mode.
+## Capabilities
+
+### Core Engine
+- **ReAct Orchestration** — Hand-rolled Go reasoning loop (no Node.js/LangChain overhead) with mission planning, evidence verification, and self-correction.
+- **Persistent Intelligence Graph** — JSON-backed memory storing targets, assets, ports, services, vulnerabilities, credentials, and flags with typed relationships.
+- **Sandboxed Execution** — Docker-isolated tool execution with host fallback that fails closed.
+- **Structured Tool Wrappers** — Typed wrappers for 10+ pentest tools with best-practice flag defaults.
+
+### Intelligence & Exploitation
+- **7-State Exploit Parser** — Every exploit attempt classified into actionable states: `SUCCESS_SHELL`, `SUCCESS_SILENT`, `PATCHED`, `FILTERED`, `WRONG_ARCH`, `AUTH_REQUIRED`, `CRASHED`.
+- **Verified Exploit Templates** — Pre-compiled chains for critical CVEs (EternalBlue, Log4Shell, PrintNightmare, MS08-067, Spring4Shell).
+- **Active Directory Arsenal** — Impacket/BloodHound wrappers (Kerberoasting, Pass-the-Hash, DCSync).
+- **Dual-Layer CVE Intelligence** — Rolling 120-day NVD cache + offline database of 100 classic CTF/pentest CVEs.
+- **Binary Triage** — Automated `checksec`, `strings`, `nm`, `gdb` fed into LLM context.
+
+### New Capabilities (Scrapling + Hermes Inspired)
+- **Session Persistence** — Persistent cookie jars per domain. Login once, enumerate everything across tool calls. ([docs/SESSION_MANAGEMENT.md](docs/SESSION_MANAGEMENT.md))
+- **Adaptive Rate Limiting (AutoThrottle)** — Per-domain rate control that speeds up when targets allow and backs off on 429/503. Respects `Retry-After` headers.
+- **Response Caching** — Tool responses cached to disk for retry without re-hitting targets.
+- **WAF Detection & Bypass Hints** — Detects Cloudflare, Akamai, AWS WAF, ModSecurity, Imperva, Sucuri with actionable bypass guidance.
+- **Skill Learning** — After verified successes, techniques are saved as reusable skills. Future targets get automatically matched against learned patterns. ([docs/SKILL_LEARNING.md](docs/SKILL_LEARNING.md))
+- **Parallel Subagents** — Independent recon/exploitation tasks run concurrently with dependency-aware scheduling. 3-5x faster recon. ([docs/SUBAGENTS.md](docs/SUBAGENTS.md))
+
+### Safety & Control
+- **Human-in-the-Loop (HitL)** — Dangerous actions halt for operator approval with tiered risk levels.
+- **Autonomous Code Gates** — Script execution, ghost tools, and reverse shells always require approval.
+- **Prompt Injection Defense** — External tool outputs sanitized before LLM context injection.
+- **Dynamic Skill Denylist** — 21 patterns blocked (reverse shells, `curl|sh`, `chmod 777`, etc.).
+- **Memory Failure Loops** — Failed command syntax tracked globally; agent cannot repeat the same mistake.
+
+### Interfaces
+- **TUI** — Professional terminal interface with sidebar, status bar, command palette (Ctrl+P), leader key system (Ctrl+X).
+- **Telegram C2 Gateway** — Remote mobile control via Telegram bot.
+- **Headless Daemon** — Runs without terminal for automated scanning.
+
+---
 
 ## Quick Start
 
@@ -52,8 +77,6 @@ DrogonClaw focuses on **high-confidence autonomous workflows**, explainable find
 
 ### Install (From Source)
 
-DrogonClaw operates outside of centralized registries to prevent censorship. It must be cloned directly from GitHub:
-
 ```bash
 git clone https://github.com/0xP4X/drogonclaw.git
 cd drogonclaw
@@ -61,13 +84,7 @@ go mod tidy
 go build -o drogonclaw ./cmd/drogonclaw/
 ```
 
-Once built, run `./drogonclaw` to launch the terminal interface.
-
-*(Note: DrogonClaw is built with a Go control plane — it compiles directly to a native Linux binary.)*
-
 ### Install (From npm)
-
-If you want the prebuilt Linux CLI from npm:
 
 ```bash
 npm install -g drogonclaw
@@ -75,31 +92,22 @@ drogonclaw setup
 drogonclaw
 ```
 
-This package publishes the Linux x64 executable only. Non-Linux platforms are intentionally blocked at install time.
-
 ### Configure
 
-DrogonClaw is configured entirely through its **Setup Wizard** — there is no
-environment-variable or export-based configuration. On first launch the wizard
-walks you through everything and writes it to `~/.drogonclaw/config.json`
-(owner read/write only):
-
-1. **Authorisation** — scope/compliance acknowledgement.
-2. **Neural Provider** — OpenRouter (default), NVIDIA NIM, OpenAI, Google Gemini, or local Ollama, plus model selection.
-3. **Credentials** — the provider API key (or Ollama endpoint).
-4. **Remote C2 Gateway** (optional) — Telegram bot token + chat ID.
-5. **Secondary API Keys** (optional) — pick any of GitHub, Shodan, VirusTotal, Brave Search, Hunter.io, or Exa to enable OSINT/recon features. Skip the whole set, or choose only the ones you want.
-
-Re-run it any time with `drogonclaw setup` or `/setup` inside the terminal.
+Run the interactive setup wizard:
 
 ```bash
 ./drogonclaw setup
 ```
 
-> Note: configuration is stored only in `~/.drogonclaw/config.json`. DrogonClaw
-> does **not** read provider/model settings from environment variables, so a
-> stray `export AI_PROVIDER=…` in your shell can no longer override your saved
-> setup.
+The wizard configures:
+1. **Authorization** — Scope/compliance acknowledgement
+2. **Neural Provider** — OpenRouter, NVIDIA NIM, OpenAI, Google Gemini, or Ollama
+3. **Credentials** — Provider API key
+4. **Remote C2** (optional) — Telegram bot token + chat ID
+5. **Secondary API Keys** (optional) — GitHub, Shodan, VirusTotal, Brave Search, Hunter.io, Exa
+
+Configuration stored in `~/.drogonclaw/config.json` (owner read/write only).
 
 ### Start
 
@@ -107,181 +115,199 @@ Re-run it any time with `drogonclaw setup` or `/setup` inside the terminal.
 ./drogonclaw
 ```
 
-Run `drogonclaw setup` first if you have not configured a provider yet.
-
 ### Daemon Mode (Headless)
-
-Run the agent from your phone via the Telegram gateway without the terminal UI:
 
 ```bash
 ./drogonclaw daemon
 ```
 
+---
+
 ## Supported Providers
 
 | Provider | Config Key | Notes |
 | --- | --- | --- |
-| OpenRouter | `openrouter` | Flexible multi-model gateway; model list is fetched live with a curated fallback |
+| OpenRouter | `openrouter` | Multi-model gateway; live model list with curated fallback |
 | NVIDIA NIM | `nvidia` | High-performance inference (Nemotron, Qwen, DeepSeek, Llama) |
-| OpenAI | `openai` | Direct API runtime (`gpt-4o`, `gpt-4o-mini`) |
-| Google Gemini | `gemini` | Enterprise reasoning core (`gemini-2.5-pro`, `gemini-2.5-flash`) |
-| Ollama | `ollama` | Autonomous offline runtime; point `OLLAMA_BASE_URL` at your local server |
+| OpenAI | `openai` | Direct API (`gpt-4o`, `gpt-4o-mini`) |
+| Google Gemini | `gemini` | Enterprise reasoning (`gemini-2.5-pro`, `gemini-2.5-flash`) |
+| Ollama | `ollama` | Offline runtime; set `OLLAMA_BASE_URL` |
 
-Provider credentials are configured via the **Setup Wizard** (`./drogonclaw setup` or `/setup`) and stored locally in `~/.drogonclaw/config.json` (owner read/write only).
+---
 
-## Architectural Pillars
+## Architecture
 
 ```mermaid
 flowchart TD
     subgraph UI ["User Interfaces"]
-        CLI["CLI Terminal"]
-        TG["Telegram C2 Gateway"]
+        CLI["CLI / TUI"]
+        TG["Telegram C2"]
+        DAEMON["Headless Daemon"]
     end
 
     subgraph Core ["DrogonClaw Engine (Go)"]
-        Orchestrator["Custom Go ReAct Orchestrator"]
-        Graph[("Intelligence Graph (JSON)")]
-        LootDB[("LootDB (SQLite3)")]
-        OPSEC["OPSEC Stealth Manager"]
-        Swarm["Swarm Commander (Goroutines)"]
+        Orchestrator["ReAct Orchestrator"]
+        Planner["Mission Planner"]
+        Evidence["Evidence Validator"]
+        Graph[("Intelligence Graph")]
+        LootDB[("LootDB (SQLite)")]
     end
 
-    subgraph Execution ["Isolated Execution Environment"]
-        Docker["Ephemeral Docker Sandbox"]
-        Tools["Nmap, Metasploit, Custom Exploits"]
+    subgraph Intelligence ["Intelligence Layer"]
+        Skills["Skill Learner"]
+        Sessions["Session Manager"]
+        Throttle["AutoThrottle"]
+        Cache["Response Cache"]
+        WAF["WAF Detector"]
+    end
+
+    subgraph Execution ["Execution Layer"]
+        Swarm["Swarm Commander"]
+        Subagents["Parallel Subagents"]
+        Sandbox["Docker Sandbox"]
+        Tools["Tool Wrappers"]
     end
 
     Target((("Target Network")))
 
-    UI -->|Natural Language Instructions| Orchestrator
-    Orchestrator <-->|Decoupled Memory| Graph
-    Orchestrator -->|Delegates Parallel Missions| Swarm
-    Orchestrator -->|Stealth Policy| OPSEC
-    Orchestrator -->|Deploys Payloads| Docker
-    Tools -->|Stores Loot & Credentials| LootDB
-    Docker --- Tools
-    Tools -->|Exploits & Recon| Target
+    UI --> Orchestrator
+    Orchestrator --> Planner
+    Orchestrator --> Evidence
+    Orchestrator <--> Graph
+    Orchestrator --> Skills
+    Orchestrator --> Subagents
+    Subagents --> Swarm
+    Swarm --> Sandbox
+    Sandbox --> Tools
+    Tools --> Sessions
+    Sessions --> Throttle
+    Sessions --> Cache
+    Tools --> WAF
+    Tools --> LootDB
+    Tools --> Target
 ```
 
-The platform revolves around five major pillars:
+For detailed architecture documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
-### 1. The Orchestration Core
+---
 
-- **Native Go ReAct Engine**: Hand-rolled, hyper-fast intelligence loop free from heavy Node.js/LangChain overhead.
-- **Mission Planner**: Breaks down objectives, reasons about paths, and delegates to specialized agents.
-- **Swarm Commander**: Automatically spins up native OS threads (Goroutines) to execute concurrent mission vectors in isolated contexts.
-- **Intelligence Graph**: A persistent JSON-backed memory graph that stores typed entities such as targets, assets, ports, services, vulnerabilities, credentials, and flags, plus explicit relationships between them.
+## Commands
 
-### 2. The Intelligence & Exploit Ecosystem
+### Keyboard Shortcuts
 
-A modular Go-backed tool registry allowing the agent to perform highly complex attacks without hallucinating syntax:
+| Shortcut | Action |
+| --- | --- |
+| `Ctrl+P` | Command palette |
+| `Ctrl+A` | Toggle autopilot |
+| `Ctrl+B` | Toggle sidebar |
+| `Ctrl+S` | Show status |
+| `Ctrl+D` | Show cost |
+| `Ctrl+E` | Open pager |
+| `Ctrl+Y` | Copy output |
+| `Ctrl+T` | New session |
+| `Ctrl+C` | Abort execution |
+| `Ctrl+X` then `b/n/l/m/t/e/x/q` | Leader key commands |
 
-- **Native Go Tool Wrappers**: Structured wrappers for common pentest tools (Nmap, Nuclei, Gobuster, FFUF, SQLMap, Subfinder, HTTPX, Checksec, Hydra, Forensics Triage) that eliminate flag-guesswork and provide pre-optimised defaults.
-- **Verified Exploit Templates**: Pre-compiled attack chains for critical vulnerabilities (EternalBlue, Log4Shell, PrintNightmare, MS08-067, Spring4Shell). Execution success depends on target vulnerability and environment; templates are verified against known vulnerable configurations, not guaranteed against all targets.
-- **Active Directory Arsenal**: Native wrappers for impacket and BloodHound (Kerberoasting, Pass-the-Hash, DCSync) allowing the agent to pivot through Windows domains.
-- **7-State Exploit Parser**: The AI doesn't just read raw output. A deterministic parser classifies every exploit attempt into one of 7 states (e.g., `SUCCESS_SHELL`, `PATCHED`, `FILTERED`, `WRONG_ARCH`) and feeds the exact recommended next step back to the reasoning engine.
-- **Dual-Layer CVE Intelligence**:
-  - Dynamic local NVD cache indexing for the last 120 days of vulnerabilities.
-  - Offline static database of the 100 most common CTF/pentest classic CVEs (vsftpd, dirtycow) for immediate recall.
-- **Binary Triage**: Automated `checksec`, `strings`, `nm`, and `gdb` tools to feed binary context directly into the LLM context window.
+### Slash Commands
 
-### 3. User Interfaces
+| Command | Description |
+| --- | --- |
+| `/setup` | Launch configuration wizard |
+| `/skills` | Show loaded modules |
+| `/skills <term>` | Search modules |
+| `/status` | Runtime state + memory graph |
+| `/health` | Sandbox/toolkit diagnostics |
+| `/ctf <path>` | Offline CTF triage |
+| `/profile <target>` | Passive target profiling |
+| `/auto` | Toggle autopilot |
+| `/persona` | Switch agent persona |
+| `/stealth` | Adjust OPSEC posture |
+| `/mode` | Switch operational mode |
+| `/report` | Generate engagement report |
+| `/swarm` | Manage agent swarm |
+| `/analyze <path>` | Analyze artifact |
+| `/sandbox` | Inspect sandbox runtime |
+| `/queue` | Show pending tasks |
+| `/sidebar` | Toggle sidebar |
+| `/details` | Show last tool details |
+| `/copy` | Copy transcript to clipboard |
+| `/help` | Full command reference |
 
-DrogonClaw is controlled through two primary interfaces:
-
-- **CLI Terminal**: The interactive `drogon>` prompt with a stylized workspace, slash commands, and live operator feedback.
-- **Telegram C2 Gateway**: A remote, mobile-friendly control channel that lets you issue natural-language instructions to the agent from your phone (see [Telegram Gateway](#telegram-gateway) for setup and whitelisting).
-
-### 4. The Cognitive Consciousness Loop
-
-DrogonClaw no longer just blindly executes commands. It operates on a strict internal **Cognitive Loop** designed to catch logic flaws, correct its own mistakes, and act autonomously:
-
-- **PERCEIVE / REFLECT / CHALLENGE / ACT**: Before every single tool execution, the AI explicitly evaluates the last output, hypothesizes why it failed, challenges its own assumptions (e.g., "Is there a 0-day here?"), and then acts.
-- **Dual-Persona Commander/Civilian**: The AI acts as a ruthless Commander during execution, but switches to an inquisitive Civilian to pause and ask the operator for intuition when genuinely stuck via the `ask_operator` protocol.
-- **Zero-Day Hunting**: Built-in `fuzz_endpoint` (ffuf integration) and `analyze_source_code` tools allow the agent to read raw source files and hunt for unpublished logic flaws, SQLi, and IDORs that no vulnerability scanner would ever catch.
-
-### 5. Autonomous Execution & Safety Layer
-
-DrogonClaw isolates operational risk and prevents unintended damage through:
-
-- **Human-in-the-Loop (HitL)**: Dangerous actions (like installing arbitrary software, modifying network interfaces, or dropping high-risk payloads) physically halt execution and prompt the operator with a full impact analysis before proceeding.
-- **Sandboxed Tool Execution**: Running command-line tools in isolated, ephemeral Docker environments.
-- **Memory Failure Loops**: The agent tracks failed command syntax globally; if an exploit syntax fails, the agent is mathematically prevented from repeating that exact mistake, forcing it to pivot.
-
-## Interactive Terminal & Commands
-
-Inside the `drogon>` prompt, you can converse with the AI naturally or use specific slash commands:
-
-- `/setup` - Launch the configuration wizard
-- `/skills` - Show loaded module categories and usage guidance
-- `/skills <term>` - Search modules by name, description, category, or parameter
-- `/skills <exact_name>` - Inspect a module's required parameters and execution backend
-- `/status` - Print runtime state and memory graph entity/link counts
-- `/health` - Run sandbox/toolkit diagnostics
-- `/ctf <path>` - Offline local-CTF triage with artifact inventory and verified flag detection
-- `/profile <target>` - Build a passive, source-accountable profile before any focused research
-- `/auto` - Toggle autopilot (skip Human-in-the-Loop approvals)
-- `/persona` - Switch the agent persona
-- `/stealth` - Adjust the OPSEC stealth posture
-- `/mode` - Switch operational mode
-- `/report` - Generate an engagement report
-- `/swarm` - Manage the agent swarm
-- `/analyze <path>` - Analyze a target artifact or source
-- `/sandbox` - Inspect or toggle the sandbox runtime
-- `/queue` - Show the pending task queue
-- `/copy` - Copy the on-screen transcript to the clipboard (and save to `drogonclaw_loot/drogonclaw_transcript.txt`)
-- `F3` - Open the current output in your pager (`$PAGER` or `less -R`) so you can freely select and copy any part of it
-- `/help` - Show the full command reference
-
-**Graceful Action Abortion:** If DrogonClaw is running a long scan or executing an exploit and you want to steer it in a different direction, simply press `Ctrl+C`. This will instantly sever the active thread, halt all sandboxed executions, and drop you back to the prompt, preserving the session memory so you can inject new instructions.
-
-**Copying output:** The terminal runs in the alternate screen, which has no scrollback, so you cannot select-and-copy arbitrary text from the UI (a drag highlights the whole screen). Press `F3` to open the current output in your pager, where you can freely select and copy any part of it. Use `/copy` to export the full transcript to your clipboard and to `~/drogonclaw_loot/drogonclaw_transcript.txt`.
-
-### Telegram Gateway
-
-Allows you to text instructions to your agent from your phone. It runs automatically if you set `TELEGRAM_TOKEN` and `TELEGRAM_CHAT_ID` in your configuration (`~/.drogonclaw/config.json`).
-
-*Security Note: You must provide your `TELEGRAM_CHAT_ID` to whitelist your account, otherwise the agent will reject all commands.*
-
-## Modularity & Swarm Intelligence
-
-DrogonClaw is designed to scale into collaborative agent swarms. You can inject new specialized agents (e.g., a "Web Fuzzer Agent" or an "Active Directory Hound") without modifying the core orchestrator.
+---
 
 ## Development
 
-DrogonClaw is a Go project. Use Go `1.26+` and have Docker available for sandbox execution.
-
 ```bash
-make build        # build the binary for the current OS
-make test         # run all Go tests with race detection
-make lint         # run golangci-lint
-make run          # build and launch the terminal interface
-make daemon       # build and run in headless daemon mode
-make docker-compose  # start core services via Docker Compose
+make build           # Build binary
+make test            # Run tests with race detection
+make lint            # Run golangci-lint
+make run             # Build and launch TUI
+make daemon          # Build and run headless
+make docker-compose  # Start Docker Compose services
+make test-cover      # Tests with coverage
+make format          # Format code
+make vet             # Run go vet
+make skills          # Regenerate skill manifest
+make doctor          # System diagnostics
+make clean           # Clean build artifacts
 ```
-
-Other useful targets: `make test-cover`, `make format`, `make vet`, `make skills` (regenerate the skill manifest), `make doctor` (system diagnostics), `make clean`.
 
 ### Repository Structure
 
-- `cmd/drogonclaw/` - CLI entrypoint
-- `internal/` - engine, agents, tools, TUI, sandbox, memory, and domain packages
-- `docs/` - architecture and readiness documentation
-- `scripts/` - build, manifest, and asset generation scripts
-- `skills/` - executable module definitions
-- `supabase/` - backend/schema assets
-- `assets/` - logos and generated charts
-- `.github/` - repo automation and funding metadata
+```
+cmd/drogonclaw/          CLI entrypoint
+internal/
+  agent/                 ReAct orchestrator, tools, subagents, skill learning
+  httputil/              Session management, AutoThrottle, response cache, WAF detection
+  memory/                Intelligence graph, loot DB, action journal
+  sandbox/               Docker sandbox execution
+  shell/                 Shell manager
+  shellutil/             Shared shell utilities
+  skills/                Skill manifest loader
+  tui/                   Terminal UI (Bubbletea + Lipgloss)
+  cvss/                  CVSS v3.1 scoring
+  core/                  HitL, mission planning, loot types
+  redteam/               Exploitation, evasion, lateral movement, post-exploitation
+  ghost/                 Anti-forensics
+  c2/                    C2 infrastructure
+  cloud/                 Cloud recon (AWS, Azure, GCP)
+  intel/                 OSINT feeds, Shodan, VirusTotal
+  mitre/                 MITRE ATT&CK mapping
+  adapt/                 Adaptive skill management
+  whitebox/              White-box assessment
+  benchmark/             Performance benchmarks
+  billing/               Cost tracking
+docs/                    Documentation
+skills/                  Executable module definitions
+scripts/                 Build and asset scripts
+assets/                  Logos and charts
+```
+
+---
+
+## Documentation
+
+| Document | Description |
+| --- | --- |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Detailed architecture with all subsystems |
+| [docs/TOOLS.md](docs/TOOLS.md) | Complete tool reference catalog |
+| [docs/SESSION_MANAGEMENT.md](docs/SESSION_MANAGEMENT.md) | Sessions, throttle, cache, WAF detection |
+| [docs/SKILL_LEARNING.md](docs/SKILL_LEARNING.md) | Learned attack patterns system |
+| [docs/SUBAGENTS.md](docs/SUBAGENTS.md) | Parallel execution framework |
+| [docs/setup.md](docs/setup.md) | Detailed setup guide |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
+| [SECURITY.md](SECURITY.md) | Vulnerability reporting |
+| [CHANGELOG.md](CHANGELOG.md) | Version history |
+
+---
 
 ## Security
 
-DrogonClaw is built for authorized security testing only. Report suspected vulnerabilities in the project via [SECURITY.md](SECURITY.md). Never deploy offensive capabilities against networks without explicit written consent.
+DrogonClaw is built for authorized security testing only. Report vulnerabilities via [SECURITY.md](SECURITY.md). Never deploy against networks without explicit written consent.
 
 ## Contributing
 
-Contributions are welcome. For guidelines, the development workflow, and scope
-rules, see [CONTRIBUTING.md](CONTRIBUTING.md). Ensure `make build`, `make lint`,
-and `make test` pass before submitting a pull request.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Ensure `make build`, `make lint`, and `make test` pass before submitting PRs.
 
 ## Disclaimer
 
@@ -291,16 +317,8 @@ DrogonClaw is designed for **authorized security testing only**. Always ensure y
 
 GNU AGPL v3
 
-## Star History
+---
 
-> **Note:** GitHub restricted access to star data on 2026-06-30, so the live
-> star-history.com embed no longer renders. This chart is a **static SVG** generated
-> from the repo owner's star timestamps (no public token). Regenerate it with:
->
-> ```bash
-> GITHUB_REPO=0xP4X/drogonclaw python3 scripts/star_history.py assets/star-history.svg
-> ```
->
-> See <https://star-history.com/blog/github-stargazer-api-restriction>.
+## Star History
 
 ![Star History](./assets/star-history.svg)
