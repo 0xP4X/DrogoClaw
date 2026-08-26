@@ -47,7 +47,11 @@ func (m *Model) View() string {
 
 	if m.showSidebar && m.layout.sidebarWidth > 0 {
 		sidebar := m.renderSidebar(m.layout.sidebarWidth, m.layout.sidebarHeight)
-		sb.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, content, sidebar))
+		fixedContent := lipgloss.NewStyle().
+			Width(m.layout.mainWidth).
+			Height(m.layout.contentHeight).
+			Render(content)
+		sb.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, fixedContent, sidebar))
 	} else {
 		sb.WriteString(content)
 	}
