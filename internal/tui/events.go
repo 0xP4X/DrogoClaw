@@ -210,8 +210,8 @@ func colorizeOutputLine(raw string) string {
 }
 
 func sanitizeToolOutputLines(result string) []string {
-	// Filter raw HTML index pages with font CSS dumps
-	if strings.Contains(result, "@font-face") || strings.Contains(result, "--mat-sys-") || strings.Contains(result, "<!DOCTYPE html>") {
+	// Filter raw HTML index pages with font CSS dumps (useless for analysis)
+	if strings.Contains(result, "@font-face") && strings.Contains(result, "--mat-sys-") {
 		return []string{"[HTML/CSS Web Response — OWASP Juice Shop App Index]"}
 	}
 	// Filter raw Express 500 stacktrace dumps

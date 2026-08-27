@@ -131,9 +131,10 @@ func (o *Orchestrator) isRepeatedCall(toolName, args string) bool {
 }
 
 func (o *Orchestrator) countRecentCalls(toolName, args string) int {
+	normalized := normalizeArgs(args)
 	count := 0
 	for _, rec := range o.recentToolCalls {
-		if rec.toolName == toolName && rec.args == args {
+		if rec.toolName == toolName && rec.args == normalized {
 			count++
 		}
 	}
@@ -141,7 +142,7 @@ func (o *Orchestrator) countRecentCalls(toolName, args string) int {
 }
 
 func (o *Orchestrator) recordToolCall(toolName, args string) {
-	o.recentToolCalls = append(o.recentToolCalls, toolCallRecord{toolName: toolName, args: args})
+	o.recentToolCalls = append(o.recentToolCalls, toolCallRecord{toolName: toolName, args: normalizeArgs(args)})
 	if len(o.recentToolCalls) > maxRecentToolCalls {
 		o.recentToolCalls = o.recentToolCalls[len(o.recentToolCalls)-maxRecentToolCalls:]
 	}
@@ -149,6 +150,18 @@ func (o *Orchestrator) recordToolCall(toolName, args string) {
 
 func (o *Orchestrator) clearRecentCalls() {
 	o.recentToolCalls = nil
+}
+
+func normalizeArgs(raw string) string {
+	var m map[string]any
+	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+		return raw
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		return raw
+	}
+	return string(b)
 }
 
 // NewOrchestrator creates the agent core.
