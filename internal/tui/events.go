@@ -25,6 +25,7 @@ func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 		m.phase = "planning"
 		if ev.Plan != nil && len(ev.Plan.Steps) > 0 {
 			m.phaseDetail = fmt.Sprintf("plan: %d steps", len(ev.Plan.Steps))
+			m.totalSteps = len(ev.Plan.Steps)
 		} else {
 			m.phaseDetail = "planning"
 		}

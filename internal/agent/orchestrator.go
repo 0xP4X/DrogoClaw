@@ -64,6 +64,14 @@ type Orchestrator struct {
 
 	// SubagentManager enables parallel task execution (inspired by Hermes Agent)
 	subagents *SubagentManager
+
+	// Repetition detection: tracks recent tool calls to break infinite loops
+	recentToolCalls []toolCallRecord
+}
+
+type toolCallRecord struct {
+	toolName string
+	args     string
 }
 
 const maxHistoryMessages = 24
@@ -111,6 +119,36 @@ func isLongRunningTool(name string) (time.Duration, bool) {
 		return 30 * time.Minute, true
 	}
 	return 0, false
+}
+
+const (
+	maxRecentToolCalls  = 8
+	repetitionThreshold = 3
+)
+
+func (o *Orchestrator) isRepeatedCall(toolName, args string) bool {
+	return o.countRecentCalls(toolName, args) >= repetitionThreshold
+}
+
+func (o *Orchestrator) countRecentCalls(toolName, args string) int {
+	count := 0
+	for _, rec := range o.recentToolCalls {
+		if rec.toolName == toolName && rec.args == args {
+			count++
+		}
+	}
+	return count
+}
+
+func (o *Orchestrator) recordToolCall(toolName, args string) {
+	o.recentToolCalls = append(o.recentToolCalls, toolCallRecord{toolName: toolName, args: args})
+	if len(o.recentToolCalls) > maxRecentToolCalls {
+		o.recentToolCalls = o.recentToolCalls[len(o.recentToolCalls)-maxRecentToolCalls:]
+	}
+}
+
+func (o *Orchestrator) clearRecentCalls() {
+	o.recentToolCalls = nil
 }
 
 // NewOrchestrator creates the agent core.
@@ -362,6 +400,19 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 		for _, tc := range resp.ToolCalls {
 			prettyArgs := formatArgs(tc.Function.Arguments)
 
+			// Check for repeated tool calls with same arguments (infinite loop detection)
+			if o.isRepeatedCall(tc.Function.Name, tc.Function.Arguments) {
+				loopMsg := fmt.Sprintf(
+					"[SYSTEM WARNING] You have called %s with identical arguments %d times in a row. This is an infinite loop. You MUST do something completely different now. Try a different tool, a different target, a different technique, or ask the operator for guidance. Do NOT call this tool with the same arguments again.",
+					tc.Function.Name, o.countRecentCalls(tc.Function.Name, tc.Function.Arguments))
+				messages = append(messages, openai.UserMessage(loopMsg))
+				o.history = append(o.history, openai.UserMessage(loopMsg))
+				o.retainHistory()
+				events <- Event{Type: EvError, Content: fmt.Sprintf("Repetition detected: %s called %d times with same args. Breaking loop.", tc.Function.Name, o.countRecentCalls(tc.Function.Name, tc.Function.Arguments))}
+				o.clearRecentCalls()
+				continue
+			}
+
 			// Optional acceptance gate for long-running, low-risk tools.
 			// In autopilot the operator has already delegated authority, so we
 			// skip the prompt entirely. Otherwise we surface an approval event
@@ -397,6 +448,7 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 			}
 
 			result := o.tools.Execute(ctx, tc.Function.Name, tc.Function.Arguments)
+			o.recordToolCall(tc.Function.Name, tc.Function.Arguments)
 			if o.actions != nil {
 				o.actions.ToolFinished(tc.Function.Name, result)
 			}
