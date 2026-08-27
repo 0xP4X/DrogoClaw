@@ -449,8 +449,12 @@ func (m Model) renderSidebar(width, height int) string {
 		elapsed = time.Since(m.execStartTime).Round(time.Second).String()
 	}
 
+	provider := fallback(m.cfg.GetProvider(), "none")
+	model := fallback(m.cfg.GetModel(), "none")
+
 	sessionId := truncateVisible(m.sessionID, max(4, innerWidth-14))
 	row("Session", HeaderInfoStyle.Render(sessionId))
+	row("Model", SidebarValueStyle.Render(truncate(provider+"/"+model, max(1, innerWidth-14))))
 	row("Workflow", SidebarValueStyle.Render(truncate(activeMode, max(1, innerWidth-14))))
 	row("Runtime", ColorizeElapsed(elapsed))
 	row("Phase", renderSidebarPhase(m.phase))
