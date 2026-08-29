@@ -69,6 +69,15 @@ All notable changes to DrogonClaw are documented here.
   `runStandaloneCommand` (`main` gocyclo 28 → 18).
 - Makefile `doctor` target now runs the real `health` subcommand (previously
   invoked a nonexistent `doctor` subcommand).
+- **Setup wizard modernization** — the flat text headings are replaced by the
+  TUI's own dark-chrome visual language: a rounded-border brand banner, filled
+  accent "pill" section headers (`AUTH` / `CONFIG` / `ACTION` / `PROVIDER` /
+  `C2` / `KEYS` / `PROFILE` / `RESET`), a boxed `CURRENT CONFIGURATION` panel
+  with accent label columns and green/⇢ status markers, and a bordered
+  completion panel. Purely presentational — flows and prompts unchanged.
+- **CLI help/version modernization** — `drogonclaw help` and `drogonclaw
+  version` now present their title + usage/build lines inside a rounded
+  bordered banner matching the wizard (GitHub-dark palette).
 
 ### Documentation
 - `docs/setup.md` rewritten for the menu-driven wizard and `/config` command.

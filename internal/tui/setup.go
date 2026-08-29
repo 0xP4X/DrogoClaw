@@ -50,11 +50,132 @@ type configReader interface {
 	GetString(string) string
 }
 
-func sectionHeader(number, title string) string {
-	return lipgloss.NewStyle().
+// Setup-screen styling: modern dark-theme chrome that mirrors the TUI's own
+// rounded-border / accent palette instead of flat text.
+var (
+	setupTitleStyle = lipgloss.NewStyle().
+			Foreground(ColorAccent).
+			Bold(true)
+	setupSubtitleStyle = lipgloss.NewStyle().
+				Foreground(ColorMuted)
+	setupTagStyle = lipgloss.NewStyle().
+			Background(ColorAccent).
+			Foreground(ColorBg).
+			Bold(true).
+			Padding(0, 1)
+	setupLabelStyle = lipgloss.NewStyle().
+			Foreground(ColorAccent).
+			Bold(true)
+	setupValueStyle = lipgloss.NewStyle().
+			Foreground(ColorWhite)
+	setupPanelStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(ColorBorder).
+			Padding(0, 2).
+			Background(ColorBgPanel)
+	setupBannerStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(ColorAccent).
+				Padding(1, 2).
+				Background(ColorBgPanel)
+)
+
+// setupSection renders a modern section header: a filled accent tag plus an
+// uppercase title and a subtle rule beneath.
+func setupSection(step, title string) string {
+	tag := setupTagStyle.Render(" " + step + " ")
+	label := setupTitleStyle.Render(strings.ToUpper(title))
+	return "\n  " + tag + "  " + label + "\n  " + SectionRuleStyle.Render(strings.Repeat("─", 52)) + "\n"
+}
+
+// setupBanner renders the wizard wordmark inside a bordered panel.
+func setupBanner() string {
+	title := lipgloss.NewStyle().
 		Foreground(ColorAccent).
 		Bold(true).
-		Render(fmt.Sprintf("  %s %s", number, title))
+		Render("🐉 DrogonClaw")
+	subtitle := setupSubtitleStyle.Render("autonomous offensive security agent · setup & configuration")
+	return "\n" + setupBannerStyle.Render(title+"\n\n"+subtitle) + "\n"
+}
+
+// setupMutedString renders dim secondary text.
+func setupMutedString(s string) string { return setupSubtitleStyle.Render(s) }
+
+// setupOnString renders a green "on" state for a stored credential.
+func setupOnString(s string) string {
+	return lipgloss.NewStyle().Foreground(ColorSuccess).Bold(true).Render(s)
+}
+
+// renderConfigSummary renders the "Current Configuration" pane: provider,
+// model, the active API key, Telegram gateway state, the secondary keys in a
+// two-column grid, and operator/agent identity. Secrets are only ever masked.
+func renderConfigSummary(r configReader) string {
+	label := func(s string) string {
+		return lipgloss.NewStyle().Width(12).Render(setupLabelStyle.Render(s))
+	}
+	rendered := setupValueStyle.Render
+
+	row := func(k, v string) string {
+		return "  " + label(k) + rendered(v)
+	}
+
+	var sb strings.Builder
+	sb.WriteString(row("Provider", providerLabel(r.GetProvider())))
+	sb.WriteString("\n")
+	sb.WriteString(row("Model", r.GetModel()))
+	sb.WriteString("\n")
+
+	if strings.EqualFold(r.GetProvider(), providerOllama) {
+		sb.WriteString(row("Endpoint", r.GetString("OLLAMA_BASE_URL")))
+		sb.WriteString("\n")
+		sb.WriteString(row("API key", "local · no key required"))
+	} else {
+		keyVal := storedKeyStatus(r.GetAPIKey())
+		if masked := maskSecret(r.GetAPIKey()); masked != "" {
+			keyVal = masked
+		}
+		sb.WriteString(row("API key", keyVal))
+	}
+	sb.WriteString("\n")
+
+	tg := telegramStatus(r)
+	if tg == stateTelOff {
+		sb.WriteString(row("Telegram", tg))
+	} else {
+		sb.WriteString(row("Telegram", setupOnString(tg)))
+	}
+	sb.WriteString("\n")
+
+	sb.WriteString("  " + label("Secondary"))
+	sb.WriteString("\n")
+	const colW = 34
+	var cells []string
+	for _, k := range secondaryKeys {
+		stored := r.GetString(k.configKey)
+		if stored == "" {
+			cells = append(cells, label(k.short)+setupMutedString("· ")+setupMutedString(stateUnset))
+		} else {
+			cells = append(cells, label(k.short)+setupOnString("● ")+setupMutedString(stateSet))
+		}
+	}
+	for i := 0; i < len(cells); i += 2 {
+		left := cells[i]
+		right := ""
+		if i+1 < len(cells) {
+			right = cells[i+1]
+		}
+		sb.WriteString("    " + lipgloss.NewStyle().Width(colW).Render(left) + right + "\n")
+	}
+
+	operator := r.GetOperatorName()
+	if operator == "" {
+		operator = "—"
+	}
+	sb.WriteString(row("Operator", operator))
+	sb.WriteString("\n")
+	sb.WriteString(row("Agent", r.GetAgentName()))
+	sb.WriteString("\n")
+	return sb.String()
 }
 
 // secondaryKeyEntry describes one optional OSINT/provider key the wizard
@@ -129,76 +250,6 @@ func telegramStatus(r configReader) string {
 		parts = append(parts, "chat "+chat)
 	}
 	return strings.Join(parts, " · ")
-}
-
-// renderConfigSummary renders the "Current Configuration" pane: provider,
-// model, the active API key, Telegram gateway state, the secondary keys in a
-// two-column grid, and operator/agent identity. Secrets are only ever masked.
-func renderConfigSummary(r configReader) string {
-	dim := SidebarLabelStyle.Render
-	val := HintDescStyle.Render
-	on := ToolOutputSuccessStyle.Render
-	off := WarningStyle.Render
-
-	row := func(label, value string) string {
-		return "  " + dim(lipgloss.NewStyle().Width(14).Render(label)) + val(value)
-	}
-
-	var sb strings.Builder
-	sb.WriteString(row("Provider", providerLabel(r.GetProvider())))
-	sb.WriteString("\n")
-
-	if strings.EqualFold(r.GetProvider(), providerOllama) {
-		sb.WriteString(row("Model", r.GetModel()))
-		sb.WriteString("\n")
-		sb.WriteString(row("Endpoint", r.GetString("OLLAMA_BASE_URL")+"  local — no key required"))
-	} else {
-		sb.WriteString(row("Model", r.GetModel()))
-		sb.WriteString("\n")
-		keyVal := storedKeyStatus(r.GetAPIKey())
-		if masked := maskSecret(r.GetAPIKey()); masked != "" {
-			keyVal = masked
-		}
-		sb.WriteString(row("API key", keyVal))
-	}
-	sb.WriteString("\n")
-
-	tg := telegramStatus(r)
-	if tg == stateTelOff {
-		sb.WriteString(row("Telegram", off(tg)))
-	} else {
-		sb.WriteString(row("Telegram", on(tg)))
-	}
-	sb.WriteString("\n")
-
-	sb.WriteString("  " + dim(lipgloss.NewStyle().Width(14).Render("Secondary")) + "\n")
-	const colW = 30
-	var cells []string
-	for _, k := range secondaryKeys {
-		if r.GetString(k.configKey) == "" {
-			cells = append(cells, dim(lipgloss.NewStyle().Width(12).Render(k.short))+off(stateUnset))
-		} else {
-			cells = append(cells, dim(lipgloss.NewStyle().Width(12).Render(k.short))+on(stateSet))
-		}
-	}
-	for i := 0; i < len(cells); i += 2 {
-		left := cells[i]
-		right := ""
-		if i+1 < len(cells) {
-			right = cells[i+1]
-		}
-		sb.WriteString("    " + lipgloss.NewStyle().Width(colW).Render(left) + right + "\n")
-	}
-
-	operator := r.GetOperatorName()
-	if operator == "" {
-		operator = "—"
-	}
-	sb.WriteString(row("Operator", operator))
-	sb.WriteString("\n")
-	sb.WriteString(row("Agent", r.GetAgentName()))
-	sb.WriteString("\n")
-	return sb.String()
 }
 
 // ollamaModelOptions discovers models installed in the local Ollama instance so
@@ -311,19 +362,15 @@ func setupSuccess(v string) {
 // every section is re-runnable, prefilled with stored values, and cancellable
 // back to the menu. Credentials are only ever masked in the summary pane.
 func RunSetup(cfg *config.Manager) {
-	brand := HeaderBrandStyle.Render
 	muted := HintDescStyle.Render
 	dim := SidebarLabelStyle.Render
 
-	fmt.Println()
-	fmt.Println(brand("  DrogonClaw Setup Wizard"))
+	fmt.Println(setupBanner())
 	fmt.Println(muted("  Review and manage your local security environment."))
 	fmt.Println(dim("  Credentials remain strictly local (~/.drogonclaw/config.json)."))
-	fmt.Println()
 
 	if !cfg.IsVerified() {
-		fmt.Println(sectionHeader("1", "Authorisation Check"))
-		fmt.Println()
+		fmt.Println(setupSection("AUTH", "Authorisation Check"))
 		var authorised bool
 		err := huh.NewConfirm().
 			Title("I authorize DrogonClaw for explicitly scoped operations only").
@@ -344,9 +391,12 @@ func RunSetup(cfg *config.Manager) {
 	}
 
 	for {
-		fmt.Println(sectionHeader("▸", "Current Configuration"))
-		fmt.Println(renderConfigSummary(cfg))
-		fmt.Println(sectionHeader("▸", "What would you like to do?"))
+		fmt.Println(setupSection("CONFIG", "Current Configuration"))
+		fmt.Println(setupPanelStyle.Render(
+			"\n  " + setupLabelStyle.Render("CURRENT CONFIGURATION") + "\n\n" +
+				renderConfigSummary(cfg) + "  \n",
+		))
+		fmt.Println(setupSection("ACTION", "What would you like to do?"))
 		fmt.Println()
 
 		var action string
@@ -383,11 +433,12 @@ func RunSetup(cfg *config.Manager) {
 	}
 
 	fmt.Println()
-	fmt.Println(SectionRuleStyle.Render("  ────────────────────────────────────────────────────────────────"))
-	fmt.Println()
-	setupSuccess("Setup Complete.")
-	fmt.Println(muted("  Configuration saved to ~/.drogonclaw/config.json."))
-	fmt.Println(muted("  Launch workspace with:  ./drogonclaw"))
+	fmt.Println(setupPanelStyle.Render(
+		"\n  " + setupTitleStyle.Render("✓  SETUP COMPLETE") + "\n\n" +
+			"  " + muted("Configuration saved to ~/.drogonclaw/config.json.") + "\n" +
+			"  " + setupOnString("Launch workspace with:  ./drogonclaw") + "\n" +
+			"  ",
+	))
 	fmt.Println()
 }
 
@@ -397,7 +448,7 @@ func RunSetup(cfg *config.Manager) {
 func runProviderSection(cfg *config.Manager) {
 	muted := setupMuted()
 
-	fmt.Println(sectionHeader("▶", "Change AI Provider & Model"))
+	fmt.Println(setupSection("PROVIDER", "AI Provider & Model"))
 	fmt.Println(muted("  Leave the API key blank to keep the currently stored key."))
 	fmt.Println()
 
@@ -508,7 +559,7 @@ func runTelegramSection(cfg *config.Manager) {
 	token := cfg.GetString("TELEGRAM_TOKEN")
 	chat := cfg.GetString("TELEGRAM_CHAT_ID")
 
-	fmt.Println(sectionHeader("▶", "Telegram C2 Gateway"))
+	fmt.Println(setupSection("C2", "Telegram Gateway"))
 	fmt.Println(muted("  Current: " + telegramStatus(cfg)))
 	fmt.Println()
 
@@ -584,7 +635,7 @@ func runTelegramSection(cfg *config.Manager) {
 func runSecondarySection(cfg *config.Manager) {
 	muted := setupMuted()
 
-	fmt.Println(sectionHeader("▶", "Secondary API Keys"))
+	fmt.Println(setupSection("KEYS", "Secondary API Keys"))
 	fmt.Println(muted("  Navigate with space/x, confirm with enter."))
 	fmt.Println()
 
@@ -658,7 +709,7 @@ func runIdentitySection(cfg *config.Manager) {
 	operator := cfg.GetOperatorName()
 	agent := cfg.GetAgentName()
 
-	fmt.Println(sectionHeader("▶", "Operator & Agent Identity"))
+	fmt.Println(setupSection("PROFILE", "Operator & Agent Identity"))
 	fmt.Println(muted("  Used in headers and reports."))
 	fmt.Println()
 
@@ -693,7 +744,7 @@ var managedConfigKeys = []string{
 // provider/model to defaults so a fresh authorised run is required.
 func runResetSection(cfg *config.Manager) {
 	muted := setupMuted()
-	fmt.Println(sectionHeader("▶", "Reset Configuration"))
+	fmt.Println(setupSection("RESET", "Reset Configuration"))
 	fmt.Println(WarningStyle.Render("  This clears AI provider keys, Telegram credentials and all secondary keys."))
 	fmt.Println()
 

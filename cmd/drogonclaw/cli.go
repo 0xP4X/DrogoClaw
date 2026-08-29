@@ -76,6 +76,11 @@ var (
 	cliCmdStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#3fb950")).
 			Bold(true)
+	cliBannerStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#30363d")).
+			Background(lipgloss.Color("#0d1117")).
+			Padding(0, 2)
 )
 
 // runStandaloneCommand executes the subcommands that finish before the runtime
@@ -163,15 +168,22 @@ func applyRunMode(opts cliOptions) {
 
 // printVersion prints build identity and runtime metadata.
 func printVersion(w io.Writer) {
-	fmt.Fprintln(w, cliTitleStyle.Render("DrogonClaw "+version))
-	fmt.Fprintf(w, "  %s %s\n", cliDimStyle.Render("build   "), cliMutedStyle.Render(buildTime))
-	fmt.Fprintf(w, "  %s %s\n", cliDimStyle.Render("go      "), cliMutedStyle.Render(runtime.Version()))
+	fmt.Fprintln(w, cliBannerStyle.Render(
+		cliTitleStyle.Render("🐉 DrogonClaw "+version)+
+			"\n"+
+			cliDimStyle.Render("  build   ")+cliMutedStyle.Render(buildTime)+
+			"\n"+
+			cliDimStyle.Render("  go      ")+cliMutedStyle.Render(runtime.Version()),
+	))
 }
 
 // printCLIHelp renders the graphical sub-command reference.
 func printCLIHelp(w io.Writer) {
-	fmt.Fprintln(w, cliTitleStyle.Render("DrogonClaw — Autonomous Offensive Security AI"))
-	fmt.Fprintln(w, cliDimStyle.Render("usage: drogonclaw [command] [flags]"))
+	fmt.Fprintln(w, cliBannerStyle.Render(
+		cliTitleStyle.Render("🐉 DrogonClaw — Autonomous Offensive Security AI")+
+			"\n"+
+			cliDimStyle.Render("usage: drogonclaw [command] [flags]"),
+	))
 	fmt.Fprintln(w, cliRuleStyle.Render(strings.Repeat("─", 60)))
 
 	maxCmd := 0
