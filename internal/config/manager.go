@@ -156,6 +156,20 @@ func (m *Manager) GetWorkspaceRoot() string {
 	return m.GetString("WORKSPACE_ROOT")
 }
 
+// GetAutopilot reports whether delegating autopilot mode is enabled. When on,
+// long-running low-risk tools auto-accept instead of pausing for the operator.
+func (m *Manager) GetAutopilot() bool {
+	v := strings.ToLower(m.GetString("AUTOPILOT"))
+	if v == "" {
+		v = strings.ToLower(os.Getenv("AUTOPILOT"))
+	}
+	return v == "true" || v == "1" || v == "on"
+}
+
+func (m *Manager) SetAutopilot(enabled bool) {
+	m.Set("AUTOPILOT", map[bool]string{true: "true", false: "false"}[enabled])
+}
+
 func (m *Manager) GetAgentName() string {
 	n := m.GetString("AGENT_NAME")
 	if n == "" {

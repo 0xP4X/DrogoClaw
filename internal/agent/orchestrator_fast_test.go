@@ -77,3 +77,26 @@ func TestTrimForVerification(t *testing.T) {
 		t.Fatal("short strings must pass through unchanged")
 	}
 }
+
+func TestBuildResultsAppendix(t *testing.T) {
+	recs := []toolOutputEvidence{
+		{tool: "old", output: strings.Repeat("o", 200)},
+		{tool: "run_subfinder", output: "sub-a\nsub-b\nsub-c"},
+	}
+	app := buildResultsAppendix(recs)
+	if !strings.Contains(app, "[run_subfinder]") {
+		t.Fatal("expected most-recent tool output first in the appendix")
+	}
+	if idx := len(app) - 1; idx < 0 || strings.Contains(app[idx:], "[old]") {
+		t.Fatal("expected the most-recent block to be listed before the older one")
+	}
+	if !strings.Contains(app, "sub-a\nsub-b\nsub-c") {
+		t.Fatal("expected the subdomain list to be included verbatim")
+	}
+
+	big := []toolOutputEvidence{{tool: "huge", output: strings.Repeat("x", resultsAppendixMax*2)}}
+	app = buildResultsAppendix(big)
+	if len(app) > resultsAppendixMax {
+		t.Fatalf("appendix exceeds budget: %d", len(app))
+	}
+}

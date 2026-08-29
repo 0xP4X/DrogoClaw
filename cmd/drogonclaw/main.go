@@ -122,6 +122,10 @@ func main() {
 	sessionID := fmt.Sprintf("ss%010d", rand.Intn(9000000000)+1000000000)
 	graph := memory.NewGraph(sessionID)
 
+	if opName := cfg.GetOperatorName(); opName != "" {
+		graph.UpdateOperatorProfile(&memory.OperatorProfile{Name: opName})
+	}
+
 	if opts.action == actionHealth {
 		out := health.RunDiagnostics(context.Background(), sb)
 		fmt.Println(out)

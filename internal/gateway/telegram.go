@@ -45,6 +45,7 @@ var (
 
 type TelegramGateway struct {
 	bot      *tele.Bot
+	cfg      *config.Manager
 	chatID   int64
 	orch     *agent.Orchestrator
 	graph    *memory.Graph
@@ -83,6 +84,14 @@ func NewTelegramGateway(cfg *config.Manager, orch *agent.Orchestrator, graph *me
 		graph:    graph,
 		opsecMgr: opsecMgr,
 		loot:     loot,
+		cfg:      cfg,
+	}
+
+	// Delegating "auto mode": if the operator saved AUTOPILOT=true, start the
+	// orchestrator already accepting long-running low-risk tools so a mission
+	// does not stall on a ⏸ prompt in an unattended chat.
+	if cfg.GetAutopilot() {
+		orch.Autopilot = true
 	}
 
 	tg.setupHandlers()
@@ -195,7 +204,7 @@ func (tg *TelegramGateway) handleCommand(c tele.Context, text string) error {
 	case "/findings":
 		return tg.sendFindings(c)
 
-	case "/autopilot":
+	case "/autopilot", "/auto":
 		return tg.sendAutopilot(c, parts)
 
 	case "/whoami":
@@ -216,7 +225,7 @@ func (tg *TelegramGateway) handleCommand(c tele.Context, text string) error {
 			"• <code>&lt;free text&gt;</code> — run a mission",
 			"• <code>/swarm &lt;mission&gt;</code> — parallel execution vectors",
 			"• <code>/findings</code> — what the agent has collected so far",
-			"• <code>/autopilot [on|off]</code> — auto-accept low-risk approvals",
+			"• <code>/autopilot [on|off]</code> (alias <code>/auto</code>) — auto-accept low-risk approvals",
 			"• <code>/status</code> — live mission snapshot / daemon dashboard",
 			"• <code>/cancel</code> — abort the running mission",
 			"• <code>/report</code> — generate the pentest report",
@@ -249,6 +258,9 @@ func (tg *TelegramGateway) sendAutopilot(c tele.Context, parts []string) error {
 	want, set := parseAutopilotArg(parts)
 	if set {
 		tg.orch.Autopilot = want
+		if tg.cfg != nil {
+			tg.cfg.SetAutopilot(want)
+		}
 	}
 	state := tg.orch.Autopilot
 	var hint string

@@ -44,7 +44,11 @@ Start the bot (and nothing else) so telemetry lands here instead of the TUI:
 3. While the agent is busy the bot shows the native **typing animation** so it
    feels alive — it stops on completion or as soon as an approval is requested.
 4. When done, the panel turns into a completion summary and the full answer is
-   delivered as a follow-up message (chunked at message-size limits).
+   delivered as a follow-up message (chunked at message-size limits). Every
+   final message also carries a **`--- RAW TOOL RESULTS ---`** appendix with the
+   actual tool output (e.g. the full 343-subdomain list), so the agent's
+   summary is never the only copy of the data. Appendices are bounded
+   (~6 KB, newest tool first) so huge scans can't flood the chat.
 
 ## Approvals (human-in-the-loop)
 
@@ -77,7 +81,7 @@ While an approval is pending, slash commands still work — send `/status` or
 | `<free text>` | Run a mission |
 | `/swarm <mission>` | Run parallel execution vectors (live panel + cancel) |
 | `/findings` | Dump the loot ledger: ports, credentials, vulnerabilities |
-| `/autopilot [on\|off]` | Toggle auto-accept of long-running low-risk tools (no arg = show current state) |
+| `/autopilot [on\|off]`, `/auto` | Toggle auto-accept of long-running low-risk tools (no arg = show current state). Persisted to config, so it survives daemon restarts |
 | `/status` | Live snapshot of the running mission; when idle, the daemon dashboard (session, graph size, loot totals) |
 | `/cancel` | Abort the running mission |
 | `/report` | Generate and send the pentest report document |

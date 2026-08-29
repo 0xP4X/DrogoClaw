@@ -137,6 +137,9 @@ func (m *MissionPlanner) GeneratePlan(ctx context.Context, objective string) (*M
 
 	content, err := m.provider.CompleteText(ctx, messages)
 	if err != nil {
+		if p := looksLikeReconMission(objective); p != nil {
+			return p, nil
+		}
 		return m.fallbackPlan(objective), nil
 	}
 
@@ -148,10 +151,105 @@ func (m *MissionPlanner) GeneratePlan(ctx context.Context, objective string) (*M
 
 	var plan MissionPlan
 	if err := json.Unmarshal([]byte(content), &plan); err != nil {
+		if p := looksLikeReconMission(objective); p != nil {
+			return p, nil
+		}
 		return m.fallbackPlan(objective), nil
 	}
 
+	if !plan.IsValidMission {
+		if p := looksLikeReconMission(objective); p != nil {
+			return p, nil
+		}
+		return &plan, nil
+	}
+
 	return &plan, nil
+}
+
+var (
+	reCIDR   = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}/\d{1,2}\b`)
+	reIPAddr = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`)
+	reDomain = regexp.MustCompile(`\b([a-zA-Z0-9][-a-zA-Z0-9]*(\.[a-zA-Z0-9][-a-zA-Z0-9]*)*\.[a-zA-Z]{2,})\b`)
+)
+
+func reconTarget(s string) string {
+	for _, re := range []*regexp.Regexp{reCIDR, reIPAddr, reDomain} {
+		if m := re.FindString(s); m != "" {
+			return m
+		}
+	}
+	return ""
+}
+
+// looksLikeReconMission is a deterministic safety net for the LLM planner.
+// LLM classification of a plain objective like "whois example.com" is not
+// always reliable (it can be treated as chit-chat), which silently turns an
+// actionable request into a conversational reply without running any tool.
+// When the text contains a concrete target AND a recon/scan intent verb, this
+// builds a real mission plan so the ReAct loop actually performs the work.
+func looksLikeReconMission(objective string) *MissionPlan {
+	target := reconTarget(objective)
+	if target == "" {
+		return nil
+	}
+
+	text := strings.ToLower(objective)
+	intent := ""
+	for _, v := range []string{
+		"whois", "subdomain", "dns", "enumerate", "scan", "fuzz",
+		"lookup", "probe", "recon", "osint", "footprint", "investigate",
+		"profile", "discover", "find ", "check ", "map ",
+	} {
+		if strings.Contains(text, v) {
+			intent = v
+			break
+		}
+	}
+	if intent == "" {
+		return nil
+	}
+
+	steps := []MissionStep{{
+		ID:              "ps-1",
+		Action:          "Passive reconnaissance (profile_target)",
+		TargetAssetID:   target,
+		ExpectedOutcome: "Passive DNS, WHOIS/RDAP, certificate-transparency and coverage-gap data",
+		Status:          StepPending,
+	}}
+
+	switch {
+	case strings.Contains(text, "subdomain"), strings.Contains(text, "dns"), strings.Contains(text, "enumerate"):
+		steps = append(steps, MissionStep{
+			ID:              "a-2",
+			Action:          "Enumerate subdomains (run_subfinder)",
+			TargetAssetID:   target,
+			ExpectedOutcome: "Discovered subdomains for the target",
+			Status:          StepPending,
+		})
+	case strings.Contains(text, "fuzz"):
+		steps = append(steps, MissionStep{
+			ID:              "a-2",
+			Action:          "Fuzz content discovery (run_gobuster)",
+			TargetAssetID:   target,
+			ExpectedOutcome: "Discovered directories and files",
+			Status:          StepPending,
+		})
+	case strings.Contains(text, "scan"), strings.Contains(text, "ports"):
+		steps = append(steps, MissionStep{
+			ID:              "a-2",
+			Action:          "Active port scan (run_nmap)",
+			TargetAssetID:   target,
+			ExpectedOutcome: "Open ports and services",
+			Status:          StepPending,
+		})
+	}
+
+	return &MissionPlan{
+		IsValidMission: true,
+		Objective:      objective,
+		Steps:          steps,
+	}
 }
 
 func (m *MissionPlanner) fallbackPlan(objective string) *MissionPlan {

@@ -139,6 +139,42 @@ All notable changes to DrogonClaw are documented here.
   panel anatomy, approvals, command reference, hints), cross-linked from
   `docs/setup.md`, `docs/INDEX.md` and the changelog.
 
+#### Telegram auto mode + visible results (this pass)
+
+Diagnosed on a live reproduction: plain objectives like `whois example.com`
+(or subdomain enumeration) were being classified by the LLM planner as
+*chit-chat*, so no tool ever ran and the agent just answered conversationally —
+and even when tools did run, the actual output (e.g. a 343-subdomain list)
+stayed in the internal evidence window and never reached the operator.
+
+- **Raw results delivered** — every final answer now appends a bounded
+  `--- RAW TOOL RESULTS ---` appendix (newest tool first, ~6 KB cap, per-block
+  truncation) so the real subdomain list / scan output ships to Telegram and
+  the TUI, not just the model's summary.
+- **Deterministic mission planner fallback** — `GeneratePlan` now recognises
+  a concrete target (domain/IP/CIDR) **plus** a recon/scan intent verb and
+  builds a real mission (`profile_target` + subfinder/nmap/gobuster as
+  appropriate) even when the LLM mislabels it as chat or returns unparseable
+  JSON. `whois example.com` no longer bounces as a conversation.
+- **Operator identity bootstrapped** — the operator profile is seeded from
+  `OPERATOR_NAME` at startup, so headless sessions get the full persona and the
+  planner stops defaulting to an unnamed "zero" operator.
+- **`/auto` alias + persistent autopilot** — `/autopilot` is aliased `/auto`
+  (matching the TUI) and the toggle is written to config (`AUTOPILOT`), so
+  auto-accept of long-running low-risk tools survives daemon restarts instead
+  of resetting every launch (this was exactly the 1-minute `subfinder` /
+  `osint_certs` approval stall seen in probes).
+
+### Tests
+- `internal/core/mission_test.go` — `reconTarget` extraction and
+  `looksLikeReconMission` (whois/subdomain/scan → mission; chit-chat/greeting
+  → no mission).
+- `internal/agent/orchestrator_fast_test.go` — `buildResultsAppendix`: newest
+  output first, verbatim list inclusion, and hard budget enforcement.
+- `internal/agent/probe_test.go` — opt-in (`DC_PROBE=1`) live probe that
+  replays the daemon wiring against the configured provider to reproduce
+  mission-planning and tool-execution behaviour without a running bot.
+
 ### Tests
 - `internal/memory/loot_test.go` — extended `Findings` round-trip: insert port/
   vulnerability/credential, verify totals and that stored credentials remain

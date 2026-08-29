@@ -46,11 +46,11 @@ type Event struct {
 
 // Orchestrator is the DrogonClaw agent — a hand-rolled ReAct loop.
 type Orchestrator struct {
-	provider       *Provider
-	tools          *ToolRegistry
-	history        []openai.ChatCompletionMessageParamUnion
-	sysPrompt      string
-	maxIterations  int
+	provider      *Provider
+	tools         *ToolRegistry
+	history       []openai.ChatCompletionMessageParamUnion
+	sysPrompt     string
+	maxIterations int
 
 	// Session state
 	Autopilot bool
@@ -86,15 +86,15 @@ type toolOutputEvidence struct {
 // that immediately follows one of these only needs to parse and summarize
 // scanner output, so it is safe to serve from the fast/cheap model tier.
 var fastPhaseTools = map[string]bool{
-	"run_nmap":            true,
-	"run_nuclei":          true,
-	"run_gobuster":        true,
-	"run_ffuf":            true,
-	"run_sqlmap":          true,
-	"run_subfinder":       true,
-	"run_httpx":           true,
+	"run_nmap":             true,
+	"run_nuclei":           true,
+	"run_gobuster":         true,
+	"run_ffuf":             true,
+	"run_sqlmap":           true,
+	"run_subfinder":        true,
+	"run_httpx":            true,
 	"run_forensics_triage": true,
-	"fuzz_endpoint":       true,
+	"fuzz_endpoint":        true,
 	"profile_target":       true,
 	"osint_certs":          true,
 	"osint_dns":            true,
@@ -139,6 +139,39 @@ func buildToolEvidence(recs []toolOutputEvidence) string {
 	return sb.String()
 }
 
+// resultsAppendixMax caps how much raw tool output is appended to the final
+// deliverable so long scans cannot blow up the operator's report (Telegram
+// chunks long messages, but bounded output keeps the summary readable).
+const resultsAppendixMax = 6000
+
+// buildResultsAppendix renders the most-recent raw tool outputs (e.g. the full
+// subdomain list) for the operator. Unlike buildToolEvidence it walks the
+// window backwards so the newest results appear first, and truncates each block
+// so a single noisy tool cannot swallow the whole appendix.
+func buildResultsAppendix(recs []toolOutputEvidence) string {
+	var sb strings.Builder
+	sb.WriteString("\n\n--- RAW TOOL RESULTS ---\n")
+	for i := len(recs) - 1; i >= 0; i-- {
+		if sb.Len() >= resultsAppendixMax {
+			break
+		}
+		r := recs[i]
+		block := "[" + r.tool + "]\n" + r.output + "\n"
+		if len(block) > 4000 {
+			block = block[:4000] + "\n…(truncated)…\n"
+		}
+		if sb.Len()+len(block) > resultsAppendixMax {
+			room := resultsAppendixMax - sb.Len()
+			if room > 0 {
+				sb.WriteString(block[:room])
+			}
+			break
+		}
+		sb.WriteString(block)
+	}
+	return sb.String()
+}
+
 type toolCallRecord struct {
 	toolName string
 	args     string
@@ -155,27 +188,27 @@ const runBudget = 30 * time.Minute
 // runtime. When not in autopilot, the orchestrator pauses before running one of
 // these and asks the operator to accept or skip it (see EvApproval).
 var longRunningTools = map[string]time.Duration{
-	"run_gobuster":              2 * time.Minute,
-	"run_ffuf":                  2 * time.Minute,
-	"run_nuclei":                2 * time.Minute,
-	"run_nmap":                  3 * time.Minute,
-	"fuzz_endpoint":             3 * time.Minute,
-	"run_subfinder":             1 * time.Minute,
-	"run_httpx":                 1 * time.Minute,
-	"refresh_cve_feeds":         2 * time.Minute,
-	"deep_research":             2 * time.Minute,
-	"osint_certs":               1 * time.Minute,
-	"run_forensics_triage":      3 * time.Minute,
-	"autonomous_fuzzing_engine": 5 * time.Minute,
-	"dynamic_payload_compiler":  5 * time.Minute,
-	"advanced_web_exploiter":    5 * time.Minute,
+	"run_gobuster":                2 * time.Minute,
+	"run_ffuf":                    2 * time.Minute,
+	"run_nuclei":                  2 * time.Minute,
+	"run_nmap":                    3 * time.Minute,
+	"fuzz_endpoint":               3 * time.Minute,
+	"run_subfinder":               1 * time.Minute,
+	"run_httpx":                   1 * time.Minute,
+	"refresh_cve_feeds":           2 * time.Minute,
+	"deep_research":               2 * time.Minute,
+	"osint_certs":                 1 * time.Minute,
+	"run_forensics_triage":        3 * time.Minute,
+	"autonomous_fuzzing_engine":   5 * time.Minute,
+	"dynamic_payload_compiler":    5 * time.Minute,
+	"advanced_web_exploiter":      5 * time.Minute,
 	"headless_browser_automation": 3 * time.Minute,
-	"zero_click_exploiter":      5 * time.Minute,
+	"zero_click_exploiter":        5 * time.Minute,
 	"async_race_condition_engine": 3 * time.Minute,
-	"write_and_run_script":      5 * time.Minute,
-	"ghost_wipe_logs":           1 * time.Minute,
-	"ghost_secure_delete":       1 * time.Minute,
-	"ghost_clear_history":       1 * time.Minute,
+	"write_and_run_script":        5 * time.Minute,
+	"ghost_wipe_logs":             1 * time.Minute,
+	"ghost_secure_delete":         1 * time.Minute,
+	"ghost_clear_history":         1 * time.Minute,
 }
 
 // isLongRunningTool reports whether a tool is expected to run a long time and,
@@ -531,6 +564,10 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 				}
 			}
 
+			if len(o.recentToolOutputs) > 0 {
+				finalContent += buildResultsAppendix(o.recentToolOutputs)
+			}
+
 			events <- Event{Type: EvToken, Content: finalContent}
 			events <- Event{Type: EvDone, Content: finalContent}
 			if o.actions != nil {
@@ -601,44 +638,44 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 				o.actions.ToolFinished(tc.Function.Name, result)
 			}
 
-		// Deterministic evidence evaluation: the model is told the verified
-		// status so it cannot claim success on prose alone. Verified findings
-		// are recorded to the loot database with provenance. The footer is
-		// appended to the tool result so the LLM sees the verification verdict.
-		verified, estatus, reason := o.tools.EvaluateTool(tc.Function.Name, result)
-		if verified {
-			o.tools.RecordVerifiedFinding()
-		}
-		if estatus != "" {
-			evidenceFooter := fmt.Sprintf("\n[EVIDENCE: %s — %s]", estatus, reason)
-			result += evidenceFooter
-		}
-
-		events <- Event{Type: EvToolDone, Tool: tc.Function.Name, Result: result}
-		// Sanitize external tool outputs before injecting into LLM context
-		sanitizedResult := sanitizeToolOutput(result)
-		messages = append(messages, openai.ToolMessage(tc.ID, sanitizedResult))
-		o.history = append(o.history, openai.ToolMessage(tc.ID, sanitizedResult))
-		o.retainHistory()
-
-		if strings.Contains(result, "[HitL_SUSPENDED]") {
-			events <- Event{Type: EvStatus, Content: "Agent execution suspended. Awaiting human approval..."}
-
-			// Block on the approval event rather than consuming a CPU core while waiting.
-			if err := core.GlobalHitL.Wait(ctx); err != nil {
-				if o.actions != nil {
-					o.actions.Finish("interrupted", err.Error())
-				}
-				return err
+			// Deterministic evidence evaluation: the model is told the verified
+			// status so it cannot claim success on prose alone. Verified findings
+			// are recorded to the loot database with provenance. The footer is
+			// appended to the tool result so the LLM sees the verification verdict.
+			verified, estatus, reason := o.tools.EvaluateTool(tc.Function.Name, result)
+			if verified {
+				o.tools.RecordVerifiedFinding()
+			}
+			if estatus != "" {
+				evidenceFooter := fmt.Sprintf("\n[EVIDENCE: %s — %s]", estatus, reason)
+				result += evidenceFooter
 			}
 
-			// Once answered, inject the answer into the loop context as if the tool returned it
-			ans := core.GlobalHitL.ConsumeAnswer()
-			messages = append(messages, openai.UserMessage(fmt.Sprintf("Human-in-the-loop response: %s", ans)))
-			o.history = append(o.history, openai.UserMessage(fmt.Sprintf("Human-in-the-loop response: %s", ans)))
+			events <- Event{Type: EvToolDone, Tool: tc.Function.Name, Result: result}
+			// Sanitize external tool outputs before injecting into LLM context
+			sanitizedResult := sanitizeToolOutput(result)
+			messages = append(messages, openai.ToolMessage(tc.ID, sanitizedResult))
+			o.history = append(o.history, openai.ToolMessage(tc.ID, sanitizedResult))
 			o.retainHistory()
-			events <- Event{Type: EvStatus, Content: "Approval received. Resuming execution..."}
-		}
+
+			if strings.Contains(result, "[HitL_SUSPENDED]") {
+				events <- Event{Type: EvStatus, Content: "Agent execution suspended. Awaiting human approval..."}
+
+				// Block on the approval event rather than consuming a CPU core while waiting.
+				if err := core.GlobalHitL.Wait(ctx); err != nil {
+					if o.actions != nil {
+						o.actions.Finish("interrupted", err.Error())
+					}
+					return err
+				}
+
+				// Once answered, inject the answer into the loop context as if the tool returned it
+				ans := core.GlobalHitL.ConsumeAnswer()
+				messages = append(messages, openai.UserMessage(fmt.Sprintf("Human-in-the-loop response: %s", ans)))
+				o.history = append(o.history, openai.UserMessage(fmt.Sprintf("Human-in-the-loop response: %s", ans)))
+				o.retainHistory()
+				events <- Event{Type: EvStatus, Content: "Approval received. Resuming execution..."}
+			}
 		}
 		o.fastPhaseNext = fastRound
 	}
