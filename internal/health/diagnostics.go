@@ -82,7 +82,7 @@ var toolsByCategory = []struct {
 			{Name: "nikto", Category: "web"},
 			{Name: "dirb", Category: "web"},
 			{Name: "wfuzz", Category: "web"},
-			{Name: "httpx", Category: "web"},
+			{Name: "httpx", Category: "web", Cmd: `{ httpx -version 2>&1; } | grep -qi projectdiscovery; { httpx-toolkit -version 2>&1; } | grep -qi projectdiscovery`},
 			{Name: "feroxbuster", Category: "web"},
 		},
 	},
@@ -101,18 +101,18 @@ var toolsByCategory = []struct {
 			{Name: "msfconsole", Category: "exploit", Critical: true},
 			{Name: "python3", Category: "exploit", Critical: true},
 			{Name: "searchsploit", Category: "exploit"},
-			{Name: "exploitdb", Category: "exploit"},
+			{Name: "exploitdb", Category: "exploit", Cmd: "test -d /usr/share/exploitdb/exploits && echo ok"},
 		},
 	},
 	{
 		Label: "Post-Exploitation",
 		Tools: []ToolDef{
-			{Name: "crackmapexec", Category: "post", Critical: true},
+			{Name: "nxc", Category: "post", Critical: true, Cmd: `command -v nxc || command -v netexec`},
 			{Name: "impacket-secretsdump", Category: "post"},
 			{Name: "evil-winrm", Category: "post"},
 			{Name: "mimikatz", Category: "post"},
 			{Name: "chisel", Category: "post"},
-			{Name: "ligolo-ng", Category: "post"},
+			{Name: "ligolo-ng", Category: "post", Cmd: "command -v ligolo-agent || command -v ligolo-ng-agent || command -v ligolo-ng-proxy"},
 		},
 	},
 	{
@@ -147,7 +147,7 @@ var toolsByCategory = []struct {
 			{Name: "autopsy", Category: "forensics"},
 			{Name: "exiftool", Category: "forensics"},
 			{Name: "steghide", Category: "forensics"},
-			{Name: "stegsolve", Category: "forensics"},
+			{Name: "stegseek", Category: "forensics"},
 		},
 	},
 	{
@@ -174,10 +174,10 @@ var toolsByCategory = []struct {
 	{
 		Label: "Documentation / Reporting",
 		Tools: []ToolDef{
-			{Name: "pandoc", Category: "docs"},
-			{Name: "wkhtmltopdf", Category: "docs"},
+{Name: "pandoc", Category: "docs"},
+			{Name: "weasyprint", Category: "docs", Cmd: "python3 -c \"import weasyprint\""},
 			{Name: "pdflatex", Category: "docs"},
-			{Name: "jq", Category: "docs", Critical: true},
+			{Name: "jq", Category: "docs"},
 			{Name: "yq", Category: "docs"},
 		},
 	},

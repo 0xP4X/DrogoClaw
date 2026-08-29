@@ -31,7 +31,16 @@ import (
 // verify the binary is actually projectdiscovery's.
 func resolveHttpx() (string, error) {
 	home, _ := os.UserHomeDir()
-	candidates := []string{"httpx", filepath.Join(home, "go", "bin", "httpx"), "/usr/local/bin/httpx"}
+	candidates := []string{
+		"httpx",
+		"httpx-toolkit",
+		filepath.Join(home, "go", "bin", "httpx"),
+		filepath.Join(home, "go", "bin", "httpx-toolkit"),
+		"/usr/local/bin/httpx",
+		"/usr/local/bin/httpx-toolkit",
+		"/usr/bin/httpx-toolkit",
+		"/opt/pdtm/bin/httpx",
+	}
 	for _, c := range candidates {
 		path, err := exec.LookPath(c)
 		if err != nil {
@@ -43,6 +52,18 @@ func resolveHttpx() (string, error) {
 		}
 	}
 	return "", fmt.Errorf("projectdiscovery/httpx not found (the 'httpx' on PATH is the Python client). Install it with: go install github.com/projectdiscovery/httpx/cmd/httpx@latest — and ensure ~/go/bin precedes /usr/bin on PATH, or run inside the sandbox")
+}
+
+// resolveVolatility returns a usable Volatility 3 console script. The PyPI
+// package has shipped under several entry-point names over time (vol, vol3,
+// volatility3); pick the first one present on PATH.
+func resolveVolatility() (string, error) {
+	for _, name := range []string{"vol3", "vol", "volatility3"} {
+		if path, err := exec.LookPath(name); err == nil {
+			return path, nil
+		}
+	}
+	return "", fmt.Errorf("volatility3 not found. Install it with: pipx install volatility3 (or pip install volatility3) and ensure its bin dir is on PATH")
 }
 
 // buildNmapFlags assembles nmap CLI flags for the given mode and optional
@@ -283,12 +304,12 @@ func (r *ToolRegistry) registerToolWrappers() {
 		cmd := fmt.Sprintf(`
 file %s
 echo "---"
-checksec --file=%s 2>/dev/null || checksec --binary=%s 2>/dev/null || echo "[!] checksec not found — installing..." && apt-get install -y checksec -qq && checksec --file=%s
+if command -v checksec >/dev/null 2>&1; then checksec --file=%s 2>/tmp/checksec.err || cat /tmp/checksec.err; else echo "[!] checksec not installed — apt install checksec (or download checksec.sh)"; fi
 echo "---"
 strings -n 8 %s | head -60
 echo "---"
 ldd %s 2>/dev/null | head -20
-`, binaryPath, binaryPath, binaryPath, binaryPath, binaryPath, binaryPath)
+`, shellutil.Quote(binaryPath), shellutil.Quote(binaryPath), shellutil.Quote(binaryPath), shellutil.Quote(binaryPath))
 		out, err := r.sandbox.Execute(ctx, cmd)
 		if err != nil {
 			return fmt.Sprintf("[checksec Error] %v\nOutput: %s", err, out)
@@ -352,7 +373,19 @@ binwalk %s 2>/dev/null || echo "[!] binwalk not installed"
 echo ""
 echo "=== HEX PREVIEW (first 64 bytes) ==="
 xxd %s | head -4
-`, filePath, filePath, filePath, filePath, filePath)
+echo ""
+echo "=== STEGHIDE ==="
+if command -v steghide >/dev/null 2>&1; then echo "" | steghide info %s 2>&1 | head -8; else echo "[!] steghide not installed"; fi
+echo ""
+echo "=== ZSTEG ==="
+if command -v zsteg >/dev/null 2>&1; then zsteg %s 2>&1 | head -10; else echo "[!] zsteg not installed"; fi
+echo ""
+echo "=== FOREMOST (carving to /workspace/foremost) ==="
+if command -v foremost >/dev/null 2>&1; then rm -rf /workspace/foremost && mkdir -p /workspace/foremost && foremost -q -o /workspace/foremost -i %s 2>&1 | tail -3 && ls /workspace/foremost 2>/dev/null; else echo "[!] foremost not installed"; fi
+echo ""
+echo "=== CUSTOM INFO (if image) ==="
+exif %s 2>/dev/null | head -20 || true
+`, shellutil.Quote(filePath), shellutil.Quote(filePath), shellutil.Quote(filePath), shellutil.Quote(filePath), shellutil.Quote(filePath), shellutil.Quote(filePath), shellutil.Quote(filePath), shellutil.Quote(filePath), shellutil.Quote(filePath))
 		out, err := r.sandbox.Execute(ctx, cmd)
 		if err != nil {
 			return fmt.Sprintf("[forensics_triage Error] %v\nOutput: %s", err, out)
@@ -463,13 +496,20 @@ else:
 	}
 
 	// ── 15. VOLATILITY 3 (Memory Forensics) ───────────────────────────────────
+	// The PyPI package historically installs different console-script names
+	// (vol / vol3 / volatility3). Probe all three so the wrapper works across
+	// apt, pipx, and pip installations instead of hard-coding a single name.
 	r.builtins["run_volatility3"] = func(ctx context.Context, args map[string]any) string {
 		memFile, _ := args["mem_file"].(string)
 		plugin, _ := args["plugin"].(string)
 		if memFile == "" || plugin == "" {
 			return "[Error] mem_file and plugin are required (e.g., windows.pslist, linux.psaux)"
 		}
-		cmd := fmt.Sprintf("volatility3 -f %s %s 2>&1", memFile, plugin)
+		bin, err := resolveVolatility()
+		if err != nil {
+			return fmt.Sprintf("[volatility3 Error] %v", err)
+		}
+		cmd := fmt.Sprintf("%s -f %s %s 2>&1", shellutil.Quote(bin), shellutil.Quote(memFile), shellutil.Quote(plugin))
 		out, err := r.sandbox.Execute(ctx, cmd)
 		if err != nil {
 			return fmt.Sprintf("[volatility3 Error] %v\nOutput: %s", err, out)

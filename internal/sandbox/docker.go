@@ -146,7 +146,7 @@ func (d *Docker) Initialize(ctx context.Context, native bool) error {
 	// Check if already provisioned
 	out, _ := d.Execute(ctx, "which sqlmap")
 	if !strings.Contains(out, "/usr/bin/sqlmap") {
-		_, _ = d.Execute(ctx, "apt-get update && apt-get install -y iputils-ping nmap dnsutils curl wget sqlmap metasploit-framework gobuster ffuf nuclei crackmapexec impacket-scripts python3-impacket john hashcat seclists subfinder whatweb wpscan")
+		_, _ = d.Execute(ctx, "apt-get update && apt-get install -y iputils-ping nmap dnsutils curl wget sqlmap metasploit-framework gobuster ffuf nuclei netexec httpx-toolkit impacket-scripts python3-impacket john hashcat seclists subfinder whatweb wpscan checksec steghide foremost bettercap hostapd mdk4 evil-winrm chisel awscli theharvester bloodhound-python python3-pwntools")
 	}
 
 	return nil
