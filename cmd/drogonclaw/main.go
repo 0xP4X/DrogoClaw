@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -228,6 +229,7 @@ func main() {
 func runBenchmark(cfg *config.Manager, args []string) {
 	var setPath, outDir string
 	timeout := 15 * time.Minute
+	concurrency := cfg.GetBenchmarkConcurrency()
 
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -245,6 +247,13 @@ func runBenchmark(cfg *config.Manager, args []string) {
 			if i+1 < len(args) {
 				if d, err := time.ParseDuration(args[i+1]); err == nil {
 					timeout = d
+				}
+				i++
+			}
+		case "--concurrency", "-c":
+			if i+1 < len(args) {
+				if n, err := strconv.Atoi(args[i+1]); err == nil && n >= 1 {
+					concurrency = n
 				}
 				i++
 			}
@@ -268,9 +277,9 @@ func runBenchmark(cfg *config.Manager, args []string) {
 		fmt.Fprintf(os.Stderr, "  [x] %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Printf("  [*] %d challenges loaded. Running (timeout %s each)...\n", len(set.Challenges), timeout)
+	fmt.Printf("  [*] %d challenges loaded. Running (timeout %s each, concurrency %d)...\n", len(set.Challenges), timeout, concurrency)
 
-	summary, err := benchmark.Run(context.Background(), set, cfg, benchmark.RunMode{ChallengeTimeout: timeout})
+	summary, err := benchmark.Run(context.Background(), set, cfg, benchmark.RunMode{ChallengeTimeout: timeout, Concurrency: concurrency})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "  [x] benchmark run failed: %v\n", err)
 		os.Exit(1)

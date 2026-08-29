@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/0xP4X/drogonclaw-go/internal/agent"
@@ -21,6 +22,9 @@ type RunMode struct {
 	ManifestPath string
 	// ChallengeTimeout bounds a single challenge (hard ceiling).
 	ChallengeTimeout time.Duration
+	// Concurrency runs challenges in parallel (default: from config or 4).
+	// Set to 1 for deterministic, serial execution.
+	Concurrency int
 }
 
 // Run executes every challenge in the set and returns a Summary.
@@ -36,6 +40,9 @@ func Run(ctx context.Context, set *Set, cfg *config.Manager, mode RunMode) (*Sum
 	if mode.ChallengeTimeout == 0 {
 		mode.ChallengeTimeout = 15 * time.Minute
 	}
+	if mode.Concurrency < 1 {
+		mode.Concurrency = cfg.GetBenchmarkConcurrency()
+	}
 
 	manifest, _ := skills.Load(mode.ManifestPath)
 
@@ -46,13 +53,48 @@ func Run(ctx context.Context, set *Set, cfg *config.Manager, mode RunMode) (*Sum
 		ByClass: map[string]ClassStat{},
 	}
 
-	for _, ch := range set.Challenges {
-		outcome := runChallenge(ctx, ch, cfg, manifest, mode)
-		summary.Outcomes = append(summary.Outcomes, outcome)
-		if outcome.Solved {
+	outcomes := make([]Outcome, len(set.Challenges))
+
+	runAll := func() {
+		for i, ch := range set.Challenges {
+			outcomes[i] = runChallenge(ctx, ch, cfg, manifest, mode)
+		}
+	}
+
+	if mode.Concurrency == 1 || len(set.Challenges) <= 1 {
+		runAll()
+	} else {
+		// Warm up the loot DB (schema + encryption key) once so parallel
+		// workers never race on first-file creation.
+		_, _ = memory.NewLootDB()
+
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		sem := make(chan struct{}, mode.Concurrency)
+		var wg sync.WaitGroup
+		for i := range set.Challenges {
+			ch := set.Challenges[i]
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				select {
+				case sem <- struct{}{}:
+				case <-ctx.Done():
+					return
+				}
+				defer func() { <-sem }()
+				outcomes[i] = runChallenge(ctx, ch, cfg, manifest, mode)
+			}()
+		}
+		wg.Wait()
+	}
+
+	for i, out := range outcomes {
+		summary.Outcomes = append(summary.Outcomes, out)
+		if out.Solved {
 			summary.Solved++
 		}
-		bumpClass(summary.ByClass, ch.Class, outcome.Solved)
+		bumpClass(summary.ByClass, set.Challenges[i].Class, out.Solved)
 	}
 
 	if summary.Total > 0 {

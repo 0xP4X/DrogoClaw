@@ -19,9 +19,10 @@ import (
 
 // Provider wraps the OpenAI-compatible client for all LLM providers.
 type Provider struct {
-	client  *openai.Client
-	model   string
-	onUsage func(model string, prompt, completion int64)
+	client    *openai.Client
+	model     string
+	fastModel string
+	onUsage   func(model string, prompt, completion int64)
 }
 
 var providerXMLTagRegex = regexp.MustCompile(`(?s)<environment_details>.*?</environment_details>|<[^>]+>`)
@@ -32,7 +33,7 @@ func stripProviderXMLTags(s string) string {
 
 // NewProvider constructs the LLM client, pointing to the correct provider base URL.
 func NewProvider(cfg *config.Manager) *Provider {
-	p := &Provider{model: cfg.GetModel()}
+	p := &Provider{model: cfg.GetModel(), fastModel: cfg.GetFastModel()}
 
 	opts := []option.RequestOption{
 		option.WithAPIKey(cfg.GetAPIKey()),
@@ -64,9 +65,9 @@ func (p *Provider) GetModel() string {
 	return p.model
 }
 
-func (p *Provider) recordUsage(prompt, completion int64) {
+func (p *Provider) recordUsage(model string, prompt, completion int64) {
 	if p.onUsage != nil {
-		p.onUsage(p.model, prompt, completion)
+		p.onUsage(model, prompt, completion)
 	}
 }
 
@@ -79,10 +80,27 @@ type CompletionResponse struct {
 // Complete sends messages to the LLM and returns the response.
 // Non-streaming: used during tool-calling loops where we need the full response.
 func (p *Provider) Complete(ctx context.Context, messages []openai.ChatCompletionMessageParamUnion, tools []openai.ChatCompletionToolParam) (*CompletionResponse, error) {
+	return p.complete(ctx, p.model, messages, tools)
+}
+
+// CompleteFast sends messages to the LLM using the fast/cheap tier when one is
+// configured; otherwise it falls back to the primary model. It is intended for
+// high-volume, low-stakes turns (parsing recon/scan output) where latency and
+// cost dominate over reasoning depth.
+func (p *Provider) CompleteFast(ctx context.Context, messages []openai.ChatCompletionMessageParamUnion, tools []openai.ChatCompletionToolParam) (*CompletionResponse, error) {
+	return p.complete(ctx, p.fastModel, messages, tools)
+}
+
+// HasFast reports whether a distinct fast/cheap model tier is configured.
+func (p *Provider) HasFast() bool {
+	return p.fastModel != "" && p.fastModel != p.model
+}
+
+func (p *Provider) complete(ctx context.Context, model string, messages []openai.ChatCompletionMessageParamUnion, tools []openai.ChatCompletionToolParam) (*CompletionResponse, error) {
 	var lastErr error
 	for attempt := 0; attempt < 3; attempt++ {
 		params := openai.ChatCompletionNewParams{
-			Model:    p.model,
+			Model:    model,
 			Messages: messages,
 		}
 		if len(tools) > 0 {
@@ -99,7 +117,7 @@ func (p *Provider) Complete(ctx context.Context, messages []openai.ChatCompletio
 				choice.Message.Content = stripProviderXMLTags(choice.Message.Content)
 			}
 			if resp.Usage.TotalTokens > 0 {
-				p.recordUsage(resp.Usage.PromptTokens, resp.Usage.CompletionTokens)
+				p.recordUsage(model, resp.Usage.PromptTokens, resp.Usage.CompletionTokens)
 			}
 			return &CompletionResponse{
 				Message:   choice.Message,
@@ -160,7 +178,7 @@ func (p *Provider) StreamFinal(ctx context.Context, messages []openai.ChatComple
 			continue
 		}
 		if last := stream.Current(); last.Usage.TotalTokens > 0 {
-			p.recordUsage(last.Usage.PromptTokens, last.Usage.CompletionTokens)
+			p.recordUsage(p.model, last.Usage.PromptTokens, last.Usage.CompletionTokens)
 		}
 		return sb.String(), nil
 	}

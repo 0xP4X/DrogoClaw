@@ -67,6 +67,76 @@ type Orchestrator struct {
 
 	// Repetition detection: tracks recent tool calls to break infinite loops
 	recentToolCalls []toolCallRecord
+
+	// Per-phase model routing: after a round whose tool calls were exclusively
+	// fast/recon-class, the next reasoning turn is served by the fast tier.
+	fastPhaseNext bool
+
+	// recentToolOutputs feeds the auto-verify step, which re-checks the
+	// agent's final claims against the raw tool evidence it actually gathered.
+	recentToolOutputs []toolOutputEvidence
+}
+
+type toolOutputEvidence struct {
+	tool   string
+	output string
+}
+
+// fastPhaseTools classifies high-volume, low-stakes enumeration tools. Reasoning
+// that immediately follows one of these only needs to parse and summarize
+// scanner output, so it is safe to serve from the fast/cheap model tier.
+var fastPhaseTools = map[string]bool{
+	"run_nmap":            true,
+	"run_nuclei":          true,
+	"run_gobuster":        true,
+	"run_ffuf":            true,
+	"run_sqlmap":          true,
+	"run_subfinder":       true,
+	"run_httpx":           true,
+	"run_forensics_triage": true,
+	"fuzz_endpoint":       true,
+	"profile_target":       true,
+	"osint_certs":          true,
+	"osint_dns":            true,
+	"osint_whois":          true,
+	"osint_shodan":         true,
+	"osint_virustotal":     true,
+	"osint_emails":         true,
+	"osint_github_dork":    true,
+	"lookup_cve":           true,
+	"refresh_cve_feeds":    true,
+	"fetch_url":            true,
+	"web_search":           true,
+	"replay_request":       true,
+}
+
+func isFastPhaseTool(name string) bool {
+	return fastPhaseTools[name]
+}
+
+// appendToolEvidence keeps a sliding window of the most recent raw tool outputs
+// (bounded) for the auto-verify step.
+func (o *Orchestrator) appendToolEvidence(tool, output string) {
+	if output == "" {
+		return
+	}
+	if len(output) > 6000 {
+		output = output[:6000]
+	}
+	o.recentToolOutputs = append(o.recentToolOutputs, toolOutputEvidence{tool: tool, output: output})
+	if len(o.recentToolOutputs) > 6 {
+		o.recentToolOutputs = o.recentToolOutputs[len(o.recentToolOutputs)-6:]
+	}
+}
+
+func buildToolEvidence(recs []toolOutputEvidence) string {
+	var sb strings.Builder
+	for _, r := range recs {
+		sb.WriteString("=== " + r.tool + " ===\n")
+		sb.WriteString(r.output)
+		sb.WriteString("\n")
+	}
+	return sb.String()
 }
 
 type toolCallRecord struct {
@@ -329,9 +399,18 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 	// without losing the in-flight tool-call context.
 	historyLen := len(o.history)
 
+	o.fastPhaseNext = false
 	maxIter := o.maxIterations
 	for i := 0; i < maxIter; i++ {
-		resp, err := o.provider.Complete(ctx, messages, o.tools.Definitions())
+		var resp *CompletionResponse
+		var err error
+		var usedFast bool
+		if o.fastPhaseNext && o.provider.HasFast() {
+			resp, err = o.provider.CompleteFast(ctx, messages, o.tools.Definitions())
+			usedFast = true
+		} else {
+			resp, err = o.provider.Complete(ctx, messages, o.tools.Definitions())
+		}
 		if err != nil {
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 				events <- Event{Type: EvError, Content: fmt.Sprintf("Run budget exceeded (%s). The run was stalled (likely waiting on an unanswered approval or a hung tool). Run in autopilot to skip approvals, or raise runBudget.", runBudget)}
@@ -401,6 +480,45 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 		if len(resp.ToolCalls) == 0 {
 			events <- Event{Type: EvStatus, Content: "Composing response..."}
 			finalContent := resp.Message.Content
+
+			// If the answering turn was served by the fast tier, re-synthesize
+			// the final deliverable with the primary model so the operator's
+			// report never ships from the cheap model alone.
+			if usedFast {
+				refine := "The above draft was produced for speed (fast model tier). " +
+					"Revisit it and produce the definitive final report for the operator."
+				messages = append(messages, openai.UserMessage(refine))
+				if fRes, fErr := o.provider.Complete(ctx, messages, nil); fErr == nil && fRes.Message.Content != "" {
+					finalContent = fRes.Message.Content
+					if len(o.history) > 0 {
+						o.history[len(o.history)-1] = fRes.Message.ToParam()
+					}
+					o.retainHistory()
+				}
+			}
+
+			// Auto-verify: re-check the final claims against the raw tool
+			// evidence actually gathered this run. Purely advisory — it warns
+			// loudly but never blocks or fabricates.
+			if o.tools != nil && o.tools.validator != nil && len(o.recentToolOutputs) > 0 {
+				vctx, vcancel := context.WithTimeout(ctx, 25*time.Second)
+				ev := buildToolEvidence(o.recentToolOutputs)
+				verdict, vErr := o.tools.validator.Validate(vctx, "combined", ev, trimForVerification(finalContent))
+				vcancel()
+				if vErr == nil {
+					vline := fmt.Sprintf("[verdict: %s · confidence %d%%] %s",
+						map[bool]string{true: "VALIDATED", false: "UNVERIFIED"}[verdict.IsValid],
+						verdict.ConfidenceScore, verdict.Reasoning)
+					finalContent += "\n\n[AUTO-VERIFY] " + vline
+					if !verdict.IsValid {
+						finalContent += "\n[AUTO-VERIFY] Warning: final findings are not backed by recorded tool evidence; treat with caution."
+					}
+					events <- Event{Type: EvStatus, Content: "Auto-verify: " + vline}
+				} else {
+					events <- Event{Type: EvStatus, Content: "Auto-verify skipped: " + vErr.Error()}
+				}
+			}
+
 			events <- Event{Type: EvToken, Content: finalContent}
 			events <- Event{Type: EvDone, Content: finalContent}
 			if o.actions != nil {
@@ -410,6 +528,7 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 		}
 
 		// Execute each tool call
+		fastRound := true
 		for _, tc := range resp.ToolCalls {
 			prettyArgs := formatArgs(tc.Function.Arguments)
 
@@ -462,6 +581,10 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 
 			result := o.tools.Execute(ctx, tc.Function.Name, tc.Function.Arguments)
 			o.recordToolCall(tc.Function.Name, tc.Function.Arguments)
+			o.appendToolEvidence(tc.Function.Name, result)
+			if !isFastPhaseTool(tc.Function.Name) {
+				fastRound = false
+			}
 			if o.actions != nil {
 				o.actions.ToolFinished(tc.Function.Name, result)
 			}
@@ -505,6 +628,7 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 			events <- Event{Type: EvStatus, Content: "Approval received. Resuming execution..."}
 		}
 		}
+		o.fastPhaseNext = fastRound
 	}
 
 	err = fmt.Errorf("agent hit max iteration limit (%d) — possible infinite loop", maxIter)
@@ -543,6 +667,15 @@ func (o *Orchestrator) ExecuteChat(ctx context.Context, userMsg string, events c
 	)
 	o.retainHistory()
 	return nil
+}
+
+// trimForVerification bounds the size of the agent's final claim before it is
+// sent to the evidence validator.
+func trimForVerification(s string) string {
+	if len(s) > 4000 {
+		s = s[:4000]
+	}
+	return s
 }
 
 // formatArgs pretty-prints JSON tool arguments for display.

@@ -88,6 +88,32 @@ func (m *Manager) GetModel() string {
 	return mod
 }
 
+func (m *Manager) GetFastModel() string {
+	mod := m.GetString("AI_MODEL_FAST")
+	if mod == "" {
+		mod = os.Getenv("AI_MODEL_FAST")
+	}
+	if mod == "" {
+		mod = m.GetModel()
+	}
+	return mod
+}
+
+func (m *Manager) GetBenchmarkConcurrency() int {
+	v := m.GetString("BENCH_CONCURRENCY")
+	if v == "" {
+		v = os.Getenv("BENCH_CONCURRENCY")
+	}
+	if v == "" {
+		return 4
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 1 {
+		return 4
+	}
+	return n
+}
+
 func (m *Manager) GetAPIKey() string {
 	provider := m.GetProvider()
 	// The wizard-stored key (config file) always takes precedence over an env

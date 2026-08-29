@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/spf13/viper"
 )
 
 // The Setup Wizard config file is the single source of truth. A stale env var
@@ -38,6 +40,34 @@ func TestConfigManager_GetAPIKeyFromConfig(t *testing.T) {
 	}
 	if got := cfg.GetBaseURL(); got != "https://openrouter.ai/api/v1" {
 		t.Fatalf("GetBaseURL = %q, want openrouter URL", got)
+	}
+}
+
+func TestConfigManager_GetFastModelFallback(t *testing.T) {
+	home, err := os.MkdirTemp("", "dc-cfg-fast")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(home)
+	cfgDir := filepath.Join(home, ".drogonclaw")
+	if err := os.MkdirAll(cfgDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	cfgJSON := `{"AI_MODEL":"deepseek/deepseek-reasoner"}`
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.json"), []byte(cfgJSON), 0600); err != nil {
+		t.Fatal(err)
+	}
+	os.Unsetenv("AI_MODEL_FAST")
+	os.Setenv("HOME", home)
+	instance = nil
+
+	m := &Manager{v: viper.New()}
+	m.load()
+	if got := m.GetFastModel(); got != "deepseek/deepseek-reasoner" {
+		t.Fatalf("GetFastModel = %q, want fallback to primary model", got)
+	}
+	if got := m.GetBenchmarkConcurrency(); got != 4 {
+		t.Fatalf("GetBenchmarkConcurrency default = %d, want 4", got)
 	}
 }
 

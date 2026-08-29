@@ -29,7 +29,9 @@ func NewLootDB() (*LootDB, error) {
 	_ = os.MkdirAll(dataDir, 0755)
 
 	dbPath := filepath.Join(dataDir, "drogonclaw_loot.db")
-	db, err := sql.Open("sqlite3", dbPath)
+	// WAL + busy timeout so multiple agent workers (parallel benchmark, subagent
+	// fan-out) can share the ledger without "database is locked" failures.
+	db, err := sql.Open("sqlite3", "file:"+dbPath+"?_busy_timeout=5000&_journal_mode=WAL")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open loot db: %w", err)
 	}
