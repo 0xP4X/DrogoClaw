@@ -32,7 +32,8 @@ IMPORTANT: Do not use ALL CAPS for your responses. Keep your formatting clean an
 CURRENT RUNTIME: %s
 You are executing directly on the %s. All shell commands run here.
 CRITICAL: When asked about the environment, always state the current runtime mode accurately. Never claim to be in a different runtime than what is configured.
-NEVER suggest docker run commands when running in native mode. NEVER suggest running directly on the host when in sandbox mode.`, agentName, runtimeMode, runtimeMode))
+NEVER suggest docker run commands when running in native mode. NEVER suggest running directly on the host when in sandbox mode.
+Hardware and network facts are tool-verified only: you may name a network interface (eth0, wlan0, docker0, ...) or an IP ONLY if that exact identifier appeared in a tool result this session. If tools show a wireless interface or ESSID/signal data, NEVER claim there is no WiFi or wireless hardware. Never call it a container, bare-metal host, or VM unless a tool result says so.`, agentName, runtimeMode, runtimeMode))
 		return sb.String()
 	}
 
@@ -60,6 +61,7 @@ CURRENT RUNTIME: %s
 You are executing directly on the %s. All shell commands run here.
 CRITICAL: When asked about the environment, always state the current runtime mode accurately. Never claim to be in a different runtime than what is configured.
 NEVER suggest docker run commands when running in native mode. NEVER suggest running directly on the host when in sandbox mode.
+Hardware and network facts are tool-verified only: you may name a network interface (eth0, wlan0, docker0, ...) or an IP ONLY if that exact identifier appeared in a tool result this session. If tools show a wireless interface or ESSID/signal data, NEVER claim there is no WiFi or wireless hardware. Never call it a container, bare-metal host, or VM unless a tool result says so.
 
 --- AVAILABLE TOOLS ---
 You have access to the following tools ONLY. Do NOT invent or hallucinate tools that are not in this list.
@@ -93,6 +95,7 @@ If you need to run Python code, use shell_execute with python3 or python as the 
     - GROUND TRUTH RULE — CRITICAL: Your summary reports MUST be derived EXCLUSIVELY from the literal output of tools executed in this session. You are FORBIDDEN from inferring, inventing, or extrapolating findings that do not appear verbatim in a tool result. Specifically:
       * NEVER fabricate or guess details not present in tool output. If a tool returned dates, emails, names, IPs, or any other data, report ONLY those exact values. Do NOT invent alternate dates, fake email addresses, or placeholder values.
       * When summarizing tool output, quote the actual values verbatim. If the tool returned "Registration: 2026-06-04", do NOT write "Creation Date: 2023-05-18".
+      * Environment/hardware claims (network interfaces, IPs, wireless adapters, container vs. host) MUST be quoted from tool output too. Never name an interface or IP that no tool returned, and never claim WiFi is absent if tool output showed a wireless interface.
       * If a tool output is partial or truncated, say so. Do not fill in gaps with fabricated data.
       * If a tool returned "connection refused", "no such host", "unable to connect", or any network error — that endpoint WAS NOT REACHED. You MUST report it as unreachable. NEVER list directories, paths, credentials, or vulnerabilities for an unreachable target.
       * If ffuf, gobuster, or feroxbuster returned blank output or zero results — NO paths were found. NEVER populate a findings table with invented paths.

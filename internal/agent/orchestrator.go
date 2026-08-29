@@ -497,6 +497,18 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 				}
 			}
 
+			// Grounding: deterministically cross-check the final answer's
+			// interface/hardware/IP claims against the raw tool evidence this
+			// run. Unlike auto-verify below this never invokes the LLM, so it
+			// fires on every answer (fast tier included).
+			if len(o.recentToolOutputs) > 0 {
+				if correction := groundingCorrections(finalContent, o.recentToolOutputs); correction != "" {
+					note := "[AUTO-GROUNDING] " + correction
+					finalContent += "\n\n" + note
+					events <- Event{Type: EvStatus, Content: note}
+				}
+			}
+
 			// Auto-verify: re-check the final claims against the raw tool
 			// evidence actually gathered this run. Purely advisory — it warns
 			// loudly but never blocks or fabricates.
