@@ -9,6 +9,7 @@ CMD_DIR := ./cmd/drogonclaw
 LDFLAGS := -s -w
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 BUILD_TIME := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
+LDFLAGS += -X main.version=$(VERSION) -X main.buildTime=$(BUILD_TIME)
 
 .PHONY: help build build-linux build-all test test-cover lint format clean setup \
         run daemon docker docker-compose skills doctor
@@ -71,8 +72,8 @@ vet: ## Run go vet
 skills: ## Regenerate skill manifest
 	node scripts/gen_skill_manifest.mjs
 
-doctor: build ## Run system diagnostics
-	./$(BINARY_NAME) doctor
+doctor: build ## Run system diagnostics (alias for the health command)
+	./$(BINARY_NAME) health
 
 deps: ## Download and tidy dependencies
 	go mod download

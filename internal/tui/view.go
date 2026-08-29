@@ -934,32 +934,20 @@ func fallback(value, def string) string {
 	return value
 }
 
-var allHints = []cmdHint{
-	{"/health", "Verify runtime environment and dependencies"},
-	{"/mode", "Select active workflow methodology"},
-	{"/analyze", "Classify target and determine attack path"},
-	{"/skills", "List and search available execution modules"},
-	{"/status", "Display current session and workspace details"},
-	{"/cost", "Show current API token usage and estimated cost"},
-	{"/stealth", "Toggle evasive timing policy"},
-	{"/auto", "Toggle autonomous execution mode"},
-	{"/profile", "Build passive target profile"},
-	{"/ctf", "Run local CTF artifact triage"},
-	{"/report", "Generate structured pentest report"},
-	{"/swarm", "Run a parallel task group"},
-	{"/queue", "Show queued prompts waiting to run"},
-	{"/timeline", "Show execution timeline of tool calls and findings"},
-	{"/sections", "List all previous saved session sections"},
-	{"/section", "Switch to a previous saved session section"},
-	{"/copy", "Export transcript to clipboard and text file"},
-	{"/benchmarks", "Display benchmark statistics and Mermaid charts"},
-	{"/sandbox", "Toggle container sandbox execution"},
-	{"/persona", "Inject custom agent persona prompt"},
-	{"/new", "Clear session memory and start clean"},
-	{"/resume", "Resume interrupted execution checkpoint"},
-	{"/help", "Show complete command reference"},
-	{"/clear", "Clear terminal output screen"},
-	{"/exit", "Terminate session gracefully"},
+// allHints powers the inline command palette and prefix completion. It is
+// derived from the slash-command registry so the palette can never drift from
+// the dispatch table. Built in init() because the registry itself is populated
+// in init() (commands.go), and var initializers in this file run before that.
+var allHints []cmdHint
+
+func init() { allHints = buildCommandHints() }
+
+func buildCommandHints() []cmdHint {
+	out := make([]cmdHint, 0, len(slashCommands))
+	for _, c := range slashCommands {
+		out = append(out, cmdHint{cmd: c.canonical(), desc: c.desc})
+	}
+	return out
 }
 
 func (m Model) renderHints() string {
@@ -1049,87 +1037,80 @@ func truncate(s string, n int) string {
 	return string(runes[:n-1]) + "…"
 }
 
+var helpCategoryTitles = map[string]string{
+	catOperations: "OPERATIONS",
+	catControls:   "CONTROLS",
+	catSession:    "SESSION",
+	catUI:         "UI",
+}
+
+var helpCategoryOrder = []string{catOperations, catControls, catSession, catUI}
+
+// renderHelp draws the full command reference. Every slash command listed here
+// is rendered straight from the shared slashCommands registry — the dispatch
+// table — so an undocumented or orphaned command is impossible by construction.
 func renderHelp() string {
 	var sb strings.Builder
 	sb.WriteString("\n  " + SectionHeaderStyle.Render("COMMAND REFERENCE") + "\n")
-	sb.WriteString("  " + SectionRuleStyle.Render("──────────────────────────────────────────────────") + "\n\n")
+	sb.WriteString("  " + SectionRuleStyle.Render(strings.Repeat("─", 48)) + "\n\n")
 
-	categories := map[string][]cmdHint{
-		"OPERATIONS": {
-			{"/health", "Verify runtime environment and dependencies"},
-			{"/mode", "Select active workflow"},
-			{"/analyze", "Classify a target and determine attack path"},
-			{"/skills", "List and search available execution modules"},
-			{"/profile", "Build passive target profile"},
-			{"/ctf", "Run local CTF artifact triage"},
-			{"/report", "Generate structured pentest report"},
-			{"/swarm", "Run a parallel task group"},
-			{"/queue", "Show queued prompts waiting to run"},
-			{"/benchmarks", "Display benchmark statistics & Mermaid charts"},
-			{"/timeline", "Show execution timeline of tool calls and findings"},
-		},
-		"CONTROLS": {
-			{"/stealth", "Toggle rate limiting policy"},
-			{"/auto", "Toggle automatic execution"},
-			{"/sandbox", "Toggle container sandbox execution"},
-			{"/persona", "Inject custom agent persona prompt"},
-		},
-		"SESSION": {
-			{"/status", "Display current session and workspace details"},
-			{"/sections", "List all previous sections"},
-			{"/section <id>", "Switch to a previous section"},
-			{"/setup", "Run interactive configuration wizard"},
-			{"/new", "Clear session memory and start clean"},
-			{"/resume", "Resume interrupted execution checkpoint"},
-			{"/copy", "Copy full transcript to clipboard / file"},
-			{"/sidebar", "Toggle sidebar panel"},
-			{"/details", "Toggle tool detail panel"},
-			{"F3", "View output in pager (select & copy any part)"},
-			{"/clear", "Clear terminal output screen"},
-			{"/help", "Show command reference"},
-			{"/exit", "Terminate session gracefully"},
-		},
-		"KEYBOARD": {
-			{"Ctrl+B", "Toggle sidebar panel"},
-			{"Ctrl+T", "Toggle tool detail panel"},
-			{"Ctrl+X", "Leader key (then press key for action)"},
-		},
-		"LEADER KEY (Ctrl+X)": {
-			{"b", "Toggle sidebar"},
-			{"n", "New session"},
-			{"l", "List sessions"},
-			{"m", "List models"},
-			{"t", "List themes"},
-			{"e", "Open editor"},
-			{"x", "Export session"},
-			{"q", "Exit"},
-		},
-	}
-
-	for cat, hints := range categories {
-		sb.WriteString("  " + SectionHeaderStyle.Render(cat) + "\n")
-		for _, c := range hints {
-			pad := strings.Repeat(" ", max(1, 14-len(c.cmd)))
-			sb.WriteString("    " + HintCmdStyle.Render(c.cmd) + pad + HintDescStyle.Render(c.desc) + "\n")
+	for _, cat := range helpCategoryOrder {
+		var entries []slashCommand
+		for _, c := range slashCommands {
+			if c.category == cat {
+				entries = append(entries, c)
+			}
+		}
+		if len(entries) == 0 {
+			continue
+		}
+		sb.WriteString("  " + SectionHeaderStyle.Render(helpCategoryTitles[cat]) + "\n")
+		for _, c := range entries {
+			label := c.canonical()
+			if c.args != "" {
+				label += " " + c.args
+			}
+			pad := strings.Repeat(" ", max(1, 22-len(label)))
+			sb.WriteString("    " + HintCmdStyle.Render(label) + pad + HintDescStyle.Render(c.desc) + "\n")
 		}
 		sb.WriteString("\n")
 	}
 
 	sb.WriteString("  " + SectionHeaderStyle.Render("KEYBOARD CONTROLS") + "\n")
-	sb.WriteString("  " + HintDescStyle.Render("  Ctrl+P  Command palette") + "\n")
-	sb.WriteString("  " + HintDescStyle.Render("  Ctrl+B  Toggle sidebar") + "\n")
-	sb.WriteString("  " + HintDescStyle.Render("  Ctrl+T  Toggle tool details") + "\n")
-	sb.WriteString("  " + HintDescStyle.Render("  Ctrl+A  Toggle autopilot") + "\n")
-	sb.WriteString("  " + HintDescStyle.Render("  Ctrl+S  Show status") + "\n")
-	sb.WriteString("  " + HintDescStyle.Render("  Ctrl+D  Show cost") + "\n")
-	sb.WriteString("  " + HintDescStyle.Render("  Ctrl+E  View in pager") + "\n")
-	sb.WriteString("  " + HintDescStyle.Render("  Ctrl+Y  Copy transcript") + "\n")
-	sb.WriteString("  " + HintDescStyle.Render("  Ctrl+C  Cancel/Quit") + "\n")
-	sb.WriteString("  " + HintDescStyle.Render("  ↑/↓     Scroll output") + "\n")
-	sb.WriteString("  " + HintDescStyle.Render("  Alt+↑/↓ History") + "\n")
-	sb.WriteString("  " + HintDescStyle.Render("  PgUp/Dn Page scroll") + "\n")
-	sb.WriteString("  " + HintDescStyle.Render("  Tab     Accept suggestion") + "\n")
-	sb.WriteString("  " + HintDescStyle.Render("  Enter   Submit") + "\n\n")
+	keyboard := []cmdHint{
+		{"Ctrl+P", "Open command palette"},
+		{"Ctrl+B", "Toggle sidebar panel"},
+		{"Ctrl+T", "Toggle tool detail panel"},
+		{"Ctrl+A", "Toggle autopilot"},
+		{"Ctrl+S", "Show session status"},
+		{"Ctrl+D", "Show token usage / cost"},
+		{"Ctrl+E", "Open output in pager"},
+		{"Ctrl+Y", "Copy transcript"},
+		{"Ctrl+C", "Cancel task (double-press) or quit"},
+		{"↑/↓", "Scroll output"},
+		{"Alt+↑/↓", "Browse input history"},
+		{"PgUp/Dn", "Page scroll"},
+		{"Tab", "Accept command suggestion"},
+		{"Enter", "Submit"},
+	}
+	for _, k := range keyboard {
+		pad := strings.Repeat(" ", max(1, 22-len(k.cmd)))
+		sb.WriteString("    " + HintCmdStyle.Render(k.cmd) + pad + HintDescStyle.Render(k.desc) + "\n")
+	}
+	sb.WriteString("\n")
+
+	sb.WriteString("  " + SectionHeaderStyle.Render("LEADER KEY (Ctrl+X then)") + "\n")
+	leader := []cmdHint{
+		{"b", "Toggle sidebar"},
+		{"n", "Start a new session"},
+		{"q", "Quit"},
+	}
+	for _, k := range leader {
+		pad := strings.Repeat(" ", max(1, 22-len(k.cmd)))
+		sb.WriteString("    " + HintCmdStyle.Render(k.cmd) + pad + HintDescStyle.Render(k.desc) + "\n")
+	}
+	sb.WriteString("\n")
+	sb.WriteString("  " + HintDescStyle.Render("Tip: type /<command> and press Tab to accept, or Ctrl+P for the palette. /commands is an alias for /help.") + "\n\n")
 
 	return sb.String()
 }

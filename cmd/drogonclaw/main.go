@@ -92,42 +92,21 @@ func main() {
 	core.InitCleanupHandler()
 	defer core.PerformCleanup()
 
-	var forceSandbox *bool
-	if len(os.Args) > 1 {
-		switch os.Args[1] {
-		case "sandbox":
-			t := true
-			forceSandbox = &t
-			os.Setenv("USE_SANDBOX", "true")
-			fmt.Println("  [+] Launching in SANDBOX mode (Docker/Kali)")
-		case "native":
-			t := false
-			forceSandbox = &t
-			os.Setenv("USE_SANDBOX", "false")
-			fmt.Println("  [+] Launching in NATIVE mode (host OS)")
-			if len(os.Args) > 2 {
-				details := strings.Join(os.Args[2:], " ")
-				fmt.Printf("  [*] Environment details: %s\n", details)
-			}
-		}
+	opts, err := parseCLI(os.Args[1:])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  [x] %v\n\n", err)
+		printCLIUnknownError(os.Stderr)
+		os.Exit(2)
 	}
 
-	if len(os.Args) > 1 && os.Args[1] == "setup" {
-		tui.RunSetup(cfg)
-		os.Exit(0)
+	// Commands that complete without booting the runtime.
+	if handled, code := runStandaloneCommand(opts, cfg); handled {
+		os.Exit(code)
 	}
 
-	if len(os.Args) > 1 && os.Args[1] == "bench" {
-		runBenchmark(cfg, os.Args[2:])
-		os.Exit(0)
-	}
+	applyRunMode(opts)
 
-	if len(os.Args) > 1 && os.Args[1] == "whitebox" {
-		runWhitebox(cfg, os.Args[2:])
-		os.Exit(0)
-	}
-
-	provider, sb, manifest, err := runStartup(cfg, forceSandbox)
+	provider, sb, manifest, err := runStartup(cfg, opts.forceSandbox)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "  [x] Startup failed: %v\n", err)
 		os.Exit(1)
@@ -143,7 +122,7 @@ func main() {
 	sessionID := fmt.Sprintf("ss%010d", rand.Intn(9000000000)+1000000000)
 	graph := memory.NewGraph(sessionID)
 
-	if len(os.Args) > 1 && os.Args[1] == "health" {
+	if opts.action == actionHealth {
 		out := health.RunDiagnostics(context.Background(), sb)
 		fmt.Println(out)
 		os.Exit(0)
@@ -174,7 +153,7 @@ func main() {
 		tgGateway.Start()
 	}
 
-	if len(os.Args) > 1 && os.Args[1] == "daemon" {
+	if opts.action == actionDaemon {
 		if tgGateway == nil {
 			fmt.Fprintf(os.Stderr, "  [x] Cannot run in daemon mode: Telegram gateway is not configured.\n")
 			fmt.Fprintf(os.Stderr, "  [!] Run './drogonclaw setup' to configure Telegram.\n")

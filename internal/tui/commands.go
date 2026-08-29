@@ -31,294 +31,521 @@ var needSetup bool
 // NeedSetup reports whether the operator requested /setup from inside the TUI.
 func NeedSetup() bool { return needSetup }
 
+// Command categories used by the registry and the /help renderer.
+const (
+	catOperations = "OPERATIONS"
+	catControls   = "CONTROLS"
+	catSession    = "SESSION"
+	catUI         = "UI"
+)
+
+// slashCommand is a single entry in the slash-command registry. The first name
+// is canonical; the rest are aliases. /help, the command palette, the inline
+// hint bar, and the dispatcher all derive from this one table, so a new
+// command cannot silently lose its documentation.
+type slashCommand struct {
+	names    []string
+	category string
+	desc     string
+	args     string // argument hint (e.g. "<target>"); "" when the command takes none
+	run      func(m *Model, args string) (*Model, tea.Cmd)
+}
+
+func (c slashCommand) canonical() string { return c.names[0] }
+
+func (c slashCommand) matches(name string) bool {
+	for _, n := range c.names {
+		if n == name {
+			return true
+		}
+	}
+	return false
+}
+
+// slashCommands is the single source of truth for every in-TUI command. It is
+// built in an init() because the /help handler renders via renderHelp, which
+// reads this table back — a var-initializer literal would form an
+// initialization cycle.
+var slashCommands []slashCommand
+
+func init() { slashCommands = buildSlashCommands() }
+
+func buildSlashCommands() []slashCommand {
+	var out []slashCommand
+	out = append(out, operationsCommands()...)
+	out = append(out, controlsCommands()...)
+	out = append(out, sessionCommands()...)
+	out = append(out, uiCommands()...)
+	return out
+}
+
+func operationsCommands() []slashCommand {
+	return []slashCommand{
+		{
+			names:    []string{"/mode"},
+			category: catOperations,
+			desc:     "Select the active attack workflow",
+			args:     "[name|off]",
+			run: func(m *Model, args string) (*Model, tea.Cmd) {
+				m.handleModeCommand(args)
+				return m, nil
+			},
+		},
+		{
+			names:    []string{"/analyze"},
+			category: catOperations,
+			desc:     "Classify a target and determine the attack path",
+			args:     "<target>",
+			run: func(m *Model, args string) (*Model, tea.Cmd) {
+				if args == "" {
+					m.appendLine(ErrorStyle.Render("  [✗] Usage: /analyze <target>"))
+					return m, nil
+				}
+				profile := m.targetAnalyzer.Analyze(args)
+				m.appendLine(SpinnerStyle.Render(profile.Summarize()))
+				if profile.Chain != nil {
+					m.appendLine(HintDescStyle.Render(fmt.Sprintf("  Next: activate chain with /mode %s", profile.Chain.Name)))
+				}
+				return m, nil
+			},
+		},
+		{
+			names:    []string{"/skills"},
+			category: catOperations,
+			desc:     "List and search available execution modules",
+			args:     "[query]",
+			run: func(m *Model, args string) (*Model, tea.Cmd) {
+				m.appendLine(renderSkills(m.manifest, args))
+				return m, nil
+			},
+		},
+		{
+			names:    []string{"/health"},
+			category: catOperations,
+			desc:     "Verify runtime environment and dependencies",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				m.appendLine(SpinnerStyle.Render("  [*] Running diagnostic checks..."))
+				m.phase = "verifying"
+				m.phaseDetail = "Diagnostics"
+				m.executing = true
+				m.execStartTime = time.Now()
+				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+				m.cancelFn = cancel
+				m.activeEvents = nil
+				healthWidth := m.viewport.Width
+				if healthWidth <= 0 {
+					healthWidth = m.width - 4
+				}
+				return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
+					return HealthResultMsg{Output: health.RunDiagnosticsWithWidth(ctx, m.sandbox, healthWidth)}
+				})
+			},
+		},
+		{
+			names:    []string{"/profile"},
+			category: catOperations,
+			desc:     "Build a passive intelligence profile",
+			args:     "<target>",
+			run: func(m *Model, args string) (*Model, tea.Cmd) {
+				if args == "" {
+					m.appendLine(ErrorStyle.Render("  [✗] Usage: /profile <target-domain-or-ip>"))
+					return m, nil
+				}
+				m2, ctx, events, cmd := m.beginTask(90*time.Second, "planning", "Building target profile", 8)
+				go func() {
+					defer close(events)
+					if err := ctx.Err(); err != nil {
+						events <- agent.Event{Type: agent.EvError, Content: "Target profile cancelled: " + err.Error()}
+						return
+					}
+					events <- agent.Event{Type: agent.EvStatus, Content: "Gathering passive intelligence for target..."}
+					profile, err := intel.BuildPublicProfile(args, m.cfg.GetShodanAPIKey(), m.cfg.GetVirusTotalAPIKey(), intel.DefaultProfileDependencies())
+					if err != nil {
+						events <- agent.Event{Type: agent.EvError, Content: fmt.Sprintf("Target profile failed: %v", err)}
+						return
+					}
+					if err := ctx.Err(); err != nil {
+						events <- agent.Event{Type: agent.EvError, Content: "Target profile cancelled: " + err.Error()}
+						return
+					}
+					events <- agent.Event{Type: agent.EvDone, Content: intel.FormatPublicProfile(profile)}
+				}()
+				return m2, cmd
+			},
+		},
+		{
+			names:    []string{"/ctf"},
+			category: catOperations,
+			desc:     "Run local CTF artifact triage",
+			args:     "<file-or-dir>",
+			run: func(m *Model, args string) (*Model, tea.Cmd) {
+				if args == "" {
+					m.appendLine(ErrorStyle.Render("  [✗] Usage: /ctf <local-file-or-directory>"))
+					return m, nil
+				}
+				m2, ctx, events, cmd := m.beginTask(2*time.Minute, "planning", "Running CTF triage", 8)
+				go func() {
+					defer close(events)
+					events <- agent.Event{Type: agent.EvStatus, Content: "Running local CTF solver (scan -> decode -> verify)..."}
+					rs, err := ctf.Solve(ctx, ctf.LocalTask{Path: args})
+					if err != nil {
+						events <- agent.Event{Type: agent.EvError, Content: fmt.Sprintf("CTF solve failed: %v", err)}
+						return
+					}
+					events <- agent.Event{Type: agent.EvDone, Content: ctf.FormatSolve(rs)}
+				}()
+				return m2, cmd
+			},
+		},
+		{
+			names:    []string{"/report"},
+			category: catOperations,
+			desc:     "Generate a structured penetration test report",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				m2, ctx, events, cmd := m.beginTask(5*time.Minute, "planning", "Generating penetration test report", 32)
+				go func() {
+					defer close(events)
+					events <- agent.Event{Type: agent.EvStatus, Content: "Drafting structured penetration test report..."}
+					reporter := core.NewReportGenerator(m.orch.GetProvider(), m.graph)
+					path, err := reporter.GenerateMarkdownReport(ctx)
+					if err != nil {
+						events <- agent.Event{Type: agent.EvError, Content: fmt.Sprintf("Report generation failed: %v", err)}
+					} else {
+						events <- agent.Event{Type: agent.EvDone, Content: fmt.Sprintf("Report generated: %s", path)}
+					}
+				}()
+				return m2, cmd
+			},
+		},
+		{
+			names:    []string{"/swarm"},
+			category: catOperations,
+			desc:     "Dispatch a parallel sub-agent swarm",
+			args:     "<objective>",
+			run: func(m *Model, args string) (*Model, tea.Cmd) {
+				if args == "" {
+					m.appendLine(ErrorStyle.Render("  [✗] Usage: /swarm <mission objective>"))
+					return m, nil
+				}
+				m2, ctx, events, cmd := m.beginTask(120*time.Minute, "planning", "Swarm commander engaged", 32)
+				objective := args
+				go func() {
+					defer close(events)
+					events <- agent.Event{Type: agent.EvStatus, Content: "Dispatching autonomous sub-agent swarm..."}
+					sysPrompt := ""
+					if m.promptRefresher != nil {
+						sysPrompt = m.promptRefresher()
+					}
+					commander := agent.NewSwarmCommander(m.orch.GetProvider(), m.orch.GetTools(), sysPrompt, m.sessionID, m.graph)
+					result, err := commander.ExecuteSwarm(ctx, objective, events)
+					if err != nil {
+						events <- agent.Event{Type: agent.EvError, Content: fmt.Sprintf("Swarm failed: %v", err)}
+					} else {
+						events <- agent.Event{Type: agent.EvDone, Content: result}
+					}
+				}()
+				return m2, cmd
+			},
+		},
+		{
+			names:    []string{"/queue"},
+			category: catOperations,
+			desc:     "Show prompts queued behind the running task",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				if len(m.promptQueue) == 0 {
+					m.appendLine(QueueStyle.Render("  [⏳] Prompt queue is empty."))
+					return m, nil
+				}
+				m.appendLine(QueueStyle.Render(fmt.Sprintf("  [⏳] PROMPT QUEUE (%d pending):", len(m.promptQueue))))
+				for i, q := range m.promptQueue {
+					m.appendLine(QueueItemStyle.Render(fmt.Sprintf("      %d. %s", i+1, q)))
+				}
+				m.appendLine(HintDescStyle.Render("      Queued prompts run automatically after the current task finishes."))
+				return m, nil
+			},
+		},
+		{
+			names:    []string{"/benchmarks"},
+			category: catOperations,
+			desc:     "Show benchmark statistics and Mermaid charts",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				m.appendLine(m.renderBenchmarks())
+				return m, nil
+			},
+		},
+		{
+			names:    []string{"/timeline"},
+			category: catOperations,
+			desc:     "Show the execution timeline of tools and findings",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				m.appendLine(m.renderTimeline())
+				return m, nil
+			},
+		},
+	}
+}
+
+func controlsCommands() []slashCommand {
+	return []slashCommand{
+		{
+			names:    []string{"/stealth"},
+			category: catControls,
+			desc:     "Toggle evasive rate-limiting policy",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				on := m.opsecMgr.Toggle()
+				if on {
+					m.appendLine(ToolDoneStyle.Render("  [⬡] Rate limiting enabled — evasive timing active"))
+				} else {
+					m.appendLine(WarningStyle.Render("  [⬡] Rate limiting disabled — high-concurrency active"))
+				}
+				if m.promptRefresher != nil {
+					m.orch.UpdateSystemPrompt(m.promptRefresher())
+				}
+				return m, nil
+			},
+		},
+		{
+			names:    []string{"/auto"},
+			category: catControls,
+			desc:     "Toggle autonomous execution mode",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				m.autopilot = !m.autopilot
+				m.orch.Autopilot = m.autopilot
+				state := "MANUAL"
+				if m.autopilot {
+					state = "AUTOPILOT"
+				}
+				m.appendLine(WarningStyle.Render(fmt.Sprintf("  [⚠] Execution Mode: %s", state)))
+				return m, nil
+			},
+		},
+		{
+			names:    []string{"/sandbox"},
+			category: catControls,
+			desc:     "Toggle container sandbox execution",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				m.pendingConfirm = "sandbox"
+				m.appendLine(WarningStyle.Render("  [CONFIRM] Type TOGGLE SANDBOX to switch execution environment."))
+				return m, nil
+			},
+		},
+		{
+			names:    []string{"/persona"},
+			category: catControls,
+			desc:     "Inject a custom agent persona directive",
+			args:     "<directive>",
+			run: func(m *Model, args string) (*Model, tea.Cmd) {
+				if args == "" {
+					m.appendLine(ErrorStyle.Render("  [✗] Usage: /persona <custom directive>"))
+					return m, nil
+				}
+				m.personaOverride = args
+				if m.promptRefresher != nil {
+					m.orch.UpdateSystemPrompt(m.promptRefresher())
+				}
+				m.appendLine(ToolDoneStyle.Render(fmt.Sprintf("  [+] Persona directive updated: %s", truncate(args, 60))))
+				return m, nil
+			},
+		},
+	}
+}
+
+func sessionCommands() []slashCommand {
+	return []slashCommand{
+		{
+			names:    []string{"/help", "/commands"},
+			category: catSession,
+			desc:     "Show the complete command reference",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				m.appendLine(renderHelp())
+				return m, nil
+			},
+		},
+		{
+			names:    []string{"/status"},
+			category: catSession,
+			desc:     "Show session, runtime and workspace details",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				for _, line := range strings.Split(m.renderStatusReport(), "\n") {
+					m.appendLine(line)
+				}
+				return m, nil
+			},
+		},
+		{
+			names:    []string{"/cost"},
+			category: catSession,
+			desc:     "Show API token usage and estimated cost",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				if m.tracker == nil {
+					m.appendLine(WarningStyle.Render("  [!] No token tracker active."))
+				} else {
+					m.appendLine(m.tracker.Render())
+				}
+				return m, nil
+			},
+		},
+		{
+			names:    []string{"/sections"},
+			category: catSession,
+			desc:     "List all previously saved session sections",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				m.appendLine(m.renderSections())
+				return m, nil
+			},
+		},
+		{
+			names:    []string{"/section"},
+			category: catSession,
+			desc:     "Switch to a previously saved session section",
+			args:     "<id>",
+			run: func(m *Model, args string) (*Model, tea.Cmd) {
+				if args == "" {
+					m.appendLine(ErrorStyle.Render("  [✗] Usage: /section <id> — switch to a previous section"))
+					return m, nil
+				}
+				m.switchSection(args)
+				return m, nil
+			},
+		},
+		{
+			names:    []string{"/setup"},
+			category: catSession,
+			desc:     "Run the interactive configuration wizard and restart",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				needSetup = true
+				m.appendLine(InfoStyle.Render("  [i] Launching setup wizard — DrogonClaw will restart afterward."))
+				return m, tea.Quit
+			},
+		},
+		{
+			names:    []string{"/new"},
+			category: catSession,
+			desc:     "Clear session memory and start clean",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				m.pendingConfirm = "new"
+				m.appendLine(WarningStyle.Render("  [CONFIRM] This clears session memory. Type CLEAR SESSION to continue."))
+				return m, nil
+			},
+		},
+		{
+			names:    []string{"/resume"},
+			category: catSession,
+			desc:     "Resume the interrupted execution checkpoint",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				if m.recovery == nil {
+					m.appendLine(WarningStyle.Render("  [RECOVERY] No interrupted mission is available."))
+					return m, nil
+				}
+				m.lastObjective = m.recovery.Objective
+				m2, ctx, events, cmd := m.beginTask(120*time.Minute, "recovering", "Restoring last durable checkpoint", 32)
+				m.appendLine(SpinnerStyle.Render("  [RECOVERY] Restoring context. Interrupted tool will be verified before retry."))
+				m.recovery = nil
+				orch := m.orch
+				go func() { _ = orch.Resume(ctx, events) }()
+				return m2, cmd
+			},
+		},
+		{
+			names:    []string{"/copy"},
+			category: catSession,
+			desc:     "Copy the full transcript to clipboard / file",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				m.appendLine(m.copyConversation())
+				return m, nil
+			},
+		},
+		{
+			names:    []string{"/clear"},
+			category: catSession,
+			desc:     "Clears the visible terminal output",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				m.lines = nil
+				m.viewport.SetContent("")
+				return m, nil
+			},
+		},
+		{
+			names:    []string{"/exit", "/quit"},
+			category: catSession,
+			desc:     "Terminate the session gracefully",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				return m, tea.Quit
+			},
+		},
+	}
+}
+
+func uiCommands() []slashCommand {
+	return []slashCommand{
+		{
+			names:    []string{"/sidebar"},
+			category: catUI,
+			desc:     "Toggle the sidebar panel",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				if m.showSidebar || m.width >= sidebarMinWidth+20 {
+					m.showSidebar = !m.showSidebar
+				}
+				state := "OFF"
+				if m.showSidebar {
+					state = "ON"
+				}
+				m.appendLine(InfoStyle.Render(fmt.Sprintf("  [-sidebar] Sidebar %s", state)))
+				return m, nil
+			},
+		},
+		{
+			names:    []string{"/details"},
+			category: catUI,
+			desc:     "Toggle the tool detail panel",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				m.showToolDetail = !m.showToolDetail
+				state := "OFF"
+				if m.showToolDetail {
+					state = "ON"
+				}
+				m.appendLine(InfoStyle.Render(fmt.Sprintf("  [details] Tool details %s", state)))
+				return m, nil
+			},
+		},
+	}
+}
+
+// beginTask sets up the standard async-task machinery used by the long-running
+// slash commands: phase/detail labels, executing state, timer, cancel func,
+// and an event channel. It returns the mutated model, the cancellable context
+// the task goroutine must honor, the event channel it must drive (and close),
+// and the batch command that feeds events to the UI loop.
+func (m *Model) beginTask(timeout time.Duration, phase, detail string, cap int) (*Model, context.Context, chan agent.Event, tea.Cmd) {
+	m.phase = phase
+	m.phaseDetail = detail
+	m.executing = true
+	m.execStartTime = time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	m.cancelFn = cancel
+	events := make(chan agent.Event, cap)
+	m.activeEvents = events
+	return m, ctx, events, tea.Batch(m.spinner.Tick, waitForEvent(events))
+}
+
+// handleSlashCommand dispatches a raw slash input through the command registry.
 func (m *Model) handleSlashCommand(raw string) (*Model, tea.Cmd) {
 	parts := strings.Fields(raw)
-	cmd := strings.ToLower(parts[0])
+	name := strings.ToLower(parts[0])
+	if name == "/" {
+		m.appendLine(renderHelp())
+		return m, nil
+	}
 	args := ""
 	if len(parts) > 1 {
 		args = strings.Join(parts[1:], " ")
 	}
-
-	switch cmd {
-	case "/exit", "/quit":
-		return m, tea.Quit
-
-	case "/clear":
-		m.lines = nil
-		m.viewport.SetContent("")
-
-	case "/new":
-		m.pendingConfirm = "new"
-		m.appendLine(WarningStyle.Render("  [CONFIRM] This clears session memory. Type CLEAR SESSION to continue."))
-
-	case "/resume":
-		if m.recovery == nil {
-			m.appendLine(WarningStyle.Render("  [RECOVERY] No interrupted mission is available."))
-			break
+	for _, c := range slashCommands {
+		if c.matches(name) {
+			return c.run(m, args)
 		}
-		m.lastObjective = m.recovery.Objective
-		m.phase = "recovering"
-		m.phaseDetail = "Restoring last durable checkpoint"
-		m.executing = true
-		m.execStartTime = time.Now()
-		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Minute)
-		m.cancelFn = cancel
-		events := make(chan agent.Event, 32)
-		m.activeEvents = events
-		m.appendLine(SpinnerStyle.Render("  [RECOVERY] Restoring context. Interrupted tool will be verified before retry."))
-		go func() { _ = m.orch.Resume(ctx, events) }()
-		m.recovery = nil
-
-	case "/stealth":
-		on := m.opsecMgr.Toggle()
-		if on {
-			m.appendLine(ToolDoneStyle.Render("  [⬡] Rate limiting enabled — evasive timing active"))
-		} else {
-			m.appendLine(WarningStyle.Render("  [⬡] Rate limiting disabled — high-concurrency active"))
-		}
-		if m.promptRefresher != nil {
-			m.orch.UpdateSystemPrompt(m.promptRefresher())
-		}
-
-	case "/auto":
-		m.autopilot = !m.autopilot
-		m.orch.Autopilot = m.autopilot
-		state := "MANUAL"
-		if m.autopilot {
-			state = "AUTOPILOT"
-		}
-		m.appendLine(WarningStyle.Render(fmt.Sprintf("  [⚠] Execution Mode: %s", state)))
-
-	case "/persona":
-		if args == "" {
-			m.appendLine(ErrorStyle.Render("  [✗] Usage: /persona <custom directive>"))
-		} else {
-			m.personaOverride = args
-			if m.promptRefresher != nil {
-				m.orch.UpdateSystemPrompt(m.promptRefresher())
-			}
-			m.appendLine(ToolDoneStyle.Render(fmt.Sprintf("  [+] Persona directive updated: %s", truncate(args, 60))))
-		}
-
-	case "/setup":
-		needSetup = true
-		m.appendLine(InfoStyle.Render("  [i] Launching setup wizard — DrogonClaw will restart afterward."))
-		return m, tea.Quit
-
-	case "/report":
-		m.phase = "planning"
-		m.phaseDetail = "Generating penetration test report"
-		m.executing = true
-		m.execStartTime = time.Now()
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		m.cancelFn = cancel
-		events := make(chan agent.Event, 32)
-		m.activeEvents = events
-		go func() {
-			defer close(events)
-			events <- agent.Event{Type: agent.EvStatus, Content: "Drafting structured penetration test report..."}
-			reporter := core.NewReportGenerator(m.orch.GetProvider(), m.graph)
-			path, err := reporter.GenerateMarkdownReport(ctx)
-			if err != nil {
-				events <- agent.Event{Type: agent.EvError, Content: fmt.Sprintf("Report generation failed: %v", err)}
-			} else {
-				events <- agent.Event{Type: agent.EvDone, Content: fmt.Sprintf("Report generated: %s", path)}
-			}
-		}()
-
-	case "/ctf":
-		if args == "" {
-			m.appendLine(ErrorStyle.Render("  [✗] Usage: /ctf <local-file-or-directory>"))
-		} else {
-			m.phase = "planning"
-			m.phaseDetail = "Running CTF triage"
-			m.executing = true
-			m.execStartTime = time.Now()
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-			m.cancelFn = cancel
-			events := make(chan agent.Event, 8)
-			m.activeEvents = events
-			go func() {
-				defer close(events)
-				events <- agent.Event{Type: agent.EvStatus, Content: "Running local CTF solver (scan -> decode -> verify)..."}
-				rs, err := ctf.Solve(ctx, ctf.LocalTask{Path: args})
-				if err != nil {
-					events <- agent.Event{Type: agent.EvError, Content: fmt.Sprintf("CTF solve failed: %v", err)}
-					return
-				}
-				events <- agent.Event{Type: agent.EvDone, Content: ctf.FormatSolve(rs)}
-			}()
-		}
-
-	case "/profile":
-		if args == "" {
-			m.appendLine(ErrorStyle.Render("  [✗] Usage: /profile <target-domain-or-ip>"))
-		} else {
-			m.phase = "planning"
-			m.phaseDetail = "Building target profile"
-			m.executing = true
-			m.execStartTime = time.Now()
-			ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
-			m.cancelFn = cancel
-			events := make(chan agent.Event, 8)
-			m.activeEvents = events
-			go func() {
-				defer close(events)
-				if err := ctx.Err(); err != nil {
-					events <- agent.Event{Type: agent.EvError, Content: "Target profile cancelled: " + err.Error()}
-					return
-				}
-				events <- agent.Event{Type: agent.EvStatus, Content: "Gathering passive intelligence for target..."}
-				profile, err := intel.BuildPublicProfile(args, m.cfg.GetShodanAPIKey(), m.cfg.GetVirusTotalAPIKey(), intel.DefaultProfileDependencies())
-				if err != nil {
-					events <- agent.Event{Type: agent.EvError, Content: fmt.Sprintf("Target profile failed: %v", err)}
-					return
-				}
-				if err := ctx.Err(); err != nil {
-					events <- agent.Event{Type: agent.EvError, Content: "Target profile cancelled: " + err.Error()}
-					return
-				}
-				events <- agent.Event{Type: agent.EvDone, Content: intel.FormatPublicProfile(profile)}
-			}()
-		}
-
-	case "/swarm":
-		if args == "" {
-			m.appendLine(ErrorStyle.Render("  [✗] Usage: /swarm <mission objective>"))
-		} else {
-			m.phase = "planning"
-			m.phaseDetail = "Swarm commander engaged"
-			m.executing = true
-			m.execStartTime = time.Now()
-			ctx, cancel := context.WithTimeout(context.Background(), 120*time.Minute)
-			m.cancelFn = cancel
-			events := make(chan agent.Event, 32)
-			m.activeEvents = events
-			go func() {
-				defer close(events)
-				events <- agent.Event{Type: agent.EvStatus, Content: "Dispatching autonomous sub-agent swarm..."}
-				sysPrompt := ""
-				if m.promptRefresher != nil {
-					sysPrompt = m.promptRefresher()
-				}
-				commander := agent.NewSwarmCommander(m.orch.GetProvider(), m.orch.GetTools(), sysPrompt, m.sessionID, m.graph)
-				result, err := commander.ExecuteSwarm(ctx, args, events)
-				if err != nil {
-					events <- agent.Event{Type: agent.EvError, Content: fmt.Sprintf("Swarm failed: %v", err)}
-				} else {
-					events <- agent.Event{Type: agent.EvDone, Content: result}
-				}
-			}()
-		}
-
-	case "/mode":
-		m.handleModeCommand(args)
-
-	case "/analyze":
-		if args == "" {
-			m.appendLine(ErrorStyle.Render("  [✗] Usage: /analyze <target>"))
-		} else {
-			profile := m.targetAnalyzer.Analyze(args)
-			m.appendLine(SpinnerStyle.Render(profile.Summarize()))
-			if profile.Chain != nil {
-				m.appendLine(HintDescStyle.Render(fmt.Sprintf("  Next: activate chain with /mode %s", profile.Chain.Name)))
-			}
-		}
-
-	case "/sandbox":
-		m.pendingConfirm = "sandbox"
-		m.appendLine(WarningStyle.Render("  [CONFIRM] Type TOGGLE SANDBOX to switch execution environment."))
-
-	case "/status":
-		for _, line := range strings.Split(m.renderStatusReport(), "\n") {
-			m.appendLine(line)
-		}
-
-	case "/cost":
-		if m.tracker == nil {
-			m.appendLine(WarningStyle.Render("  [!] No token tracker active."))
-		} else {
-			m.appendLine(m.tracker.Render())
-		}
-
-	case "/health":
-		m.appendLine(SpinnerStyle.Render("  [*] Running diagnostic checks..."))
-		m.phase = "verifying"
-		m.phaseDetail = "Diagnostics"
-		m.executing = true
-		m.execStartTime = time.Now()
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-		m.cancelFn = cancel
-		m.activeEvents = nil
-		healthWidth := m.viewport.Width
-		if healthWidth <= 0 {
-			healthWidth = m.width - 4
-		}
-		return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
-			return HealthResultMsg{Output: health.RunDiagnosticsWithWidth(ctx, m.sandbox, healthWidth)}
-		})
-
-	case "/skills":
-		m.appendLine(renderSkills(m.manifest, args))
-
-	case "/queue":
-		if len(m.promptQueue) == 0 {
-			m.appendLine(QueueStyle.Render("  [⏳] Prompt queue is empty."))
-		} else {
-			m.appendLine(QueueStyle.Render(fmt.Sprintf("  [⏳] PROMPT QUEUE (%d pending):", len(m.promptQueue))))
-			for i, q := range m.promptQueue {
-				m.appendLine(QueueItemStyle.Render(fmt.Sprintf("      %d. %s", i+1, q)))
-			}
-			m.appendLine(HintDescStyle.Render("      Queued prompts run automatically after the current task finishes."))
-		}
-
-	case "/sections":
-		m.appendLine(m.renderSections())
-
-	case "/section":
-		if args == "" {
-			m.appendLine(ErrorStyle.Render("  [✗] Usage: /section <id> — switch to a previous section"))
-			break
-		}
-		m.switchSection(args)
-
-	case "/copy":
-		m.appendLine(m.copyConversation())
-
-	case "/benchmarks":
-		m.appendLine(m.renderBenchmarks())
-
-	case "/timeline":
-		m.appendLine(m.renderTimeline())
-
-	case "/sidebar":
-		if m.showSidebar || m.width >= sidebarMinWidth+20 {
-			m.showSidebar = !m.showSidebar
-		}
-		state := "OFF"
-		if m.showSidebar {
-			state = "ON"
-		}
-		m.appendLine(InfoStyle.Render(fmt.Sprintf("  [-sidebar] Sidebar %s", state)))
-
-	case "/details":
-		m.showToolDetail = !m.showToolDetail
-		state := "OFF"
-		if m.showToolDetail {
-			state = "ON"
-		}
-		m.appendLine(InfoStyle.Render(fmt.Sprintf("  [details] Tool details %s", state)))
-
-	case "/help":
-		m.appendLine(renderHelp())
-
-	default:
-		m.appendLine(WarningStyle.Render(fmt.Sprintf("  [?] Unknown command: %s. Type /help for reference.", cmd)))
 	}
-
-	if m.executing && m.activeEvents != nil {
-		return m, tea.Batch(m.spinner.Tick, waitForEvent(m.activeEvents))
-	}
+	m.appendLine(WarningStyle.Render(fmt.Sprintf("  [?] Unknown command: %s. Type /help for reference.", name)))
 	return m, nil
 }
 
