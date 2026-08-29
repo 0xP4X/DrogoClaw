@@ -2,6 +2,92 @@
 
 All notable changes to DrogonClaw are documented here.
 
+## [Unreleased] — 2026-08-29
+
+### Added
+
+#### Grounding Guard (anti-hallucination)
+- **Deterministic grounding guard** (`internal/agent/grounding.go`) — before the
+  final answer is surfaced, a rules-only check cross-references every claim
+  against the recorded tool evidence. Fabricated interface names (`eth0`, `lo`),
+  invented IPs, and any claim that denies WiFi/wireless hardware while tools
+  observed a wireless interface get corrected inline with an `[AUTO-GROUNDING]`
+  note and a status event. No LLM call: it cannot be skipped by prompt drift.
+- **Prompt hardening** (`internal/agent/prompt.go`) — RUNTIME ENVIRONMENT and
+  GROUND TRUTH RULE now instruct the model to only assert interfaces/IPs it has
+  directly observed and never to deny the existence of wireless hardware.
+- **Regression pins** — `TestGroundingCatchesLiveTranscript` replays the exact
+  `wlan0 → P4X` WiFi recon transcript that previously produced a fabricated
+  `eth0 172.17.0.2/16` answer and asserts the correction fires.
+
+#### Command Registry (TUI)
+- **Single slash-command registry** (`internal/tui/commands.go`) — the 28
+  in-TUI commands (was a 60-complexity `switch`) are now one declarative table
+  with canonical name, aliases, category, description, argument hint and handler.
+  Built from per-category builders (OPERATIONS / CONTROLS / SESSION / UI).
+- `/help` and `/commands` now render **straight from the registry**, so an
+  undocumented or orphaned command is impossible by construction.
+- **`/config`** — show the stored provider, model, Telegram and OSINT-key
+  configuration summary (secrets masked) directly in the terminal.
+- Async-task boilerplate (`/profile`, `/ctf`, `/report`, `/swarm`, `/resume`)
+  extracted into `beginTask`, which returns a cancellable `context.Context` that
+  every long-running handler now honors.
+
+#### CLI Dispatch & Versioning
+- **Command table + `help`** (`cmd/drogonclaw/cli.go`) — `./drogonclaw help`
+  renders a graphical sub-command reference; unknown subcommands now fail with
+  exit 2 instead of silently dropping into the TUI.
+- **`version` command** — prints build version, build time and Go runtime.
+- **Build metadata injection** — Makefile now links `main.version` and
+  `main.buildTime` via `-X` ldflags (`drogonclaw version` shows the git
+  describe tag).
+
+#### Setup Wizard Redesign
+- **Menu-driven controller** (`internal/tui/setup.go`) — instead of one linear
+  pass, the wizard now shows a **Current Configuration summary** (provider,
+  model, API-key status, Telegram state, OSINT keys, identity — all secrets
+  masked) and a menu: change provider/model, manage Telegram, manage secondary
+  keys, edit identity, or reset everything.
+- **Returning-user friendly** — the authorisation gate is asked once and
+  persisted; stored values are prefilled so an API key can be viewed/changed
+  without being re-entered.
+- **Telegram is now reviewable** — re-running setup shows the current token
+  (masked) and chat ID and offers keep / replace / disable, answering the
+  previous gap where already-configured users could not inspect the gateway.
+- **Graceful cancellation** — every section returns to the menu; the wizard no
+  longer calls `os.Exit(1)` mid-flow (which would previously abort the whole
+  process).
+- Credential display uses a fixed-width mask revealing only the last 4
+  characters; the renderer reads config through a `configReader` interface so it
+  never depends on the operator's live config in tests.
+
+### Changed
+- TUI help: stale leader keys (`l`/`m`/`t`/`e`/`x`) and dead keyboard hints
+  removed; `/help` now groups commands by category and lists only live bindings.
+- Palette and inline hint bar derive from the registry (order = category order).
+- `main.go` dispatch reduced from a flat if-chain to `parseCLI` +
+  `runStandaloneCommand` (`main` gocyclo 28 → 18).
+- Makefile `doctor` target now runs the real `health` subcommand (previously
+  invoked a nonexistent `doctor` subcommand).
+
+### Documentation
+- `docs/setup.md` rewritten for the menu-driven wizard and `/config` command.
+- This changelog — entries cover the grounding guard, command registry, CLI
+  dispatch/versioning and setup redesign above.
+
+### Tests
+- `internal/tui/setup_test.go` — `maskSecret`, `providerLabel`, `storedKeyStatus`,
+  `telegramStatus`, `renderConfigSummary` (cloud + ollama paths), secondary-key
+  table sync, provider→config-key mapping, curated model options, reset-list
+  coverage.
+- `internal/tui/commands_test.go` — registry consistency (unique aliases,
+  canonical names, valid categories, `/config` present), bare `/` help,
+  unknown-command warning, alias-to-entry resolution.
+- `cmd/drogonclaw/cli_test.go` — `parseCLI` for every subcommand, run modes,
+  flag forwarding, unknown rejection, help/version rendering.
+
+---
+
 ## [Unreleased] — 2026-08-26
 
 ### Added

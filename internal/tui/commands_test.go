@@ -48,6 +48,9 @@ func TestSlashCommandRegistryConsistent(t *testing.T) {
 	if !seenname["/exit"] || !seenname["/quit"] {
 		t.Error("registry missing /exit or /quit alias")
 	}
+	if !seenname["/config"] {
+		t.Error("registry missing /config")
+	}
 
 	if len(allHints) != len(slashCommands) {
 		t.Errorf("palette hints (%d) drifted from registry (%d)", len(allHints), len(slashCommands))

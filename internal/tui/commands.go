@@ -373,6 +373,17 @@ func sessionCommands() []slashCommand {
 			},
 		},
 		{
+			names:    []string{"/config"},
+			category: catSession,
+			desc:     "Show stored provider, Telegram and API-key configuration",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				for _, line := range strings.Split(renderConfigSummary(m.cfg), "\n") {
+					m.appendLine(line)
+				}
+				return m, nil
+			},
+		},
+		{
 			names:    []string{"/cost"},
 			category: catSession,
 			desc:     "Show API token usage and estimated cost",
