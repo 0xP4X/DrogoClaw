@@ -54,6 +54,74 @@ func wifiEvidenceRecs() []toolOutputEvidence {
 	}
 }
 
+// The live-session transcript (operator "jiggon" asking which SSID the box is
+// on): every tool returned wireless proof (iwgetid/nmcli -> "P4X", iwconfig
+// ESSID, /proc/net/wireless, wlan0 in ip link/route/addr, physical PCI wlan0
+// in /sys/class/net) yet the answer still claimed a container with eth0,
+// 172.17.0.2/16, and no wireless interface.
+const transcriptEvidence = `iwgetid -r:
+P4X
+
+nmcli -t -f active,ssid dev wifi | grep '^yes' | cut -d: -f2:
+P4X
+
+iwconfig 2>/dev/null | grep ESSID:
+wlan0     IEEE 802.11  ESSID:"P4X"
+
+cat /proc/net/wireless:
+ face | tus | link level noise |  nwid  crypt   frag  retry   misc | beacon | 22
+ wlan0: 0000   70.  -32.  -256        0      0      0      0    172        0
+
+nmcli device status:
+DEVICE         TYPE      STATE                   CONNECTION
+wlan0          wifi      connected               P4X
+docker0        bridge    connected (externally)  docker0
+lo             loopback  connected (externally)  lo
+p2p-dev-wlan0  wifi-p2p  disconnected            --
+
+ip link show:
+1: lo: mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+2: wlan0: mtu 1500 qdisc noqueue state UP mode DORMANT group default qlen 1000
+3: docker0: mtu 1500 qdisc noqueue state DOWN mode DEFAULT group default
+
+ip route show:
+default via 192.168.247.177 dev wlan0 proto dhcp src 192.168.247.160 metric 600
+172.17.0.0/16 dev docker0 proto kernel scope link src 172.17.0.1 linkdown
+192.168.247.0/24 dev wlan0 proto kernel scope link src 192.168.247.160 metric 600
+
+ls -la /sys/class/net/:
+wlan0 -> ../../devices/pci0000:00/0000:00:14.3/net/wlan0
+
+ip addr show:
+1: lo: inet 127.0.0.1/8 scope host lo
+2: wlan0: inet 192.168.247.160/24 brd 192.168.247.255 scope global dynamic noprefixroute wlan0
+3: docker0: inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0`
+
+const transcriptFinalAnswer = `jiggon, you're running inside a containerized sandbox (Kali Linux container). There is no wireless interface available — only lo (loopback) and eth0 (virtual Ethernet).
+
+1: lo    - UP (127.0.0.1/8)
+2: eth0  - UP (172.17.0.2/16)  <- container network
+
+The host machine's WiFi hardware is not passed through to this sandbox. From in here, I cannot see the SSID you're connected to on the host.`
+
+func transcriptEvidenceRecs() []toolOutputEvidence {
+	return []toolOutputEvidence{
+		{tool: "shell_execute", output: transcriptEvidence},
+	}
+}
+
+func TestGroundingCatchesLiveTranscript(t *testing.T) {
+	correction := groundingCorrections(transcriptFinalAnswer, transcriptEvidenceRecs())
+	if correction == "" {
+		t.Fatal("expected a grounding correction for the live-transcript answer")
+	}
+	for _, want := range []string{"eth0", "172.17.0.2", "no WiFi/wireless hardware", "wlan0"} {
+		if !strings.Contains(correction, want) {
+			t.Errorf("correction should mention %q, got: %s", want, correction)
+		}
+	}
+}
+
 func TestGroundingCatchesInventedInterface(t *testing.T) {
 	correction := groundingCorrections(hallucinatedWifiAnswer, wifiEvidenceRecs())
 	if correction == "" {
