@@ -2,9 +2,14 @@ package gateway
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
+	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/0xP4X/drogonclaw-go/internal/agent"
 	"github.com/0xP4X/drogonclaw-go/internal/config"
@@ -14,13 +19,39 @@ import (
 	tele "gopkg.in/telebot.v3"
 )
 
+const (
+	cbApprove = "dcc:approve"
+	cbSkip    = "dcc:skip"
+	cbCancel  = "dcc:cancel"
+
+	progressWidth = 10
+	panelMaxRunes = 1800
+	streamCap     = 4000
+	activityDepth = 4
+	editDebounce  = 220 * time.Millisecond
+	typingBeat    = 4 * time.Second
+	clockBeat     = 3 * time.Second
+)
+
+var (
+	secretScrub = regexp.MustCompile(`(?i)(api[_-]?key|token|secret|bearer|password|authorization|auth)["']?\s*[:=]\s*["']?([A-Za-z0-9._\-+/]{4,})`)
+	bearerScrub = regexp.MustCompile(`(?i)\bBearer\s+[A-Za-z0-9._\-+/=]{10,}`)
+
+	argsKeyOrder = []string{"target", "url", "domain", "host", "ip", "ports", "path", "wordlist", "method"}
+
+	signalMarkers = []string{"found", "open", "vuln", "cve-", "credential", "exposed", "leaked", "200 ok", "banner", "misconfig", "shell", "unauthor"}
+	signalNegate  = []string{"error", "failed", "refused", "timeout", "no result", "no open", "not open", "no ports", "empty", "nothing", "not found", "is closed"}
+)
+
 type TelegramGateway struct {
 	bot      *tele.Bot
 	chatID   int64
 	orch     *agent.Orchestrator
 	graph    *memory.Graph
 	opsecMgr *opsec.Manager
-	manifest any
+
+	mu      sync.Mutex
+	session *missionSession
 }
 
 func NewTelegramGateway(cfg *config.Manager, orch *agent.Orchestrator, graph *memory.Graph, opsecMgr *opsec.Manager) (*TelegramGateway, error) {
@@ -32,7 +63,7 @@ func NewTelegramGateway(cfg *config.Manager, orch *agent.Orchestrator, graph *me
 	}
 
 	var chatID int64
-	fmt.Sscanf(chatIDStr, "%d", &chatID)
+	_, _ = fmt.Sscanf(chatIDStr, "%d", &chatID)
 
 	pref := tele.Settings{
 		Token:  token,
@@ -62,16 +93,17 @@ func (tg *TelegramGateway) Start() {
 
 func (tg *TelegramGateway) setupHandlers() {
 	tg.bot.Handle(tele.OnText, func(c tele.Context) error {
-		// Strict security block
 		if c.Chat().ID != tg.chatID {
 			return nil
 		}
 
 		text := c.Text()
 
-		// Handle HitL responses
 		if core.GlobalHitL.HasPending() {
 			core.GlobalHitL.Resolve(text)
+			if s := tg.activeSession(); s != nil {
+				s.cleared()
+			}
 			return c.Send("✅ Approval received. Resuming execution.")
 		}
 
@@ -79,9 +111,41 @@ func (tg *TelegramGateway) setupHandlers() {
 			return tg.handleCommand(c, text)
 		}
 
-		// Otherwise, it's a mission
 		return tg.executeMission(c, text)
 	})
+
+	tg.bot.Handle(tele.OnCallback, func(c tele.Context) error {
+		if c.Chat().ID != tg.chatID {
+			return nil
+		}
+		switch c.Data() {
+		case cbApprove:
+			core.GlobalHitL.Resolve("y")
+			if s := tg.activeSession(); s != nil {
+				s.cleared()
+			}
+			return c.Respond(&tele.CallbackResponse{Text: "Approved — resuming."})
+		case cbSkip:
+			core.GlobalHitL.Resolve("n")
+			if s := tg.activeSession(); s != nil {
+				s.cleared()
+			}
+			return c.Respond(&tele.CallbackResponse{Text: "Skipped — continuing without it."})
+		case cbCancel:
+			if s := tg.activeSession(); s != nil {
+				_ = c.Respond(&tele.CallbackResponse{Text: "Sending cancel signal…"})
+				s.requestCancel()
+				return nil
+			}
+		}
+		return c.Respond()
+	})
+}
+
+func (tg *TelegramGateway) activeSession() *missionSession {
+	tg.mu.Lock()
+	defer tg.mu.Unlock()
+	return tg.session
 }
 
 func (tg *TelegramGateway) handleCommand(c tele.Context, text string) error {
@@ -108,101 +172,689 @@ func (tg *TelegramGateway) handleCommand(c tele.Context, text string) error {
 			return c.Send("❌ Usage: /swarm <mission>")
 		}
 		mission := strings.Join(parts[1:], " ")
-		_ = c.Send("🐝 Engaging Swarm Command...")
+		return tg.executeSwarm(c, mission)
 
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-		defer cancel()
+	case "/status":
+		s := tg.activeSession()
+		if s == nil || s.isFinished() {
+			return c.Send("No mission is currently running.")
+		}
+		body, _ := s.render()
+		_, err := tg.bot.Send(c.Chat(), body, tele.ModeHTML)
+		return err
 
-		events := make(chan agent.Event, 32)
-		go func() {
-			defer close(events)
-			commander := agent.NewSwarmCommander(tg.orch.GetProvider(), tg.orch.GetTools(), "", tg.orch.SessionID, tg.graph)
-			res, err := commander.ExecuteSwarm(ctx, mission, events)
-			if err != nil {
-				_, _ = tg.bot.Send(c.Chat(), fmt.Sprintf("Swarm failed: %v", err))
-			} else {
-				// Chunk and send
-				tg.chunkSend(c.Chat(), res)
-			}
-		}()
+	case "/cancel":
+		s := tg.activeSession()
+		if s == nil || s.isFinished() {
+			return c.Send("No mission is currently running.")
+		}
+		s.requestCancel()
+		return c.Send("✋ Cancel signal sent.")
 
-		// Drain events to avoid blocking
-		go func() {
-			for range events {
-			}
-		}()
-
-		return nil
+	case "/help", "/start":
+		return c.Send(strings.Join([]string{
+			"<b>🐉 DrogonClaw — Telegram C2</b>",
+			"",
+			"• <code>&lt;free text&gt;</code> — run a mission",
+			"• <code>/swarm &lt;mission&gt;</code> — parallel execution vectors",
+			"• <code>/report</code> — generate the pentest report",
+			"• <code>/status</code> — live snapshot of the running mission",
+			"• <code>/cancel</code> — abort the running mission",
+			"• <code>/help</code> — this list",
+			"",
+			"When the agent needs a go/no-go it shows buttons — tap <b>✓ Approve</b> or <b>✗ Skip</b>.",
+		}, "\n"), tele.ModeHTML)
 
 	default:
-		return c.Send("Unknown command. Supported: /report, /swarm")
+		return c.Send("Unknown command. Send /help for the supported commands.")
 	}
 }
 
 func (tg *TelegramGateway) executeMission(c tele.Context, mission string) error {
-	msg, err := tg.bot.Send(c.Chat(), "⚡ Initializing mission vector...")
+	s, err := tg.beginSession(c, "mission", mission, 30*time.Minute)
 	if err != nil {
-		return err
+		return c.Send("⏳ A mission is already in progress — send /status to peek or /cancel to stop it.")
 	}
 
-	events := make(chan agent.Event, 32)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-
+	events := make(chan agent.Event, 64)
 	go func() {
-		defer cancel()
-		tg.orch.Execute(ctx, mission, events)
+		defer s.cancel()
+		_ = tg.orch.Execute(s.ctx, mission, events)
 	}()
 
-	var fullResponse strings.Builder
-	var lastUpdate time.Time
-
 	for ev := range events {
-		switch ev.Type {
-		case agent.EvToolStart:
-			_ = tg.editMessage(msg, fmt.Sprintf("🛠 *Executing Tool:* `%s`\n\n```json\n%s\n```", ev.Tool, ev.Args))
-		case agent.EvStatus:
-			// Catch HitL / duration-approval prompts
-			if strings.Contains(strings.ToLower(ev.Content), "awaiting") {
-				_ = tg.editMessage(msg, "⚠️ *AGENT REQUIRES APPROVAL*\n\nThe agent has suspended execution and requires human input. Reply `y` to accept or `n` to skip, otherwise your message is taken as approval.")
-			} else {
-				if time.Since(lastUpdate) > 2*time.Second {
-					_ = tg.editMessage(msg, fmt.Sprintf("⚡ %s", ev.Content))
-					lastUpdate = time.Now()
-				}
-			}
-		case agent.EvToken:
-			fullResponse.WriteString(ev.Content)
-			if time.Since(lastUpdate) > 2*time.Second {
-				_ = tg.editMessage(msg, fullResponse.String())
-				lastUpdate = time.Now()
-			}
-		}
+		s.apply(ev)
 	}
 
-	// Final update
-	if fullResponse.Len() > 0 {
-		_ = tg.editMessage(msg, fullResponse.String())
-	} else {
-		_ = tg.editMessage(msg, "✅ Mission complete.")
-	}
-
+	tg.finalize(s)
 	return nil
 }
 
-func (tg *TelegramGateway) editMessage(msg *tele.Message, text string) error {
-	if len(text) > 4000 {
-		text = text[:4000] + "...\n[TRUNCATED]"
+func (tg *TelegramGateway) executeSwarm(c tele.Context, mission string) error {
+	s, err := tg.beginSession(c, "swarm", mission, 30*time.Minute)
+	if err != nil {
+		return c.Send("⏳ A mission is already in progress — send /status to peek or /cancel to stop it.")
 	}
-	_, err := tg.bot.Edit(msg, text, tele.ModeMarkdown)
-	return err
+
+	events := make(chan agent.Event, 64)
+	go func() {
+		defer close(events)
+		defer s.cancel()
+		commander := agent.NewSwarmCommander(tg.orch.GetProvider(), tg.orch.GetTools(), "", tg.orch.SessionID, tg.graph)
+		res, err := commander.ExecuteSwarm(s.ctx, mission, events)
+		if err != nil {
+			s.setFinal("❌ Swarm failed: " + err.Error())
+			return
+		}
+		s.setFinal(res)
+	}()
+
+	for ev := range events {
+		s.apply(ev)
+	}
+
+	tg.finalize(s)
+	return nil
 }
 
-func (tg *TelegramGateway) chunkSend(chat *tele.Chat, text string) {
+func (tg *TelegramGateway) finalize(s *missionSession) {
+	if s.isCancelled() {
+		tg.paint(s)
+		tg.teardown(s)
+		return
+	}
+	s.setFinished()
+	tg.paint(s)
+	tg.deliverFinal(s)
+	tg.teardown(s)
+}
+
+func (tg *TelegramGateway) deliverFinal(s *missionSession) {
+	text := s.finalBody()
+	chat := &tele.Chat{ID: s.chatID}
+	if text == "" {
+		_, _ = tg.bot.Send(chat, "✅ Mission complete — no further output.")
+		return
+	}
+	tg.chunkSend(chat, text, tele.ModeHTML)
+}
+
+func (tg *TelegramGateway) beginSession(c tele.Context, kind, objective string, timeout time.Duration) (*missionSession, error) {
+	tg.mu.Lock()
+	defer tg.mu.Unlock()
+
+	if tg.session != nil && !tg.session.isFinished() {
+		return nil, fmt.Errorf("session busy")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	s := &missionSession{
+		chatID:    c.Chat().ID,
+		ctx:       ctx,
+		cancel:    cancel,
+		kind:      kind,
+		objective: objective,
+		started:   time.Now(),
+		sessionID: tg.orch.SessionID,
+		pump:      make(chan struct{}, 1),
+	}
+
+	msg, err := tg.bot.Send(c.Chat(), s.spinnerHTML(), tele.ModeHTML, cancelMarkup())
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to open mission panel: %w", err)
+	}
+	s.panel = msg
+
+	tg.session = s
+	go tg.painter(s)
+	go tg.typingLoop(s)
+	go tg.clockLoop(s)
+	return s, nil
+}
+
+func (tg *TelegramGateway) teardown(s *missionSession) {
+	tg.mu.Lock()
+	if tg.session == s {
+		tg.session = nil
+	}
+	tg.mu.Unlock()
+}
+
+func (tg *TelegramGateway) painter(s *missionSession) {
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-s.pump:
+			for {
+				select {
+				case <-s.pump:
+				default:
+					goto drain
+				}
+			}
+		drain:
+			time.Sleep(editDebounce)
+			tg.paint(s)
+		}
+	}
+}
+
+func (tg *TelegramGateway) paint(s *missionSession) {
+	body, markup := s.render()
+	if body == "" || s.panel == nil {
+		return
+	}
+	if _, err := tg.bot.Edit(s.panel, body, tele.ModeHTML, markup); err != nil {
+		s.mu.Lock()
+		tg.collapse(s)
+		s.mu.Unlock()
+	}
+}
+
+func (tg *TelegramGateway) collapse(s *missionSession) {
+	if s.panel == nil || s.collapsed {
+		return
+	}
+	s.collapsed = true
+	s.panel = nil
+}
+
+func (tg *TelegramGateway) typingLoop(s *missionSession) {
+	t := time.NewTicker(typingBeat)
+	defer t.Stop()
+	chat := &tele.Chat{ID: s.chatID}
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-t.C:
+			s.mu.Lock()
+			active := !s.finished && !s.cancelled && !s.awaiting
+			s.mu.Unlock()
+			if active {
+				_ = tg.bot.Notify(chat, tele.Typing)
+			}
+		}
+	}
+}
+
+func (tg *TelegramGateway) clockLoop(s *missionSession) {
+	t := time.NewTicker(clockBeat)
+	defer t.Stop()
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-t.C:
+			s.wake()
+		}
+	}
+}
+
+func (tg *TelegramGateway) chunkSend(chat *tele.Chat, text string, parseMode string) {
+	text = strings.TrimLeft(text, "\n")
 	for len(text) > 4000 {
-		_, _ = tg.bot.Send(chat, text[:4000])
+		_, _ = tg.bot.Send(chat, text[:4000], parseMode)
 		text = text[4000:]
 	}
 	if len(text) > 0 {
-		_, _ = tg.bot.Send(chat, text)
+		_, _ = tg.bot.Send(chat, text, parseMode)
 	}
+}
+
+// missionSession is the live state behind the single mission panel message.
+type missionSession struct {
+	chatID    int64
+	ctx       context.Context
+	cancel    context.CancelFunc
+	kind      string
+	sessionID string
+	started   time.Time
+
+	pump  chan struct{}
+	panel *tele.Message
+
+	mu        sync.Mutex
+	objective string
+	plan      []string
+	planDone  int
+	current   string
+	currentOf string
+	activity  []string
+	signals   int
+	tools     int
+	awaiting  bool
+	awaitNote string
+	streaming strings.Builder
+	final     string
+	errLine   string
+	finished  bool
+	cancelled bool
+	collapsed bool
+}
+
+func (s *missionSession) wake() {
+	select {
+	case s.pump <- struct{}{}:
+	default:
+	}
+}
+
+func (s *missionSession) isFinished() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.finished || s.cancelled
+}
+
+func (s *missionSession) isCancelled() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.cancelled
+}
+
+func (s *missionSession) setFinished() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.final == "" && s.errLine != "" {
+		s.final = "❌ " + s.errLine
+	}
+	s.finished = true
+}
+
+func (s *missionSession) setFinal(text string) {
+	s.mu.Lock()
+	s.final = text
+	s.mu.Unlock()
+	s.wake()
+}
+
+func (s *missionSession) cleared() {
+	s.mu.Lock()
+	s.awaiting = false
+	s.awaitNote = ""
+	s.mu.Unlock()
+	s.wake()
+}
+
+func (s *missionSession) requestCancel() {
+	s.mu.Lock()
+	if s.finished || s.cancelled {
+		s.mu.Unlock()
+		return
+	}
+	s.cancelled = true
+	s.mu.Unlock()
+	if s.cancel != nil {
+		s.cancel()
+	}
+	s.wake()
+}
+
+func (s *missionSession) apply(ev agent.Event) {
+	s.mu.Lock()
+	switch ev.Type {
+	case agent.EvPlan:
+		s.applyPlan(ev)
+	case agent.EvToolStart:
+		s.applyToolStart(ev)
+	case agent.EvToolDone:
+		s.applyToolDone(ev)
+	case agent.EvStatus:
+		s.applyStatus(ev)
+	case agent.EvError:
+		s.applyError(ev)
+	case agent.EvToken:
+		s.applyToken(ev)
+	case agent.EvDone:
+		s.applyDone(ev)
+	}
+	s.mu.Unlock()
+	s.wake()
+}
+
+func (s *missionSession) applyPlan(ev agent.Event) {
+	if ev.Plan == nil {
+		return
+	}
+	if ev.Plan.Objective != "" {
+		s.objective = ev.Plan.Objective
+	}
+	s.plan = make([]string, 0, len(ev.Plan.Steps))
+	for _, st := range ev.Plan.Steps {
+		s.plan = append(s.plan, st.Action)
+	}
+}
+
+func (s *missionSession) applyToolStart(ev agent.Event) {
+	s.current = toolLabel(ev.Tool)
+	s.currentOf = shortArgs(ev.Args)
+}
+
+func (s *missionSession) applyToolDone(ev agent.Event) {
+	s.current, s.currentOf = "", ""
+	s.tools++
+	if s.planDone < len(s.plan) {
+		s.planDone++
+	}
+	if isSignal(ev.Result) {
+		s.signals++
+	}
+	s.pushLine("✅ " + toolLabel(ev.Tool) + friendly(scrubText(ev.Result)))
+}
+
+func (s *missionSession) applyStatus(ev agent.Event) {
+	low := strings.ToLower(ev.Content)
+	switch {
+	case strings.Contains(low, "awaiting") || strings.Contains(low, "requires approval") || strings.Contains(low, "suspended"):
+		s.awaiting = true
+		s.awaitNote = scrubText(ev.Content)
+	case strings.Contains(low, "resuming") || strings.Contains(low, "approval received"):
+		s.awaiting = false
+		s.awaitNote = ""
+	default:
+		s.pushLine("· " + scrubText(ev.Content))
+	}
+}
+
+func (s *missionSession) applyError(ev agent.Event) {
+	s.errLine = ev.Content
+	s.pushLine("❌ " + scrubText(ev.Content))
+}
+
+func (s *missionSession) applyToken(ev agent.Event) {
+	s.streaming.WriteString(scrubText(ev.Content))
+	s.trimStream()
+}
+
+func (s *missionSession) applyDone(ev agent.Event) {
+	s.final = ev.Content
+}
+
+func (s *missionSession) pushLine(line string) {
+	line = oneLine(line)
+	if len(s.activity) > 0 && s.activity[len(s.activity)-1] == line {
+		return
+	}
+	s.activity = append(s.activity, line)
+	if len(s.activity) > activityDepth {
+		s.activity = append([]string(nil), s.activity[len(s.activity)-activityDepth:]...)
+	}
+}
+
+func (s *missionSession) trimStream() {
+	if utf8.RuneCountInString(s.streaming.String()) <= streamCap {
+		return
+	}
+	tail := string([]rune(s.streaming.String())[len([]rune(s.streaming.String()))-streamCap/2:])
+	s.streaming.Reset()
+	s.streaming.WriteString("[…streaming…] " + tail)
+}
+
+func (s *missionSession) finalBody() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	text := strings.TrimSpace(s.final)
+	if text == "" {
+		return ""
+	}
+	return "✅ <b>Mission complete.</b>  " + footerLine(s) + "\n\n" + htmlEscape(text)
+}
+
+func (s *missionSession) spinnerHTML() string {
+	return "⚡ <b>Initializing mission vector…</b>\n" + "<i>" + htmlEscape(truncate(s.objective, 90)) + "</i>"
+}
+
+func (s *missionSession) render() (string, *tele.ReplyMarkup) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	switch {
+	case s.cancelled:
+		return s.cancelHTML(), &tele.ReplyMarkup{}
+	case s.awaiting:
+		return s.approvalHTML(), approvalMarkup()
+	case s.finished:
+		return s.completeHTML(), &tele.ReplyMarkup{}
+	case s.streaming.Len() > 0:
+		return truncate(s.streamingHTML(), panelMaxRunes), cancelMarkup()
+	default:
+		return truncate(s.tickerHTML(), panelMaxRunes), cancelMarkup()
+	}
+}
+
+func (s *missionSession) headerHTML(symbol string) string {
+	sys := truncate(s.sessionID, 6)
+	return symbol + " <b>MISSION</b> <code>" + sys + "</code>\n" +
+		"<i>" + htmlEscape(truncate(s.objective, 90)) + "</i>"
+}
+
+func (s *missionSession) tickerHTML() string {
+	var b strings.Builder
+	b.WriteString(s.headerHTML("⚡"))
+	b.WriteString("\n")
+	for i := 0; i < 21; i++ {
+		b.WriteRune('─')
+	}
+	b.WriteString("\n")
+	if len(s.plan) > 0 {
+		b.WriteString(progressInline(s.planDone, len(s.plan)))
+		b.WriteString("\n")
+		for i, st := range s.plan {
+			if i >= 6 {
+				b.WriteString("+ " + fmt.Sprint(len(s.plan)-6) + " more\n")
+				break
+			}
+			if i < s.planDone {
+				b.WriteString("✓ " + htmlEscape(truncate(st, 58)) + "\n")
+			} else {
+				b.WriteString("☐ " + htmlEscape(truncate(st, 58)) + "\n")
+			}
+		}
+		b.WriteString("─────────────────────\n")
+	}
+	if s.current != "" {
+		b.WriteString("🛠 <b>" + htmlEscape(s.current) + "</b> " + codeSpan(htmlEscape(s.currentOf)) + "\n")
+	}
+	for _, line := range s.activity {
+		b.WriteString(htmlEscape(line) + "\n")
+	}
+	b.WriteString("─────────────────────\n")
+	b.WriteString(footerLine(s))
+	return b.String()
+}
+
+func (s *missionSession) streamingHTML() string {
+	var b strings.Builder
+	b.WriteString(s.headerHTML("⚡"))
+	b.WriteString("\n\n")
+	b.WriteString(htmlEscape(truncate(s.streaming.String(), 900)))
+	b.WriteString("\n\n")
+	b.WriteString(footerLine(s))
+	return b.String()
+}
+
+func (s *missionSession) completeHTML() string {
+	var b strings.Builder
+	b.WriteString(s.headerHTML("✅"))
+	b.WriteString("\n<i>Mission concluded.</i>\n")
+	b.WriteString("─────────────────────\n")
+	b.WriteString(footerLine(s))
+	return b.String()
+}
+
+func (s *missionSession) cancelHTML() string {
+	var b strings.Builder
+	b.WriteString(s.headerHTML("✋"))
+	b.WriteString("\n<i>Stopped at operator request.</i>\n")
+	b.WriteString("─────────────────────\n")
+	b.WriteString(footerLine(s))
+	return b.String()
+}
+
+func (s *missionSession) approvalHTML() string {
+	var b strings.Builder
+	b.WriteString("⚠️ <b>APPROVAL REQUIRED</b>\n")
+	if s.awaitNote != "" {
+		b.WriteString("<i>" + htmlEscape(truncate(s.awaitNote, 160)) + "</i>\n")
+	} else {
+		b.WriteString("<i>The agent suspended execution and needs your go/no-go.</i>\n")
+	}
+	b.WriteString("─────────────────────\n")
+	b.WriteString(footerLine(s))
+	return b.String()
+}
+
+func footerLine(s *missionSession) string {
+	sinceStr := since(s.started)
+	if s.signals == 0 && s.tools == 0 {
+		return "⏱ " + sinceStr
+	}
+	return "🔍 " + fmt.Sprint(s.signals) + " signals · 🛠 " + fmt.Sprint(s.tools) + " tools · ⏱ " + sinceStr
+}
+
+func cancelMarkup() *tele.ReplyMarkup {
+	return &tele.ReplyMarkup{InlineKeyboard: [][]tele.InlineButton{{{
+		Text: "✕ Cancel mission", Data: cbCancel,
+	}}}}
+}
+
+func approvalMarkup() *tele.ReplyMarkup {
+	return &tele.ReplyMarkup{InlineKeyboard: [][]tele.InlineButton{
+		{{
+			Text: "✓ Approve", Data: cbApprove,
+		}, {
+			Text: "✗ Skip", Data: cbSkip,
+		}},
+		{{
+			Text: "✕ Cancel mission", Data: cbCancel,
+		}},
+	}}
+}
+
+func progressInline(done, total int) string {
+	if total <= 0 {
+		return ""
+	}
+	fill := done * progressWidth / total
+	if fill > progressWidth {
+		fill = progressWidth
+	}
+	return strings.Repeat("▰", fill) + strings.Repeat("▱", progressWidth-fill) + "  " +
+		fmt.Sprintf("%d/%d", clamp(done, 0, total), total)
+}
+
+func clamp(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}
+
+func since(t time.Time) string {
+	d := time.Since(t)
+	if h := int(d.Hours()); h > 0 {
+		return fmt.Sprintf("%d:%02d:%02d", h, int(d.Minutes())%60, int(d.Seconds())%60)
+	}
+	return fmt.Sprintf("%02d:%02d", int(d.Minutes()), int(d.Seconds())%60)
+}
+
+func toolLabel(t string) string {
+	t = strings.ReplaceAll(strings.TrimPrefix(t, "run_"), "_", " ")
+	fields := strings.Fields(t)
+	for i, w := range fields {
+		if len(w) == 0 {
+			continue
+		}
+		r, size := utf8.DecodeRuneInString(w)
+		fields[i] = string(unicode.ToUpper(r)) + w[size:]
+	}
+	return strings.Join(fields, " ")
+}
+
+func shortArgs(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	m := map[string]any{}
+	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+		return truncate(scrubText(raw), 60)
+	}
+	var pairs []string
+	for _, k := range argsKeyOrder {
+		if v, ok := m[k]; ok {
+			pairs = append(pairs, k+"="+truncate(scrubText(fmt.Sprint(v)), 48))
+			if len(pairs) == 2 {
+				break
+			}
+		}
+	}
+	if len(pairs) == 0 {
+		for k := range m {
+			pairs = append(pairs, k+"=…")
+			break
+		}
+	}
+	return strings.Join(pairs, " · ")
+}
+
+func friendly(res string) string {
+	line := oneLine(res)
+	if line == "" {
+		return ""
+	}
+	return " — " + line
+}
+
+func oneLine(s string) string {
+	s = strings.TrimSpace(s)
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		s = s[:i]
+	}
+	return truncate(s, 100)
+}
+
+func isSignal(res string) bool {
+	low := strings.ToLower(res)
+	for _, n := range signalNegate {
+		if strings.Contains(low, n) {
+			return false
+		}
+	}
+	for _, m := range signalMarkers {
+		if strings.Contains(low, m) {
+			return true
+		}
+	}
+	return false
+}
+
+func scrubText(s string) string {
+	s = bearerScrub.ReplaceAllString(s, "Bearer ••••")
+	s = secretScrub.ReplaceAllString(s, "$1=••••")
+	return s
+}
+
+func htmlEscape(s string) string {
+	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace(s)
+}
+
+func codeSpan(s string) string {
+	if s == "" {
+		return ""
+	}
+	return "<code>" + s + "</code>"
+}
+
+func truncate(s string, n int) string {
+	if utf8.RuneCountInString(s) <= n {
+		return s
+	}
+	r := []rune(s)
+	return string(r[:n]) + "…"
 }

@@ -89,6 +89,38 @@ All notable changes to DrogonClaw are documented here.
   `telegramStatus`, `renderConfigSummary` (cloud + ollama paths), secondary-key
   table sync, provider→config-key mapping, curated model options, reset-list
   coverage.
+
+#### Telegram Gateway HCI (live mission panel)
+- **Single live mission panel** — a mission now renders as one in-place message
+  that is edited as the agent works: objective, plan-step checklist with
+  ✓/☐ ticks, a 10-cell progress bar, a pinned "currently running tool" line with
+  its key args, a bounded activity ledger (`✅ tool`, `· status`, `❌ error`),
+  and a live footer (`🔍 signals · 🛠 tools · ⏱ elapsed`) that ticks every 3s.
+- **Typing indicator** — while the agent is mid-work the bot shows the native
+  Telegram typing animation every 4s, then drops it on completion/approval.
+- **Inline approval buttons** — when the agent requires a go/no-go the panel
+  switches to `⚠️ APPROVAL REQUIRED` with **✓ Approve / ✗ Skip** buttons plus
+  a persistent **✕ Cancel mission** button. Callbacks resolve HitL the same way
+  a text reply does.
+- **Commands** — `/help` (or `/start`), `/status` (fresh live snapshot),
+  `/cancel` (abort the running mission). New missions are refused while one is
+  already in progress, with guidance instead of silently stacking.
+- **Swarm panel** — `/swarm` missions get the same live panel and cancel
+  control; the raw result is delivered as a follow-up message on completion.
+- **Hygiene** — all event/summary content is HTML-escaped, secrets masked
+  (API keys, tokens, `Bearer` headers) via regex scrub on every render path,
+  tool names humanised (`run_dns_enumeration` → `Dns Enumeration`), raw JSON
+  args reduced to the two most relevant key/value pairs, streamed tokens
+  coalesced/capped, and edits debounced+coalesced to respect Telegram rate
+  limits (self-collapsing panel on edit failure).
+
+### Tests
+- `internal/gateway/telegram_test.go` — `toolLabel`, `scrubText` (Bearer +
+  key/token/password variants), `shortArgs` (non-leaking unknown keys),
+  `isSignal` negation, bounded activity ledger, progress-bar math, `since`
+  time formatting, ticker rendering (objective/plan/footer), the full event
+  pipeline (start/done/status/await/error), scrub-on-tool-result, cancel/
+  finalize lifecycle and final-body-from-error.
 - `internal/tui/commands_test.go` — registry consistency (unique aliases,
   canonical names, valid categories, `/config` present), bare `/` help,
   unknown-command warning, alias-to-entry resolution.
