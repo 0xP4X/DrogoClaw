@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/0xP4X/drogonclaw-go/internal/agent"
+	"github.com/0xP4X/drogonclaw-go/internal/memory"
 )
 
 func agentEvent(t agent.EventType, tool, args string) agent.Event {
@@ -230,5 +231,84 @@ func TestFinalBodyFromError(t *testing.T) {
 	s.setFinished()
 	if !strings.Contains(s.finalBody(), "LLM error: 429 too many requests") {
 		t.Errorf("setFinished should fold errLine into final: %q", s.finalBody())
+	}
+}
+
+func TestChunkTextRuneAligned(t *testing.T) {
+	long := strings.Repeat("é", 9000)
+	chunks := chunkText(long, 4000)
+	if len(chunks) != 3 {
+		t.Fatalf("chunkText = %d chunks, want 3", len(chunks))
+	}
+	for _, c := range chunks {
+		if len([]rune(c)) > 4000 {
+			t.Errorf("chunk exceeds 4000 runes: %d", len([]rune(c)))
+		}
+		if !strings.HasSuffix(c, "é") {
+			t.Errorf("chunk torn mid-rune: %q", c[len(c)-2:])
+		}
+	}
+	if got := chunkText("", 10); got != nil {
+		t.Errorf("chunkText empty = %v", got)
+	}
+	if got := chunkText("hello", 10); len(got) != 1 || got[0] != "hello" {
+		t.Errorf("chunkText short = %v", got)
+	}
+}
+
+func TestParseAutopilotArg(t *testing.T) {
+	cases := []struct {
+		args string
+		want bool
+		set  bool
+	}{
+		{"/autopilot", false, false},
+		{"/autopilot on", true, true},
+		{"/autopilot off", false, true},
+		{"/autopilot enable", true, true},
+		{"/autopilot disable", false, true},
+		{"/autopilot yes", true, true},
+		{"/autopilot nope", false, false},
+	}
+	for _, tc := range cases {
+		want, set := parseAutopilotArg(strings.Fields(tc.args))
+		if want != tc.want || set != tc.set {
+			t.Errorf("parseAutopilotArg(%q) = (%v,%v), want (%v,%v)", tc.args, want, set, tc.want, tc.set)
+		}
+	}
+}
+
+func TestFindingsHTML(t *testing.T) {
+	rep := memory.FindingsReport{
+		Ports: 3, Credentials: 1, Vulnerabilities: 2,
+		Items: []memory.FindingItem{
+			{Category: "port", Target: "10.0.0.7", Detail: "10.0.0.7/443 https"},
+			{Category: "vuln", Target: "10.0.0.7", Detail: "CVE-2026-0001 — RCE", Severity: "high"},
+			{Category: "cred", Target: "10.0.0.7", Detail: "admin / secret123"},
+		},
+	}
+	out := findingsHTML(rep)
+	for _, want := range []string{"3 ports", "1 credentials", "2 vulnerabilities", "CVE-2026-0001", "admin / secret123", "HIGH"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("findingsHTML missing %q:\n%s", want, out)
+		}
+	}
+	empty := findingsHTML(memory.FindingsReport{})
+	if !strings.Contains(empty, "Nothing collected") {
+		t.Errorf("empty findings should say nothing collected: %q", empty)
+	}
+	if strings.Contains(out, "&") && !strings.Contains(out, "&amp;") && !strings.Contains(out, "&lt;") {
+		t.Errorf("findingsHTML should escape HTML")
+	}
+}
+
+func TestAutopilotHTML(t *testing.T) {
+	on := autopilotHTML(true, "hint")
+	off := autopilotHTML(false, "hint")
+	if !strings.Contains(on, "on") || strings.Contains(on, "/autopilot on") == false {
+		t.Errorf("autopilot on render wrong: %q", on)
+	}
+	if !strings.Contains(off, "off") {
+		t.Errorf("autopilot off render wrong: %q", off)
 	}
 }

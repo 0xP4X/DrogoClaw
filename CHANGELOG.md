@@ -121,6 +121,31 @@ All notable changes to DrogonClaw are documented here.
   time formatting, ticker rendering (objective/plan/footer), the full event
   pipeline (start/done/status/await/error), scrub-on-tool-result, cancel/
   finalize lifecycle and final-body-from-error.
+
+#### Telegram conversation audit (this pass)
+- **Commands win over approvals** — while the agent is awaiting a go/no-go,
+  `/status`, `/cancel` and friends are now handled normally instead of being
+  swallowed as the human answer; only plain (non-slash) text resolves the
+  pending approval. Approval panels also invite typed replies.
+- **`/findings`** — new LootDB read API (`Findings(limit)`) with AES-GCM
+  credential decryption and a per-category truncation-safe ledger renderer.
+- **`/autopilot [on|off]`** — toggle auto-accept of long-running low-risk
+  approvals from the chat; no-arg form reports current state.
+- **`/whoami`** and an **idle `/status` dashboard** — session id, graph
+  node/edge counts, loot totals and autopilot state when nothing is running.
+- **Rune-safe chunking** — final report delivery now slices on rune boundaries
+  so multi-byte text can never be torn mid-character.
+- Docs: `docs/telegram.md` — full operator guide (conversation flow, mission
+  panel anatomy, approvals, command reference, hints), cross-linked from
+  `docs/setup.md`, `docs/INDEX.md` and the changelog.
+
+### Tests
+- `internal/memory/loot_test.go` — extended `Findings` round-trip: insert port/
+  vulnerability/credential, verify totals and that stored credentials remain
+  encrypted while the report view decrypts them.
+- `internal/gateway/telegram_test.go` — `chunkText` rune alignment, 4-path
+  `parseAutopilotArg` table, `findingsHTML` (categories, severity badge,
+  HTML-escaping, empty ledger) and `autopilotHTML`.
 - `internal/tui/commands_test.go` — registry consistency (unique aliases,
   canonical names, valid categories, `/config` present), bare `/` help,
   unknown-command warning, alias-to-entry resolution.

@@ -101,6 +101,11 @@ ID and offers keep / replace / disable.
 The `TELEGRAM_CHAT_ID` is a strict whitelist — any command from another chat is
 rejected.
 
+Once running, the bot presents a live mission panel, inline approve/skip/cancel
+buttons and a small command set (`/help`, `/status`, `/findings`, `/autopilot`,
+`/cancel`, `/report`, `/whoami`). See the full protocol in
+[telegram.md](telegram.md).
+
 ## Headless Daemon
 
 Run the agent without the terminal UI (useful with the Telegram gateway):

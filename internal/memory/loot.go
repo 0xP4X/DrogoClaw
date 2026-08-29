@@ -147,7 +147,7 @@ func (l *LootDB) InsertCredential(target, username, password, hash string) error
 		return fmt.Errorf("failed to encrypt hash: %w", err)
 	}
 
-	_, err = l.db.Exec(`INSERT INTO credentials (target, username, password_enc, hash_enc, discovered_at) VALUES (?, ?, ?, ?, ?)`, 
+	_, err = l.db.Exec(`INSERT INTO credentials (target, username, password_enc, hash_enc, discovered_at) VALUES (?, ?, ?, ?, ?)`,
 		target, username, encPassword, encHash, time.Now())
 	return err
 }
@@ -158,6 +158,137 @@ func (l *LootDB) InsertVulnerability(target, cve, description, severity string) 
 	defer l.mu.Unlock()
 	_, err := l.db.Exec(`INSERT INTO vulnerabilities (target, cve, description, severity, discovered_at) VALUES (?, ?, ?, ?, ?)`, target, cve, description, severity, time.Now())
 	return err
+}
+
+// FindingItem is one human-readable line from the findings ledger.
+type FindingItem struct {
+	Category string
+	Target   string
+	Detail   string
+	Severity string
+}
+
+// FindingsReport summarises the loot ledger: per-category totals plus the most
+// recent items (capped at limit per category). Credentials are decrypted so the
+// operator can review them; the report is only ever delivered to the whitelisted
+// chat or the local operator.
+type FindingsReport struct {
+	Ports           int
+	Credentials     int
+	Vulnerabilities int
+	Items           []FindingItem
+}
+
+// Findings reads the current findings ledger. Credential passwords/hashes are
+// AES-GCM decrypted before being returned.
+func (l *LootDB) Findings(limit int) (FindingsReport, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	var rep FindingsReport
+
+	if err := l.db.QueryRow(`SELECT COUNT(*) FROM ports`).Scan(&rep.Ports); err != nil {
+		return rep, err
+	}
+	if err := l.db.QueryRow(`SELECT COUNT(*) FROM credentials`).Scan(&rep.Credentials); err != nil {
+		return rep, err
+	}
+	if err := l.db.QueryRow(`SELECT COUNT(*) FROM vulnerabilities`).Scan(&rep.Vulnerabilities); err != nil {
+		return rep, err
+	}
+
+	rows, err := l.db.Query(`SELECT ip, port, service, version FROM ports ORDER BY discovered_at DESC LIMIT ?`, limit)
+	if err != nil {
+		return rep, err
+	}
+	for rows.Next() {
+		var ip, service, version string
+		var port int
+		if err := rows.Scan(&ip, &port, &service, &version); err != nil {
+			rows.Close()
+			return rep, err
+		}
+		detail := fmt.Sprintf("%s/%d %s", ip, port, service)
+		if version != "" {
+			detail += " " + version
+		}
+		rep.Items = append(rep.Items, FindingItem{Category: "port", Target: ip, Detail: detail})
+	}
+	rows.Close()
+
+	rows, err = l.db.Query(`SELECT target, cve, description, severity FROM vulnerabilities ORDER BY discovered_at DESC LIMIT ?`, limit)
+	if err != nil {
+		return rep, err
+	}
+	for rows.Next() {
+		var target, cve, desc, sev string
+		if err := rows.Scan(&target, &cve, &desc, &sev); err != nil {
+			rows.Close()
+			return rep, err
+		}
+		detail := cve
+		if desc != "" {
+			if detail != "" {
+				detail += " — " + desc
+			} else {
+				detail = desc
+			}
+		}
+		rep.Items = append(rep.Items, FindingItem{Category: "vuln", Target: target, Detail: detail, Severity: sev})
+	}
+	rows.Close()
+
+	rows, err = l.db.Query(`SELECT target, username, password_enc, hash_enc FROM credentials ORDER BY discovered_at DESC LIMIT ?`, limit)
+	if err != nil {
+		return rep, err
+	}
+	for rows.Next() {
+		var target, user, passEnc, hashEnc string
+		if err := rows.Scan(&target, &user, &passEnc, &hashEnc); err != nil {
+			rows.Close()
+			return rep, err
+		}
+		pass, _ := l.decryptData(passEnc)
+		hash, _ := l.decryptData(hashEnc)
+		detail := user
+		if pass != "" {
+			detail += " / " + pass
+		}
+		if detail == "" && hash != "" {
+			detail = "hash " + hash
+		}
+		rep.Items = append(rep.Items, FindingItem{Category: "cred", Target: target, Detail: detail})
+	}
+	rows.Close()
+
+	return rep, nil
+}
+
+func (l *LootDB) decryptData(ciphertext string) (string, error) {
+	if ciphertext == "" {
+		return "", nil
+	}
+	raw, err := base64.StdEncoding.DecodeString(ciphertext)
+	if err != nil {
+		return "", err
+	}
+	block, err := aes.NewCipher(l.key)
+	if err != nil {
+		return "", err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+	if len(raw) < gcm.NonceSize() {
+		return "", fmt.Errorf("ciphertext too short")
+	}
+	nonce, body := raw[:gcm.NonceSize()], raw[gcm.NonceSize():]
+	plain, err := gcm.Open(nil, nonce, body, nil)
+	if err != nil {
+		return "", err
+	}
+	return string(plain), nil
 }
 
 // Close gracefully closes the database.

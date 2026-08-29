@@ -148,7 +148,7 @@ func main() {
 	sysPrompt := agent.BuildSystemPrompt(graph, opsecMgr, "", sb.RuntimeLabel())
 	orch := agent.NewOrchestratorWithJournal(provider, tools, sysPrompt, sessionID, graph, memory.NewActionJournal(sessionID), cfg.GetMaxIterations())
 
-	tgGateway, err := gateway.NewTelegramGateway(cfg, orch, graph, opsecMgr)
+	tgGateway, err := gateway.NewTelegramGateway(cfg, orch, graph, opsecMgr, lootDb)
 	if err == nil && tgGateway != nil {
 		tgGateway.Start()
 	}

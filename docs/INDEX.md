@@ -65,6 +65,12 @@ The REST API (`internal/api/server.go`) is an optional local control-plane compo
 - **Authorization**: No RBAC — single-token authentication only
 - **Binding**: Loopback only unless explicitly configured otherwise
 
+### Telegram C2
+
+Control DrogonClaw from your phone via the whitelisted Telegram bot — live
+mission panel, approval buttons and operator commands. Full protocol, command
+reference and tips in [telegram.md](telegram.md).
+
 ### TUI Commands
 
 - `/health` — Run sandbox/toolkit diagnostics

@@ -49,12 +49,13 @@ type TelegramGateway struct {
 	orch     *agent.Orchestrator
 	graph    *memory.Graph
 	opsecMgr *opsec.Manager
+	loot     *memory.LootDB
 
 	mu      sync.Mutex
 	session *missionSession
 }
 
-func NewTelegramGateway(cfg *config.Manager, orch *agent.Orchestrator, graph *memory.Graph, opsecMgr *opsec.Manager) (*TelegramGateway, error) {
+func NewTelegramGateway(cfg *config.Manager, orch *agent.Orchestrator, graph *memory.Graph, opsecMgr *opsec.Manager, loot *memory.LootDB) (*TelegramGateway, error) {
 	token := cfg.GetString("TELEGRAM_TOKEN")
 	chatIDStr := cfg.GetString("TELEGRAM_CHAT_ID")
 
@@ -81,6 +82,7 @@ func NewTelegramGateway(cfg *config.Manager, orch *agent.Orchestrator, graph *me
 		orch:     orch,
 		graph:    graph,
 		opsecMgr: opsecMgr,
+		loot:     loot,
 	}
 
 	tg.setupHandlers()
@@ -99,6 +101,13 @@ func (tg *TelegramGateway) setupHandlers() {
 
 		text := c.Text()
 
+		// Slash commands always win, even while an approval is pending — the
+		// operator may need /status or /cancel at the exact moment the agent
+		// is asking for a go/no-go. Plain (non-slash) text is the answer.
+		if strings.HasPrefix(text, "/") {
+			return tg.handleCommand(c, text)
+		}
+
 		if core.GlobalHitL.HasPending() {
 			core.GlobalHitL.Resolve(text)
 			if s := tg.activeSession(); s != nil {
@@ -107,8 +116,8 @@ func (tg *TelegramGateway) setupHandlers() {
 			return c.Send("✅ Approval received. Resuming execution.")
 		}
 
-		if strings.HasPrefix(text, "/") {
-			return tg.handleCommand(c, text)
+		if s := tg.activeSession(); s != nil && !s.isFinished() {
+			return c.Send("⏳ A mission is already running — send /status to peek or /cancel to stop it.")
 		}
 
 		return tg.executeMission(c, text)
@@ -177,11 +186,20 @@ func (tg *TelegramGateway) handleCommand(c tele.Context, text string) error {
 	case "/status":
 		s := tg.activeSession()
 		if s == nil || s.isFinished() {
-			return c.Send("No mission is currently running.")
+			return c.Send(tg.dashboardHTML(), tele.ModeHTML)
 		}
 		body, _ := s.render()
 		_, err := tg.bot.Send(c.Chat(), body, tele.ModeHTML)
 		return err
+
+	case "/findings":
+		return tg.sendFindings(c)
+
+	case "/autopilot":
+		return tg.sendAutopilot(c, parts)
+
+	case "/whoami":
+		return c.Send(tg.whoamiHTML(), tele.ModeHTML)
 
 	case "/cancel":
 		s := tg.activeSession()
@@ -197,17 +215,87 @@ func (tg *TelegramGateway) handleCommand(c tele.Context, text string) error {
 			"",
 			"• <code>&lt;free text&gt;</code> — run a mission",
 			"• <code>/swarm &lt;mission&gt;</code> — parallel execution vectors",
-			"• <code>/report</code> — generate the pentest report",
-			"• <code>/status</code> — live snapshot of the running mission",
+			"• <code>/findings</code> — what the agent has collected so far",
+			"• <code>/autopilot [on|off]</code> — auto-accept low-risk approvals",
+			"• <code>/status</code> — live mission snapshot / daemon dashboard",
 			"• <code>/cancel</code> — abort the running mission",
+			"• <code>/report</code> — generate the pentest report",
+			"• <code>/whoami</code> — operator / agent identity",
 			"• <code>/help</code> — this list",
 			"",
-			"When the agent needs a go/no-go it shows buttons — tap <b>✓ Approve</b> or <b>✗ Skip</b>.",
+			"When the agent needs a go/no-go the mission panel turns into buttons — tap <b>✓ Approve</b> or <b>✗ Skip</b>, or answer with your own text.",
 		}, "\n"), tele.ModeHTML)
 
 	default:
 		return c.Send("Unknown command. Send /help for the supported commands.")
 	}
+}
+
+// sendFindings renders the loot ledger to the chat.
+func (tg *TelegramGateway) sendFindings(c tele.Context) error {
+	if tg.loot == nil {
+		return c.Send("No findings ledger available (Loot DB not initialised).")
+	}
+	rep, err := tg.loot.Findings(8)
+	if err != nil {
+		return c.Send("❌ Could not read the findings ledger: " + err.Error())
+	}
+	return c.Send(findingsHTML(rep), tele.ModeHTML)
+}
+
+// sendAutopilot reads or toggles the delegating "autopilot" mode. When enabled,
+// long-running low-risk tools no longer pause for approval.
+func (tg *TelegramGateway) sendAutopilot(c tele.Context, parts []string) error {
+	want, set := parseAutopilotArg(parts)
+	if set {
+		tg.orch.Autopilot = want
+	}
+	state := tg.orch.Autopilot
+	var hint string
+	if state {
+		hint = "Long-running low-risk tools auto-accept — the agent will not pause for ⏸ approvals."
+	} else {
+		hint = "The agent pauses and asks before long-running low-risk tools; you can ✓ Approve or ✗ Skip."
+	}
+	return c.Send(autopilotHTML(state, hint), tele.ModeHTML)
+}
+
+// sendWhoami renders the operator and agent identity from the intelligence
+// graph.
+func (tg *TelegramGateway) whoamiHTML() string {
+	var b strings.Builder
+	b.WriteString("<b>🐉 Operator & Agent</b>\n")
+	op, agentID := "—", "—"
+	if p := tg.graph.GetOperatorProfile(); p != nil && p.Name != "" {
+		op = p.Name
+	}
+	if p := tg.graph.GetAgentProfile(); p != nil && p.Name != "" {
+		agentID = p.Name
+	}
+	b.WriteString("👤 Operator: <code>" + htmlEscape(op) + "</code>\n")
+	b.WriteString("🤖 Agent:    <code>" + htmlEscape(agentID) + "</code>\n")
+	return b.String()
+}
+
+// dashboardHTML is the idle dashboard shown by /status when nothing is running:
+// session identity, graph size and the findings ledger totals.
+func (tg *TelegramGateway) dashboardHTML() string {
+	var b strings.Builder
+	b.WriteString("✅ <b>Standing by — no mission running.</b>\n")
+	b.WriteString("🧩 Session <code>" + htmlEscape(tg.orch.SessionID) + "</code>\n")
+	b.WriteString("🗺 " + fmt.Sprint(tg.graph.NodeCount()) + " nodes · " + fmt.Sprint(tg.graph.EdgeCount()) + " edges in the intelligence graph\n")
+	if tg.loot != nil {
+		if rep, err := tg.loot.Findings(1); err == nil {
+			b.WriteString("🔎 " + fmt.Sprint(rep.Ports) + " ports · " + fmt.Sprint(rep.Credentials) + " credentials · " + fmt.Sprint(rep.Vulnerabilities) + " vulnerabilities\n")
+		}
+	}
+	autopilot := "off"
+	if tg.orch.Autopilot {
+		autopilot = "on"
+	}
+	b.WriteString("⚡ Autopilot: " + autopilot + "\n\n")
+	b.WriteString("Send a mission, or /help for commands.")
+	return b.String()
 }
 
 func (tg *TelegramGateway) executeMission(c tele.Context, mission string) error {
@@ -394,14 +482,31 @@ func (tg *TelegramGateway) clockLoop(s *missionSession) {
 }
 
 func (tg *TelegramGateway) chunkSend(chat *tele.Chat, text string, parseMode string) {
+	for _, chunk := range chunkText(text, 4000) {
+		_, _ = tg.bot.Send(chat, chunk, parseMode)
+	}
+}
+
+// chunkText splits text into rune-aligned chunks of at most size runes so
+// multi-byte characters are never torn apart mid-sequence.
+func chunkText(text string, size int) []string {
 	text = strings.TrimLeft(text, "\n")
-	for len(text) > 4000 {
-		_, _ = tg.bot.Send(chat, text[:4000], parseMode)
-		text = text[4000:]
+	if text == "" {
+		return nil
 	}
-	if len(text) > 0 {
-		_, _ = tg.bot.Send(chat, text, parseMode)
+	if utf8.RuneCountInString(text) <= size {
+		return []string{text}
 	}
+	runes := []rune(text)
+	var chunks []string
+	for len(runes) > size {
+		chunks = append(chunks, string(runes[:size]))
+		runes = runes[size:]
+	}
+	if len(runes) > 0 {
+		chunks = append(chunks, string(runes))
+	}
+	return chunks
 }
 
 // missionSession is the live state behind the single mission panel message.
@@ -703,6 +808,7 @@ func (s *missionSession) approvalHTML() string {
 	}
 	b.WriteString("─────────────────────\n")
 	b.WriteString(footerLine(s))
+	b.WriteString("\n\nTap a button, or reply with your own text answer.")
 	return b.String()
 }
 
@@ -712,6 +818,61 @@ func footerLine(s *missionSession) string {
 		return "⏱ " + sinceStr
 	}
 	return "🔍 " + fmt.Sprint(s.signals) + " signals · 🛠 " + fmt.Sprint(s.tools) + " tools · ⏱ " + sinceStr
+}
+
+func findingsHTML(rep memory.FindingsReport) string {
+	var b strings.Builder
+	b.WriteString("🔎 <b>FINDINGS LEDGER</b>\n")
+	b.WriteString("🛰 " + fmt.Sprint(rep.Ports) + " ports · 🔑 " + fmt.Sprint(rep.Credentials) + " credentials · ⚠ " + fmt.Sprint(rep.Vulnerabilities) + " vulnerabilities\n")
+	if len(rep.Items) == 0 {
+		b.WriteString("\n<i>Nothing collected yet — send a mission.</i>")
+		return b.String()
+	}
+	b.WriteString("─────────────────\n")
+	for _, it := range rep.Items {
+		switch it.Category {
+		case "port":
+			b.WriteString("🛰 " + htmlEscape(it.Detail) + "\n")
+		case "vuln":
+			sev := it.Severity
+			sevText := strings.ToUpper(sev)
+			switch {
+			case strings.Contains(sevText, "CRITI") || strings.Contains(sevText, "HIGH"):
+				b.WriteString("⚠ " + htmlEscape(it.Target) + " — <b>HIGH</b> " + htmlEscape(it.Detail) + "\n")
+			default:
+				b.WriteString("⚠ " + htmlEscape(it.Target) + " — " + htmlEscape(it.Detail) + "\n")
+			}
+		case "cred":
+			b.WriteString("🔑 " + htmlEscape(it.Target) + " — " + htmlEscape(it.Detail) + "\n")
+		}
+	}
+	return b.String()
+}
+
+func autopilotHTML(on bool, hint string) string {
+	state := "off"
+	glyph := "◻"
+	if on {
+		state = "on"
+		glyph = "◼"
+	}
+	return "⚡ <b>Autopilot: " + state + "</b> " + glyph + "\n<i>" + htmlEscape(hint) + "</i>\n\n" +
+		"Use <code>/autopilot on</code> or <code>/autopilot off</code> to change it."
+}
+
+// parseAutopilotArg interprets the optional argument of /autopilot. Returns the
+// desired state and whether an explicit change was requested.
+func parseAutopilotArg(parts []string) (want, set bool) {
+	if len(parts) < 2 {
+		return false, false
+	}
+	switch strings.ToLower(strings.TrimSpace(parts[1])) {
+	case "on", "enable", "yes", "1", "true":
+		return true, true
+	case "off", "disable", "no", "0", "false":
+		return false, true
+	}
+	return false, false
 }
 
 func cancelMarkup() *tele.ReplyMarkup {
