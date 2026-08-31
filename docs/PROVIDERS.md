@@ -392,14 +392,14 @@ For proxies or custom endpoints:
 
 ### Rate Limiting
 
-Configure rate limits per provider:
+Evasive rate-limiting is controlled via:
 
 ```bash
-> /stealth
+> /set EVASION high      # high / medium / low  (alias: /set OPSEC high)
+> /config set EVASION medium
 
-# Enables adaptive rate limiting
-# Respects 429/503 responses
-# Adds delay between requests
+# Adaptive throttling respects 429/503 + Retry-After
+# and backs off automatically. Toggle with /set, not a bare command.
 ```
 
 ---

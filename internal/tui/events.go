@@ -15,10 +15,6 @@ type WelcomeBannerMsg struct {
 	Show bool
 }
 
-type HealthResultMsg struct {
-	Output string
-}
-
 func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 	var cmds []tea.Cmd
 

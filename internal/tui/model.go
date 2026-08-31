@@ -199,8 +199,9 @@ func (m Model) Init() tea.Cmd {
 	var cmds []tea.Cmd
 	cmds = append(cmds, m.spinner.Tick, textarea.Blink, tea.SetWindowTitle("DrogonClaw"))
 
-	// Show welcome banner if config is missing
-	if m.cfg.GetProvider() == "" {
+	// Show welcome banner if no provider has been configured yet.
+	// GetProvider() defaults to "openrouter" so we must check the raw key.
+	if m.cfg.GetString("AI_PROVIDER") == "" && m.cfg.GetString("OPENROUTER_API_KEY") == "" && m.cfg.GetString("OPENAI_API_KEY") == "" {
 		cmds = append(cmds, func() tea.Msg {
 			return WelcomeBannerMsg{Show: true}
 		})
@@ -228,15 +229,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			sb.WriteString(SectionRuleStyle.Render("  " + strings.Repeat("─", 60)) + "\n\n")
 			m.appendLine(sb.String())
 		}
-		return m, nil
-
-	case HealthResultMsg:
-		if msg.Output != "" {
-			m.appendLine(msg.Output)
-		}
-		m.executing = false
-		m.phase = "idle"
-		m.phaseDetail = ""
 		return m, nil
 
 	case tea.WindowSizeMsg:

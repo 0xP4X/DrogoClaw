@@ -73,15 +73,29 @@ reference and tips in [telegram.md](telegram.md).
 
 ### TUI Commands
 
-- `/health` — Run sandbox/toolkit diagnostics
-- `/status` — Print runtime state and memory graph counts
-- `/skills` — Show loaded modules by category
-- `/skills <term>` — Search modules by name or description
+All commands derive from one registry — `/help` is always the authority.
+
+- `/workflow [name|off]` (`/mode` alias) — Select attack workflow methodology
+- `/analyze <target>` — Classify target and determine attack path
+- `/skills [query]` — List/search available execution modules
+- `/profile <target>` — Build passive intelligence profile
 - `/ctf <path>` — Offline CTF triage with flag detection
-- `/router [auto|local|9router|off|status]` — Configure intelligent model routing
-- `/providers` — Show provider health and routing status
+- `/report` — Generate structured pentest report
+- `/swarm <objective>` — Dispatch parallel sub-agent swarm
+- `/health` — Environment diagnostics (Docker, dependencies, sandbox)
+- `/status` — Session metrics: runtime, tools, findings, phase
+- `/cost` — Token usage & cost with routing savings
+- `/timeline` — Execution log with durations & results
+- `/findings` — Detection summary (vulns, creds, flags)
+- `/config [set KEY VALUE]` / `/set <KEY> <VALUE>` — View or modify settings
+- `/router [auto|local|9router|off|status]` — Intelligent routing
+- `/providers` — Provider health & routing dashboard
 - `/theme [name]` — Switch color theme (dark/light/dracula/nord/gruvbox)
-- `/auto` — Toggle autopilot mode
+- `/set EXECUTION_MODE [manual|autonomous]` — Runtime: autonomous execution
+- `/set EVASION [high|medium|low]` — Rate-limiting & evasion
+- `/set ISOLATION [on|off]` — Docker sandbox isolation
+- `/setup` `/new` `/resume` `/copy` `/clear` `/exit` — Session lifecycle
+- `/sidebar` `/details` — Display toggles (Ctrl+B / Ctrl+T)
 - `/help` — Full command reference
 
 ## Keyboard Shortcuts

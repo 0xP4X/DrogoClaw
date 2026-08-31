@@ -89,56 +89,61 @@ Press `Ctrl+X` then one of these keys within 2 seconds:
 
 ## 📋 Slash Commands
 
-### Operations
+Commands are grouped the same way `/help` renders them — one registry, zero drift.
+
+### Operations — Active Tasks
 
 | Command | Arguments | Description |
 |---------|-----------|-------------|
-| `/mode` | `[name\|off]` | Select attack workflow methodology |
+| `/workflow` `/mode` | `[name\|off]` | Select attack workflow methodology |
 | `/analyze` | `<target>` | Classify target and determine attack path |
 | `/skills` | `[query]` | List/search available execution modules |
-| `/health` | - | Verify runtime environment |
 | `/profile` | `<target>` | Build passive intelligence profile |
 | `/ctf` | `<path>` | Run local CTF artifact triage |
 | `/report` | - | Generate structured pentest report |
 | `/swarm` | `<objective>` | Dispatch parallel sub-agent swarm |
-| `/queue` | - | Show prompts queued behind running task |
-| `/benchmarks` | - | Show benchmark statistics |
-| `/timeline` | - | Show execution timeline |
 
-### Controls
+### Controls — Settings
 
 | Command | Arguments | Description |
 |---------|-----------|-------------|
-| `/router` | `[auto\|local\|9router\|off]` | Configure intelligent routing |
-| `/stealth` | - | Toggle evasive rate-limiting |
-| `/auto` | - | Toggle autonomous execution mode |
-| `/sandbox` | - | Toggle container sandbox execution |
-| `/persona` | `<directive>` | Inject custom agent persona |
+| `/config` | `[set KEY VALUE]` | View or modify settings (provider, model, routing, theme, execution) |
+| `/set` | `<KEY> <VALUE>` | Quickly set a config value (alias: `/config set`) |
+| `/router` | `[auto\|local\|9router\|off\|status]` | Configure intelligent routing |
+| `/providers` | - | Provider health & routing status dashboard |
+| `/theme` | `[name]` | Switch color theme (dark/light/dracula/nord/gruvbox) |
 
-### Session
+Runtime controls via `/set` / `/config set`:
+
+| Setting | Values | Description |
+|---------|--------|-------------|
+| `EXECUTION_MODE` `AUTOPILOT` | `manual` / `autonomous` | Enable autonomous execution (alias: `AUTOPILOT on/off`) |
+| `EVASION` `OPSEC` | `high` / `medium` / `low` | Rate-limiting & evasion level |
+| `ISOLATION` `SANDBOX` | `on` / `off` | Docker sandbox isolation |
+
+### Session — Metrics & Lifecycle
 
 | Command | Arguments | Description |
 |---------|-----------|-------------|
 | `/help` | - | Show complete command reference |
-| `/status` | - | Show session and workspace details |
-| `/config` | - | Show stored configuration |
-| `/cost` | - | Show API token usage and cost |
-| `/sections` | - | List all saved session sections |
-| `/section` | `<id>` | Switch to previous session |
-| `/setup` | - | Run configuration wizard |
-| `/new` | - | Clear session memory |
-| `/resume` | - | Resume interrupted execution |
-| `/copy` | - | Copy transcript to clipboard/file |
+| `/status` | - | Session metrics: runtime, tools run, findings, current phase |
+| `/cost` | - | Token usage breakdown: input/output tokens, cost, routing savings |
+| `/health` | - | Environment diagnostics: Docker, dependencies, sandbox readiness |
+| `/timeline` | - | Execution log: when each tool ran, duration, results summary |
+| `/findings` | - | Detection summary: vulnerabilities, credentials, flags |
+| `/setup` | - | Run interactive configuration wizard |
+| `/new` | - | Clear session memory (confirms with `yes/no`) |
+| `/resume` | - | Resume interrupted execution from last checkpoint |
+| `/copy` | - | Export transcript to clipboard & file |
 | `/clear` | - | Clear visible terminal output |
-| `/exit` | - | Terminate session gracefully |
+| `/exit` `/quit` | - | Terminate session gracefully |
 
-### UI
+### UI — Display
 
 | Command | Arguments | Description |
 |---------|-----------|-------------|
-| `/theme` | `[dark\|light\|dracula\|nord\|gruvbox]` | Switch color theme (persisted) |
-| `/sidebar` | - | Toggle sidebar panel |
-| `/details` | - | Toggle tool detail panel |
+| `/sidebar` | - | Toggle sidebar panel (Ctrl+B) |
+| `/details` | - | Toggle tool detail panel (Ctrl+T) |
 
 ---
 
@@ -339,10 +344,12 @@ test https://example.com for vulnerabilities
 **Skill Learning:**
 After successful exploits, DrogonClaw automatically saves techniques as reusable skills. View them with `/skills`.
 
-**Custom Personas:**
+**Custom Execution Controls:**
 ```bash
-# Inject specialized behavior
-/persona "Focus on Active Directory vulnerabilities"
+# Runtime controls are now unified under /set and /config set
+/set EXECUTION_MODE autonomous   # enable autonomous execution
+/set EVASION high                # high/medium/low evasion
+/set ISOLATION on                # Docker sandbox on/off
 ```
 
 ---

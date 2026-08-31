@@ -205,16 +205,18 @@ For detailed architecture documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
 | `Ctrl+D` | Show cost |
 | `Ctrl+E` | Open pager |
 | `Ctrl+Y` | Copy output |
-| `Ctrl+T` | New session |
+| `Ctrl+T` | Toggle tool detail panel |
 | `Ctrl+C` | Abort execution |
 | `Ctrl+X` then `b/n/l/m/t/e/x/q` | Leader key commands |
 
 ### Slash Commands
 
-**Operations** (Active Tasks)
+All commands are listed the same way `/help` renders them — one registry, zero drift.
+
+**Operations — Active Tasks**
 | Command | Description |
 | --- | --- |
-| `/workflow <name>` | Select attack workflow (recon/exploit/ctf/web/api/mail) |
+| `/workflow <name>` (`/mode` alias) | Select attack workflow (recon/exploit/ctf/web/api/mail) |
 | `/analyze <target>` | Classify target and suggest attack path |
 | `/profile <target>` | Build passive intelligence profile |
 | `/ctf <path>` | Solve local CTF challenge |
@@ -222,43 +224,39 @@ For detailed architecture documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
 | `/swarm <objective>` | Dispatch parallel sub-agent swarm |
 | `/skills [query]` | List/search available modules |
 
-**Intelligence** (Metrics & Status)
-| Command | Description |
-| --- | --- |
-| `/status` | Session statistics and metrics |
-| `/cost` | Token usage and cost (with routing savings) |
-| `/health` | Verify environment and dependencies |
-| `/timeline` | Execution timeline of tools/findings |
-| `/findings` | Summarize detected findings |
-
-**Config** (Settings)
+**Controls — Settings**
 | Command | Description |
 | --- | --- |
 | `/config [set KEY VALUE]` | View or modify settings |
-| `/set KEY VALUE` | Quickly set a config value (alias) |
-| `/router [auto\|local\|9router\|off]` | Configure intelligent routing |
-| `/providers` | Provider health dashboard |
-| `/theme [name]` | Switch color theme |
+| `/set <KEY> <VALUE>` | Quickly set a config value (alias: `/config set`) |
+| `/router [auto\|local\|9router\|off\|status]` | Configure intelligent routing |
+| `/providers` | Provider health & routing status dashboard |
+| `/theme [name]` | Switch color theme (dark/light/dracula/nord/gruvbox) |
+| `/set EXECUTION_MODE [manual\|autonomous]` | Runtime: `AUTOPILOT` alias — autonomous execution |
+| `/set EVASION [high\|medium\|low]` | Runtime: `OPSEC` alias — rate-limiting & evasion |
+| `/set ISOLATION [on\|off]` | Runtime: `SANDBOX` alias — Docker isolation |
 
-**Execution** (Runtime Control)
-| Command | Description |
-| --- | --- |
-| `/set EXECUTION_MODE [manual\|autonomous]` | Enable/disable autonomous mode |
-| `/set EVASION [high\|medium\|low]` | Adjust rate limiting and evasion |
-| `/set ISOLATION [on\|off]` | Toggle Docker sandbox |
-
-**Session** (Lifecycle & UI)
+**Session — Metrics & Lifecycle**
 | Command | Description |
 | --- | --- |
 | `/help` | Command reference |
+| `/status` | Session metrics: runtime, tools run, findings, phase |
+| `/cost` | Token usage breakdown with routing savings |
+| `/health` | Environment diagnostics: Docker, dependencies, sandbox |
+| `/timeline` | Execution log: when each tool ran, duration, results |
+| `/findings` | Detection summary: vulns, creds, flags, info |
 | `/setup` | Configuration wizard |
-| `/new` | Start fresh session |
-| `/resume` | Resume interrupted execution |
-| `/copy` | Export transcript |
-| `/clear` | Clear output |
-| `/exit` | Shutdown gracefully |
-| `/sidebar` | Toggle sidebar (Ctrl+B) |
-| `/details` | Toggle tool details (Ctrl+T) |
+| `/new` | Clear session memory (confirms `yes`/`no`) |
+| `/resume` | Resume interrupted execution from last checkpoint |
+| `/copy` | Export transcript to clipboard & file |
+| `/clear` | Clear visible terminal output |
+| `/exit` `/quit` | Terminate session gracefully |
+
+**UI — Display**
+| Command | Description |
+| --- | --- |
+| `/sidebar` | Toggle sidebar panel (Ctrl+B) |
+| `/details` | Toggle tool detail panel (Ctrl+T) |
 
 ---
 

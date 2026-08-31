@@ -276,15 +276,4 @@ func (m *Manager) SetTheme(name string) {
 	m.Set("THEME", name)
 }
 
-func (m *Manager) SetAutopilot(enabled bool) {
-	val := "false"
-	if enabled {
-		val = "true"
-	}
-	m.Set("AUTOPILOT", val)
-}
-
-func (m *Manager) IsAutopilot() bool {
-	s := strings.ToLower(m.GetString("AUTOPILOT"))
-	return s == "true" || s == "on"
-}
+func (m *Manager) IsAutopilot() bool { return m.GetAutopilot() }

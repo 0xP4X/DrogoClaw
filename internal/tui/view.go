@@ -335,7 +335,6 @@ func (m Model) renderInputLine() string {
 		}
 		lines = append(lines, prefix+cmdStr+HintDescStyle.Render("  "+truncateVisible(h.desc, max(12, m.width-20))))
 	}
-	}
 
 	if len(m.promptQueue) > 0 {
 		qItems := make([]string, 0, len(m.promptQueue))
@@ -1050,10 +1049,10 @@ func truncate(s string, n int) string {
 }
 
 var helpCategoryTitles = map[string]string{
-	catOperations: "OPERATIONS",
-	catControls:   "CONTROLS",
-	catSession:    "SESSION",
-	catUI:         "UI",
+	catOperations: "OPERATIONS  —  Active Tasks",
+	catControls:   "CONTROLS  —  Settings",
+	catSession:    "SESSION  —  Metrics & Lifecycle",
+	catUI:         "UI  —  Display",
 }
 
 var helpCategoryOrder = []string{catOperations, catControls, catSession, catUI}
@@ -1122,7 +1121,7 @@ func renderHelp() string {
 		sb.WriteString("    " + HintCmdStyle.Render(k.cmd) + pad + HintDescStyle.Render(k.desc) + "\n")
 	}
 	sb.WriteString("\n")
-	sb.WriteString("  " + HintDescStyle.Render("Tip: type /<command> and press Tab to accept, or Ctrl+P for the palette. /commands is an alias for /help.") + "\n\n")
+	sb.WriteString("  " + HintDescStyle.Render("Tip: type /<command> and press Tab to accept, or Ctrl+P for the palette.") + "\n\n")
 
 	return sb.String()
 }

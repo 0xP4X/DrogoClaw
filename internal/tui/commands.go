@@ -136,28 +136,6 @@ func operationsCommands() []slashCommand {
 			},
 		},
 		{
-			names:    []string{"/health"},
-			category: catOperations,
-			desc:     "Verify runtime environment and dependencies",
-			run: func(m *Model, _ string) (*Model, tea.Cmd) {
-				m.appendLine(SpinnerStyle.Render("  [*] Running diagnostic checks..."))
-				m.phase = "verifying"
-				m.phaseDetail = "Diagnostics"
-				m.executing = true
-				m.execStartTime = time.Now()
-				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-				m.cancelFn = cancel
-				m.activeEvents = nil
-				healthWidth := m.viewport.Width
-				if healthWidth <= 0 {
-					healthWidth = m.width - 4
-				}
-				return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
-					return HealthResultMsg{Output: health.RunDiagnosticsWithWidth(ctx, m.sandbox, healthWidth)}
-				})
-			},
-		},
-		{
 			names:    []string{"/profile"},
 			category: catOperations,
 			desc:     "Build a passive intelligence profile",
@@ -263,15 +241,6 @@ func operationsCommands() []slashCommand {
 				return m2, cmd
 			},
 		},
-		{
-			names:    []string{"/timeline"},
-			category: catOperations,
-			desc:     "Show the execution timeline of tools and findings",
-			run: func(m *Model, _ string) (*Model, tea.Cmd) {
-				m.appendLine(m.renderTimeline())
-				return m, nil
-			},
-		},
 	}
 }
 
@@ -303,12 +272,13 @@ func controlsCommands() []slashCommand {
 		{
 			names:    []string{"/set"},
 			category: catControls,
-			desc:     "Quickly set a config value (alias: /config set KEY VALUE)",
+			desc:     "Quickly set a config value (alias: /config set)",
 			args:     "<KEY> <VALUE>",
 			run: func(m *Model, args string) (*Model, tea.Cmd) {
 				parts := strings.SplitN(strings.TrimSpace(args), " ", 2)
 				if len(parts) != 2 {
 					m.appendLine(ErrorStyle.Render("  [✗] Usage: /set KEY VALUE"))
+					m.appendLine(HintDescStyle.Render("      Example: /set EXECUTION_MODE autonomous"))
 					return m, nil
 				}
 				return m.handleConfigSet(parts[0], parts[1])
@@ -407,7 +377,7 @@ func sessionCommands() []slashCommand {
 		{
 			names:    []string{"/status"},
 			category: catSession,
-			desc:     "Show session statistics and execution metrics",
+			desc:     "Session metrics: runtime, tools run, findings count, current phase",
 			run: func(m *Model, _ string) (*Model, tea.Cmd) {
 				for _, line := range strings.Split(m.renderStatusReport(), "\n") {
 					m.appendLine(line)
@@ -418,7 +388,7 @@ func sessionCommands() []slashCommand {
 		{
 			names:    []string{"/cost"},
 			category: catSession,
-			desc:     "Show API token usage and estimated cost (with routing savings)",
+			desc:     "Token usage breakdown: input/output tokens, cost, routing savings",
 			run: func(m *Model, _ string) (*Model, tea.Cmd) {
 				if m.tracker == nil {
 					m.appendLine(WarningStyle.Render("  [!] No token tracker active."))
@@ -431,7 +401,7 @@ func sessionCommands() []slashCommand {
 		{
 			names:    []string{"/health"},
 			category: catSession,
-			desc:     "Verify runtime environment and dependencies",
+			desc:     "Environment diagnostics: Docker, dependencies, sandbox readiness",
 			run: func(m *Model, _ string) (*Model, tea.Cmd) {
 				m.appendLine(SpinnerStyle.Render("  [*] Running diagnostic checks..."))
 				m.phase = "verifying"
@@ -453,7 +423,7 @@ func sessionCommands() []slashCommand {
 		{
 			names:    []string{"/timeline"},
 			category: catSession,
-			desc:     "Show execution timeline of tools and findings",
+			desc:     "Execution log: when each tool ran, duration, results summary",
 			run: func(m *Model, _ string) (*Model, tea.Cmd) {
 				m.appendLine(m.renderTimeline())
 				return m, nil
@@ -462,7 +432,7 @@ func sessionCommands() []slashCommand {
 		{
 			names:    []string{"/findings"},
 			category: catSession,
-			desc:     "Summarize all detected findings (vulnerabilities, credentials, flags)",
+			desc:     "Detection summary: vulnerabilities, credentials, flags, interesting info",
 			run: func(m *Model, _ string) (*Model, tea.Cmd) {
 				return m.handleFindingsSummary()
 			},
@@ -491,15 +461,17 @@ func sessionCommands() []slashCommand {
 		{
 			names:    []string{"/resume"},
 			category: catSession,
-			desc:     "Resume interrupted execution from checkpoint",
+			desc:     "Resume interrupted execution from last checkpoint",
 			run: func(m *Model, _ string) (*Model, tea.Cmd) {
 				if m.recovery == nil {
-					m.appendLine(WarningStyle.Render("  [RECOVERY] No interrupted mission is available."))
+					m.appendLine(WarningStyle.Render("  [!] No interrupted mission available."))
 					return m, nil
 				}
+				m.appendLine(InfoStyle.Render(fmt.Sprintf("  [⟳] Resuming: %s", m.recovery.Objective)))
+				m.appendLine(HintDescStyle.Render(fmt.Sprintf("      Last checkpoint: %v", m.recovery.UpdatedAt)))
 				m.lastObjective = m.recovery.Objective
 				m2, ctx, events, cmd := m.beginTask(120*time.Minute, "recovering", "Restoring last durable checkpoint", 32)
-				m.appendLine(SpinnerStyle.Render("  [RECOVERY] Restoring context. Interrupted tool will be verified before retry."))
+				m.appendLine(SpinnerStyle.Render("  [*] Restoring context. Interrupted tool will be verified before retry."))
 				m.recovery = nil
 				orch := m.orch
 				go func() { _ = orch.Resume(ctx, events) }()
