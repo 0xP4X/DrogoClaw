@@ -160,6 +160,10 @@ func New(
 	// Initialize session logger
 	sessionLog, _ := logging.NewSessionLogger(sessionID)
 
+	// Resolve theme from config (defaults to dark) and apply globally so
+	// all lipgloss styles match the saved preference on first frame.
+	initialTheme := GetTheme(cfg.GetTheme())
+	ApplyTheme(initialTheme)
 	m := &Model{
 		viewport:       vp,
 		input:          ta,
@@ -180,7 +184,7 @@ func New(
 		sessionLog:     sessionLog,
 		lastStreamTime: time.Now(),
 		// New redesign state
-		theme: DefaultTheme,
+		theme: initialTheme,
 		leader: LeaderState{
 			Timeout: 2 * time.Second,
 		},
@@ -192,11 +196,17 @@ func New(
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(
-		m.spinner.Tick,
-		textarea.Blink,
-		tea.SetWindowTitle("DrogonClaw"),
-	)
+	var cmds []tea.Cmd
+	cmds = append(cmds, m.spinner.Tick, textarea.Blink, tea.SetWindowTitle("DrogonClaw"))
+
+	// Show welcome banner if config is missing
+	if m.cfg.GetProvider() == "" {
+		cmds = append(cmds, func() tea.Msg {
+			return WelcomeBannerMsg{Show: true}
+		})
+	}
+
+	return tea.Batch(cmds...)
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -204,12 +214,39 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 
+	case WelcomeBannerMsg:
+		if msg.Show {
+			var sb strings.Builder
+			sb.WriteString("\n")
+			sb.WriteString(SectionHeaderStyle.Render("  ⚡ WELCOME TO DROGONCLAW") + "\n")
+			sb.WriteString(SectionRuleStyle.Render("  " + strings.Repeat("─", 60)) + "\n\n")
+			sb.WriteString(HintDescStyle.Render("  Configuration required. Run /setup to get started:") + "\n\n")
+			sb.WriteString(InfoStyle.Render("  /setup        Launch interactive configuration wizard") + "\n")
+			sb.WriteString(InfoStyle.Render("  /help         Show all available commands") + "\n")
+			sb.WriteString(InfoStyle.Render("  /config       View current settings") + "\n\n")
+			sb.WriteString(WarningStyle.Render("  Tip: You can use DrogonClaw immediately with /setup") + "\n")
+			sb.WriteString(SectionRuleStyle.Render("  " + strings.Repeat("─", 60)) + "\n\n")
+			m.appendLine(sb.String())
+		}
+		return m, nil
+
+	case HealthResultMsg:
+		if msg.Output != "" {
+			m.appendLine(msg.Output)
+		}
+		m.executing = false
+		m.phase = "idle"
+		m.phaseDetail = ""
+		return m, nil
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		m.input.SetWidth(max(8, msg.Width-InputPaneStyle.GetHorizontalFrameSize()-8))
 		if msg.Width < sidebarMinWidth+20 {
 			m.showSidebar = false
+		} else {
+			m.showSidebar = true
 		}
 		m.layout = calculateLayoutWithSidebar(m.width, m.height, m.showSidebar)
 		m.updateViewportContent()
@@ -733,18 +770,12 @@ func summarizeResult(result string, limit int) string {
 }
 
 func (m Model) confirmationAccepted(answer string) bool {
-	return answer == m.confirmationPhrase()
+	lower := strings.ToLower(strings.TrimSpace(answer))
+	return lower == "yes" || lower == "y" || lower == "ok"
 }
 
 func (m Model) confirmationPhrase() string {
-	switch m.pendingConfirm {
-	case "new":
-		return "CLEAR SESSION"
-	case "sandbox":
-		return "TOGGLE SANDBOX"
-	default:
-		return "CONFIRM"
-	}
+	return "(yes/no)"
 }
 
 func (m Model) runtimeLabel() string {

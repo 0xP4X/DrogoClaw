@@ -78,6 +78,9 @@ reference and tips in [telegram.md](telegram.md).
 - `/skills` — Show loaded modules by category
 - `/skills <term>` — Search modules by name or description
 - `/ctf <path>` — Offline CTF triage with flag detection
+- `/router [auto|local|9router|off|status]` — Configure intelligent model routing
+- `/providers` — Show provider health and routing status
+- `/theme [name]` — Switch color theme (dark/light/dracula/nord/gruvbox)
 - `/auto` — Toggle autopilot mode
 - `/help` — Full command reference
 

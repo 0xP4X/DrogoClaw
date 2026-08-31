@@ -63,7 +63,9 @@ func (m *Manager) Reload() {
 
 func (m *Manager) save() {
 	home, _ := os.UserHomeDir()
-	_ = m.v.WriteConfigAs(filepath.Join(home, ".drogonclaw", "config.json"))
+	path := filepath.Join(home, ".drogonclaw", "config.json")
+	_ = m.v.WriteConfigAs(path)
+	_ = os.Chmod(path, 0600)
 }
 
 func (m *Manager) GetProvider() string {
@@ -75,6 +77,17 @@ func (m *Manager) GetProvider() string {
 		p = "openrouter"
 	}
 	return strings.ToLower(p)
+}
+
+func (m *Manager) GetRouterMode() string {
+	mode := m.GetString("ROUTER_MODE")
+	if mode == "" {
+		mode = os.Getenv("ROUTER_MODE")
+	}
+	if mode == "" {
+		mode = "off" // Routing disabled by default
+	}
+	return strings.ToLower(mode)
 }
 
 func (m *Manager) GetModel() string {
@@ -127,24 +140,36 @@ func (m *Manager) GetAPIKey() string {
 		return firstNonEmpty(m.GetString("GOOGLE_API_KEY"), os.Getenv("GOOGLE_API_KEY"))
 	case "ollama":
 		return "ollama"
+	case "9router":
+		return firstNonEmpty(m.GetString("NINEROUTER_API_KEY"), os.Getenv("NINEROUTER_API_KEY"))
 	default: // openrouter
 		return firstNonEmpty(m.GetString("OPENROUTER_API_KEY"), os.Getenv("OPENROUTER_API_KEY"))
 	}
+}
+
+func (m *Manager) GetNineRouterAPIKey() string {
+	return firstNonEmpty(m.GetString("NINEROUTER_API_KEY"), os.Getenv("NINEROUTER_API_KEY"))
 }
 
 func (m *Manager) GetBaseURL() string {
 	switch m.GetProvider() {
 	case "openrouter":
 		return "https://openrouter.ai/api/v1"
+	case "openai":
+		return "https://api.openai.com/v1"
 	case "nvidia":
 		return "https://integrate.api.nvidia.com/v1"
 	case "ollama":
 		base := firstNonEmpty(m.GetString("OLLAMA_BASE_URL"), os.Getenv("OLLAMA_BASE_URL"), "http://localhost:11434")
-		return strings.TrimRight(base, "/") + "/v1"
+		base = strings.TrimRight(base, "/")
+		base = strings.TrimSuffix(base, "/v1")
+		return base + "/v1"
 	case "gemini":
 		return "https://generativelanguage.googleapis.com/v1beta/openai/"
+	case "9router":
+		return "https://api.9router.ai/v1"
 	default:
-		return "https://api.openai.com/v1"
+		return "https://openrouter.ai/api/v1"
 	}
 }
 
@@ -237,4 +262,29 @@ func (m *Manager) SetVerified(verified bool) {
 	} else {
 		m.Set("DROGONCLAW_VERIFIED", "false")
 	}
+}
+
+func (m *Manager) GetTheme() string {
+	t := m.GetString("THEME")
+	if t == "" {
+		return "dark"
+	}
+	return t
+}
+
+func (m *Manager) SetTheme(name string) {
+	m.Set("THEME", name)
+}
+
+func (m *Manager) SetAutopilot(enabled bool) {
+	val := "false"
+	if enabled {
+		val = "true"
+	}
+	m.Set("AUTOPILOT", val)
+}
+
+func (m *Manager) IsAutopilot() bool {
+	s := strings.ToLower(m.GetString("AUTOPILOT"))
+	return s == "true" || s == "on"
 }

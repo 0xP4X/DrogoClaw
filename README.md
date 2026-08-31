@@ -132,6 +132,7 @@ Configuration stored in `~/.drogonclaw/config.json` (owner read/write only).
 | OpenAI | `openai` | Direct API (`gpt-4o`, `gpt-4o-mini`) |
 | Google Gemini | `gemini` | Enterprise reasoning (`gemini-2.5-pro`, `gemini-2.5-flash`) |
 | Ollama | `ollama` | Offline runtime; set `OLLAMA_BASE_URL` |
+| 9Router.ai | `9router` | Intelligent routing with cost optimization ([docs/ROUTING.md](docs/ROUTING.md)) |
 
 ---
 
@@ -210,28 +211,54 @@ For detailed architecture documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ### Slash Commands
 
+**Operations** (Active Tasks)
 | Command | Description |
 | --- | --- |
-| `/setup` | Launch configuration wizard |
-| `/skills` | Show loaded modules |
-| `/skills <term>` | Search modules |
-| `/status` | Runtime state + memory graph |
-| `/health` | Sandbox/toolkit diagnostics |
-| `/ctf <path>` | Offline CTF triage |
-| `/profile <target>` | Passive target profiling |
-| `/auto` | Toggle autopilot |
-| `/persona` | Switch agent persona |
-| `/stealth` | Adjust OPSEC posture |
-| `/mode` | Switch operational mode |
-| `/report` | Generate engagement report |
-| `/swarm` | Manage agent swarm |
-| `/analyze <path>` | Analyze artifact |
-| `/sandbox` | Inspect sandbox runtime |
-| `/queue` | Show pending tasks |
-| `/sidebar` | Toggle sidebar |
-| `/details` | Show last tool details |
-| `/copy` | Copy transcript to clipboard |
-| `/help` | Full command reference |
+| `/workflow <name>` | Select attack workflow (recon/exploit/ctf/web/api/mail) |
+| `/analyze <target>` | Classify target and suggest attack path |
+| `/profile <target>` | Build passive intelligence profile |
+| `/ctf <path>` | Solve local CTF challenge |
+| `/report` | Generate penetration test report |
+| `/swarm <objective>` | Dispatch parallel sub-agent swarm |
+| `/skills [query]` | List/search available modules |
+
+**Intelligence** (Metrics & Status)
+| Command | Description |
+| --- | --- |
+| `/status` | Session statistics and metrics |
+| `/cost` | Token usage and cost (with routing savings) |
+| `/health` | Verify environment and dependencies |
+| `/timeline` | Execution timeline of tools/findings |
+| `/findings` | Summarize detected findings |
+
+**Config** (Settings)
+| Command | Description |
+| --- | --- |
+| `/config [set KEY VALUE]` | View or modify settings |
+| `/set KEY VALUE` | Quickly set a config value (alias) |
+| `/router [auto\|local\|9router\|off]` | Configure intelligent routing |
+| `/providers` | Provider health dashboard |
+| `/theme [name]` | Switch color theme |
+
+**Execution** (Runtime Control)
+| Command | Description |
+| --- | --- |
+| `/set EXECUTION_MODE [manual\|autonomous]` | Enable/disable autonomous mode |
+| `/set EVASION [high\|medium\|low]` | Adjust rate limiting and evasion |
+| `/set ISOLATION [on\|off]` | Toggle Docker sandbox |
+
+**Session** (Lifecycle & UI)
+| Command | Description |
+| --- | --- |
+| `/help` | Command reference |
+| `/setup` | Configuration wizard |
+| `/new` | Start fresh session |
+| `/resume` | Resume interrupted execution |
+| `/copy` | Export transcript |
+| `/clear` | Clear output |
+| `/exit` | Shutdown gracefully |
+| `/sidebar` | Toggle sidebar (Ctrl+B) |
+| `/details` | Toggle tool details (Ctrl+T) |
 
 ---
 
@@ -258,6 +285,7 @@ make clean           # Clean build artifacts
 cmd/drogonclaw/          CLI entrypoint
 internal/
   agent/                 ReAct orchestrator, tools, subagents, skill learning
+  router/                Intelligent routing (local + 9Router.ai)
   httputil/              Session management, AutoThrottle, response cache, WAF detection
   memory/                Intelligence graph, loot DB, action journal
   sandbox/               Docker sandbox execution
@@ -290,6 +318,9 @@ assets/                  Logos and charts
 | Document | Description |
 | --- | --- |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Detailed architecture with all subsystems |
+| [docs/TUI.md](docs/TUI.md) | TUI guide, shortcuts, themes, commands |
+| [docs/ROUTING.md](docs/ROUTING.md) | Intelligent routing (local + 9Router.ai) |
+| [docs/PROVIDERS.md](docs/PROVIDERS.md) | Provider setup and switching guide |
 | [docs/TOOLS.md](docs/TOOLS.md) | Complete tool reference catalog |
 | [docs/SESSION_MANAGEMENT.md](docs/SESSION_MANAGEMENT.md) | Sessions, throttle, cache, WAF detection |
 | [docs/SKILL_LEARNING.md](docs/SKILL_LEARNING.md) | Learned attack patterns system |

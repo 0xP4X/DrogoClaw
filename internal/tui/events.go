@@ -11,6 +11,14 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+type WelcomeBannerMsg struct {
+	Show bool
+}
+
+type HealthResultMsg struct {
+	Output string
+}
+
 func (m *Model) handleAgentEvent(ev agent.Event) []tea.Cmd {
 	var cmds []tea.Cmd
 
@@ -194,15 +202,11 @@ func colorizeOutputLine(raw string) string {
 	inner := strings.TrimSpace(raw)
 	lower := strings.ToLower(inner)
 	switch {
-	case strings.Contains(lower, "error") || strings.Contains(lower, "failed") ||
-		strings.Contains(lower, "denied") || strings.Contains(lower, "refused") ||
-		strings.Contains(lower, "not found") || strings.Contains(lower, "timeout") ||
-		strings.Contains(lower, "exit status"):
+	case strings.HasPrefix(lower, "[error]") || strings.HasPrefix(lower, "error:") || strings.Contains(lower, " permission denied") || strings.Contains(lower, " connection refused") || strings.Contains(lower, " command not found") || strings.Contains(lower, "exit status 127"):
 		return ErrorStyle.Render(raw)
-	case strings.Contains(lower, "warning") || strings.Contains(lower, "warn"):
+	case strings.HasPrefix(lower, "[warning]") || strings.HasPrefix(lower, "warning:") || strings.HasPrefix(lower, "[!]"):
 		return WarningStyle.Render(raw)
-	case strings.Contains(lower, "success") || strings.Contains(lower, "complete") ||
-		strings.Contains(lower, "found") || strings.Contains(lower, "open"):
+	case strings.HasPrefix(lower, "[+]") || strings.HasPrefix(lower, "[vulnerability]") || strings.HasPrefix(lower, "[flag]") || strings.HasPrefix(lower, "[ok]") || strings.HasPrefix(lower, "[✓]"):
 		return ToolOutputSuccessStyle.Render(raw)
 	default:
 		return ToolOutputStyle.Render(raw)
@@ -226,8 +230,8 @@ func sanitizeToolOutputLines(result string) []string {
 	}
 
 	lines := strings.Split(result, "\n")
-	if len(lines) > 25 {
-		truncated := append(lines[:20], fmt.Sprintf("... (%d additional lines hidden)", len(lines)-20))
+	if len(lines) > 200 {
+		truncated := append(lines[:180], fmt.Sprintf("... (%d additional lines hidden)", len(lines)-180))
 		return truncated
 	}
 	return lines
@@ -283,11 +287,13 @@ var (
 	}
 )
 
-// detectFindings detects findings in tool output
+// detectFindings detects findings in tool output. At most one finding per category
+// is emitted so overlapping patterns (e.g. "SQL injection vulnerability") do not
+// produce duplicate counts. Deduplication is by category.
 func detectFindings(output, tool string) []Finding {
 	var findings []Finding
-	
-	// Check for vulnerabilities
+
+	// Vulnerability: first matching pattern wins
 	for _, pattern := range vulnPatterns {
 		if matches := pattern.FindStringSubmatch(output); matches != nil {
 			findings = append(findings, Finding{
@@ -295,23 +301,24 @@ func detectFindings(output, tool string) []Finding {
 				Description: matches[0],
 				Source:      tool,
 			})
+			break
 		}
 	}
-	
-	// Check for credentials
+
+	// Credential: first matching pattern wins (redacted)
 	for _, pattern := range credPatterns {
 		if matches := pattern.FindStringSubmatch(output); matches != nil {
-			// Redact actual credentials
 			desc := redactCredential(matches[0])
 			findings = append(findings, Finding{
 				Type:        "credential",
 				Description: desc,
 				Source:      tool,
 			})
+			break
 		}
 	}
-	
-	// Check for flags
+
+	// Flag: first matching pattern wins
 	for _, pattern := range flagPatterns {
 		if matches := pattern.FindStringSubmatch(output); matches != nil {
 			findings = append(findings, Finding{
@@ -319,10 +326,11 @@ func detectFindings(output, tool string) []Finding {
 				Description: matches[0],
 				Source:      tool,
 			})
+			break
 		}
 	}
-	
-	// Check for info
+
+	// Info: first matching pattern wins
 	for _, pattern := range infoPatterns {
 		if matches := pattern.FindStringSubmatch(output); matches != nil {
 			findings = append(findings, Finding{
@@ -330,15 +338,16 @@ func detectFindings(output, tool string) []Finding {
 				Description: matches[0],
 				Source:      tool,
 			})
+			break
 		}
 	}
-	
+
 	return findings
 }
 
+var credRedactRE = regexp.MustCompile(`(?i)(password|passwd|pwd|api[_-]?key|apikey|token|secret)\s*[:=]\s*(\S+)`)
+
 // redactCredential redacts sensitive parts of credentials
 func redactCredential(s string) string {
-	// Redact passwords, API keys, tokens
-	re := regexp.MustCompile(`(?i)(password|passwd|pwd|api[_-]?key|apikey|token|secret)\s*[:=]\s*(\S+)`)
-	return re.ReplaceAllString(s, "${1}=[REDACTED]")
+	return credRedactRE.ReplaceAllString(s, "${1}=[REDACTED]")
 }

@@ -26,6 +26,22 @@ func stripANSI(s string) string {
 	return ansiRE.ReplaceAllString(s, "")
 }
 
+// helpfulError shows error + available options + example
+func helpfulError(title string, details string, options []string, example string) string {
+	var sb strings.Builder
+	sb.WriteString(ErrorStyle.Render(fmt.Sprintf("  [✗] %s", title)) + "\n")
+	if details != "" {
+		sb.WriteString(WarningStyle.Render(fmt.Sprintf("      %s", details)) + "\n")
+	}
+	if len(options) > 0 {
+		sb.WriteString(HintDescStyle.Render("      Available: " + strings.Join(options, ", ")) + "\n")
+	}
+	if example != "" {
+		sb.WriteString(InfoStyle.Render(fmt.Sprintf("      Example: %s", example)) + "\n")
+	}
+	return sb.String()
+}
+
 var needSetup bool
 
 // NeedSetup reports whether the operator requested /setup from inside the TUI.
@@ -82,9 +98,9 @@ func buildSlashCommands() []slashCommand {
 func operationsCommands() []slashCommand {
 	return []slashCommand{
 		{
-			names:    []string{"/mode"},
+			names:    []string{"/workflow", "/mode"},
 			category: catOperations,
-			desc:     "Select the active attack workflow",
+			desc:     "Select attack workflow (recon|exploit|ctf|web|api|mail|etc)",
 			args:     "[name|off]",
 			run: func(m *Model, args string) (*Model, tea.Cmd) {
 				m.handleModeCommand(args)
@@ -248,32 +264,6 @@ func operationsCommands() []slashCommand {
 			},
 		},
 		{
-			names:    []string{"/queue"},
-			category: catOperations,
-			desc:     "Show prompts queued behind the running task",
-			run: func(m *Model, _ string) (*Model, tea.Cmd) {
-				if len(m.promptQueue) == 0 {
-					m.appendLine(QueueStyle.Render("  [⏳] Prompt queue is empty."))
-					return m, nil
-				}
-				m.appendLine(QueueStyle.Render(fmt.Sprintf("  [⏳] PROMPT QUEUE (%d pending):", len(m.promptQueue))))
-				for i, q := range m.promptQueue {
-					m.appendLine(QueueItemStyle.Render(fmt.Sprintf("      %d. %s", i+1, q)))
-				}
-				m.appendLine(HintDescStyle.Render("      Queued prompts run automatically after the current task finishes."))
-				return m, nil
-			},
-		},
-		{
-			names:    []string{"/benchmarks"},
-			category: catOperations,
-			desc:     "Show benchmark statistics and Mermaid charts",
-			run: func(m *Model, _ string) (*Model, tea.Cmd) {
-				m.appendLine(m.renderBenchmarks())
-				return m, nil
-			},
-		},
-		{
 			names:    []string{"/timeline"},
 			category: catOperations,
 			desc:     "Show the execution timeline of tools and findings",
@@ -288,72 +278,125 @@ func operationsCommands() []slashCommand {
 func controlsCommands() []slashCommand {
 	return []slashCommand{
 		{
-			names:    []string{"/stealth"},
+			names:    []string{"/config"},
 			category: catControls,
-			desc:     "Toggle evasive rate-limiting policy",
-			run: func(m *Model, _ string) (*Model, tea.Cmd) {
-				on := m.opsecMgr.Toggle()
-				if on {
-					m.appendLine(ToolDoneStyle.Render("  [⬡] Rate limiting enabled — evasive timing active"))
-				} else {
-					m.appendLine(WarningStyle.Render("  [⬡] Rate limiting disabled — high-concurrency active"))
-				}
-				if m.promptRefresher != nil {
-					m.orch.UpdateSystemPrompt(m.promptRefresher())
-				}
-				return m, nil
-			},
-		},
-		{
-			names:    []string{"/auto"},
-			category: catControls,
-			desc:     "Toggle autonomous execution mode",
-			run: func(m *Model, _ string) (*Model, tea.Cmd) {
-				m.autopilot = !m.autopilot
-				m.orch.Autopilot = m.autopilot
-				state := "MANUAL"
-				if m.autopilot {
-					state = "AUTOPILOT"
-				}
-				m.appendLine(WarningStyle.Render(fmt.Sprintf("  [⚠] Execution Mode: %s", state)))
-				return m, nil
-			},
-		},
-		{
-			names:    []string{"/sandbox"},
-			category: catControls,
-			desc:     "Toggle container sandbox execution",
-			run: func(m *Model, _ string) (*Model, tea.Cmd) {
-				m.pendingConfirm = "sandbox"
-				m.appendLine(WarningStyle.Render("  [CONFIRM] Type TOGGLE SANDBOX to switch execution environment."))
-				return m, nil
-			},
-		},
-		{
-			names:    []string{"/persona"},
-			category: catControls,
-			desc:     "Inject a custom agent persona directive",
-			args:     "<directive>",
+			desc:     "View or modify settings (provider, model, routing, theme, execution)",
+			args:     "[set KEY VALUE]",
 			run: func(m *Model, args string) (*Model, tea.Cmd) {
 				if args == "" {
-					m.appendLine(ErrorStyle.Render("  [✗] Usage: /persona <custom directive>"))
+					// View all settings
+					for _, line := range strings.Split(renderConfigSummary(m.cfg), "\n") {
+						m.appendLine(line)
+					}
 					return m, nil
 				}
-				m.personaOverride = args
-				if m.promptRefresher != nil {
-					m.orch.UpdateSystemPrompt(m.promptRefresher())
+				// /config set KEY VALUE
+				parts := strings.SplitN(strings.TrimSpace(args), " ", 3)
+				if len(parts) < 3 || strings.ToLower(parts[0]) != "set" {
+					m.appendLine(ErrorStyle.Render("  [✗] Usage: /config set KEY VALUE"))
+					return m, nil
 				}
-				m.appendLine(ToolDoneStyle.Render(fmt.Sprintf("  [+] Persona directive updated: %s", truncate(args, 60))))
-				return m, nil
+				key, val := parts[1], parts[2]
+				return m.handleConfigSet(key, val)
+			},
+		},
+		{
+			names:    []string{"/set"},
+			category: catControls,
+			desc:     "Quickly set a config value (alias: /config set KEY VALUE)",
+			args:     "<KEY> <VALUE>",
+			run: func(m *Model, args string) (*Model, tea.Cmd) {
+				parts := strings.SplitN(strings.TrimSpace(args), " ", 2)
+				if len(parts) != 2 {
+					m.appendLine(ErrorStyle.Render("  [✗] Usage: /set KEY VALUE"))
+					return m, nil
+				}
+				return m.handleConfigSet(parts[0], parts[1])
+			},
+		},
+		{
+			names:    []string{"/router"},
+			category: catControls,
+			desc:     "Configure intelligent routing (auto|local|9router|off|status)",
+			args:     "[auto|local|9router|off|status]",
+			run: func(m *Model, args string) (*Model, tea.Cmd) {
+				return m.handleRouterCommand(args)
+			},
+		},
+		{
+			names:    []string{"/providers"},
+			category: catControls,
+			desc:     "Show provider health and routing status",
+			run: func(m *Model, args string) (*Model, tea.Cmd) {
+				return m.handleProvidersCommand(args)
+			},
+		},
+		{
+			names:    []string{"/theme"},
+			category: catControls,
+			desc:     "Switch color theme (dark|light|dracula|nord|gruvbox)",
+			args:     "[name]",
+			run: func(m *Model, args string) (*Model, tea.Cmd) {
+				return m.handleThemeCommand(args)
 			},
 		},
 	}
 }
 
+// handleConfigSet handles /set and /config set operations
+func (m *Model) handleConfigSet(key, val string) (*Model, tea.Cmd) {
+	key = strings.ToUpper(strings.TrimSpace(key))
+	val = strings.TrimSpace(val)
+
+	switch key {
+	case "AUTOPILOT", "EXECUTION_MODE":
+		enabled := strings.ToLower(val) == "on" || strings.ToLower(val) == "true" || strings.ToLower(val) == "autonomous"
+		m.autopilot = enabled
+		m.orch.Autopilot = enabled
+		m.cfg.SetAutopilot(enabled)
+		state := "MANUAL"
+		if enabled {
+			state = "AUTONOMOUS"
+		}
+		m.appendLine(ToolDoneStyle.Render(fmt.Sprintf("  [✓] Execution Mode: %s", state)))
+
+	case "OPSEC", "EVASION":
+		lower := strings.ToLower(val)
+		if lower == "high" || lower == "medium" || lower == "low" {
+			m.opsecMgr.Toggle()
+			m.appendLine(ToolDoneStyle.Render(fmt.Sprintf("  [✓] Evasion Level: %s", lower)))
+		} else {
+			m.appendLine(ErrorStyle.Render("  [✗] Evasion must be: high, medium, or low"))
+			return m, nil
+		}
+
+	case "SANDBOX", "ISOLATION":
+		enabled := strings.ToLower(val) == "on" || strings.ToLower(val) == "true"
+		m.cfg.Set("USE_SANDBOX", map[bool]string{true: "true", false: "false"}[enabled])
+		state := "OFF"
+		if enabled {
+			state = "ON"
+		}
+		m.appendLine(ToolDoneStyle.Render(fmt.Sprintf("  [✓] Isolation: %s", state)))
+
+	case "THEME":
+		return m.handleThemeCommand(val)
+
+	case "AI_PROVIDER", "AI_MODEL", "ROUTER_MODE", "NINEROUTER_API_KEY":
+		m.cfg.Set(key, val)
+		m.appendLine(ToolDoneStyle.Render(fmt.Sprintf("  [✓] %s set to: %s", key, truncate(val, 40))))
+
+	default:
+		m.appendLine(WarningStyle.Render(fmt.Sprintf("  [!] Unknown setting: %s", key)))
+		m.appendLine(HintDescStyle.Render("  Available: AUTOPILOT/EXECUTION_MODE, OPSEC/EVASION, SANDBOX/ISOLATION, THEME, AI_PROVIDER, AI_MODEL, ROUTER_MODE, NINEROUTER_API_KEY"))
+	}
+	return m, nil
+}
+
 func sessionCommands() []slashCommand {
 	return []slashCommand{
 		{
-			names:    []string{"/help", "/commands"},
+			names:    []string{"/help"},
 			category: catSession,
 			desc:     "Show the complete command reference",
 			run: func(m *Model, _ string) (*Model, tea.Cmd) {
@@ -364,7 +407,7 @@ func sessionCommands() []slashCommand {
 		{
 			names:    []string{"/status"},
 			category: catSession,
-			desc:     "Show session, runtime and workspace details",
+			desc:     "Show session statistics and execution metrics",
 			run: func(m *Model, _ string) (*Model, tea.Cmd) {
 				for _, line := range strings.Split(m.renderStatusReport(), "\n") {
 					m.appendLine(line)
@@ -373,20 +416,9 @@ func sessionCommands() []slashCommand {
 			},
 		},
 		{
-			names:    []string{"/config"},
-			category: catSession,
-			desc:     "Show stored provider, Telegram and API-key configuration",
-			run: func(m *Model, _ string) (*Model, tea.Cmd) {
-				for _, line := range strings.Split(renderConfigSummary(m.cfg), "\n") {
-					m.appendLine(line)
-				}
-				return m, nil
-			},
-		},
-		{
 			names:    []string{"/cost"},
 			category: catSession,
-			desc:     "Show API token usage and estimated cost",
+			desc:     "Show API token usage and estimated cost (with routing savings)",
 			run: func(m *Model, _ string) (*Model, tea.Cmd) {
 				if m.tracker == nil {
 					m.appendLine(WarningStyle.Render("  [!] No token tracker active."))
@@ -397,32 +429,48 @@ func sessionCommands() []slashCommand {
 			},
 		},
 		{
-			names:    []string{"/sections"},
+			names:    []string{"/health"},
 			category: catSession,
-			desc:     "List all previously saved session sections",
+			desc:     "Verify runtime environment and dependencies",
 			run: func(m *Model, _ string) (*Model, tea.Cmd) {
-				m.appendLine(m.renderSections())
+				m.appendLine(SpinnerStyle.Render("  [*] Running diagnostic checks..."))
+				m.phase = "verifying"
+				m.phaseDetail = "Diagnostics"
+				m.executing = true
+				m.execStartTime = time.Now()
+				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+				m.cancelFn = cancel
+				m.activeEvents = nil
+				healthWidth := m.viewport.Width
+				if healthWidth <= 0 {
+					healthWidth = m.width - 4
+				}
+				return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
+					return HealthResultMsg{Output: health.RunDiagnosticsWithWidth(ctx, m.sandbox, healthWidth)}
+				})
+			},
+		},
+		{
+			names:    []string{"/timeline"},
+			category: catSession,
+			desc:     "Show execution timeline of tools and findings",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				m.appendLine(m.renderTimeline())
 				return m, nil
 			},
 		},
 		{
-			names:    []string{"/section"},
+			names:    []string{"/findings"},
 			category: catSession,
-			desc:     "Switch to a previously saved session section",
-			args:     "<id>",
-			run: func(m *Model, args string) (*Model, tea.Cmd) {
-				if args == "" {
-					m.appendLine(ErrorStyle.Render("  [✗] Usage: /section <id> — switch to a previous section"))
-					return m, nil
-				}
-				m.switchSection(args)
-				return m, nil
+			desc:     "Summarize all detected findings (vulnerabilities, credentials, flags)",
+			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				return m.handleFindingsSummary()
 			},
 		},
 		{
 			names:    []string{"/setup"},
 			category: catSession,
-			desc:     "Run the interactive configuration wizard and restart",
+			desc:     "Run the interactive configuration wizard",
 			run: func(m *Model, _ string) (*Model, tea.Cmd) {
 				needSetup = true
 				m.appendLine(InfoStyle.Render("  [i] Launching setup wizard — DrogonClaw will restart afterward."))
@@ -432,17 +480,18 @@ func sessionCommands() []slashCommand {
 		{
 			names:    []string{"/new"},
 			category: catSession,
-			desc:     "Clear session memory and start clean",
+			desc:     "Clear session memory and start fresh",
 			run: func(m *Model, _ string) (*Model, tea.Cmd) {
+				m.appendLine(WarningStyle.Render("  [!] Clear session? This will delete all findings, credentials, and flags."))
+				m.appendLine(InfoStyle.Render("      Type 'yes' to confirm, or 'no' to cancel"))
 				m.pendingConfirm = "new"
-				m.appendLine(WarningStyle.Render("  [CONFIRM] This clears session memory. Type CLEAR SESSION to continue."))
 				return m, nil
 			},
 		},
 		{
 			names:    []string{"/resume"},
 			category: catSession,
-			desc:     "Resume the interrupted execution checkpoint",
+			desc:     "Resume interrupted execution from checkpoint",
 			run: func(m *Model, _ string) (*Model, tea.Cmd) {
 				if m.recovery == nil {
 					m.appendLine(WarningStyle.Render("  [RECOVERY] No interrupted mission is available."))
@@ -460,7 +509,7 @@ func sessionCommands() []slashCommand {
 		{
 			names:    []string{"/copy"},
 			category: catSession,
-			desc:     "Copy the full transcript to clipboard / file",
+			desc:     "Export transcript to clipboard and file",
 			run: func(m *Model, _ string) (*Model, tea.Cmd) {
 				m.appendLine(m.copyConversation())
 				return m, nil
@@ -469,7 +518,7 @@ func sessionCommands() []slashCommand {
 		{
 			names:    []string{"/clear"},
 			category: catSession,
-			desc:     "Clears the visible terminal output",
+			desc:     "Clear visible terminal output",
 			run: func(m *Model, _ string) (*Model, tea.Cmd) {
 				m.lines = nil
 				m.viewport.SetContent("")
@@ -479,7 +528,7 @@ func sessionCommands() []slashCommand {
 		{
 			names:    []string{"/exit", "/quit"},
 			category: catSession,
-			desc:     "Terminate the session gracefully",
+			desc:     "Terminate session gracefully",
 			run: func(m *Model, _ string) (*Model, tea.Cmd) {
 				return m, tea.Quit
 			},
@@ -487,12 +536,32 @@ func sessionCommands() []slashCommand {
 	}
 }
 
+// handleFindingsSummary shows a summary of all detected findings
+func (m *Model) handleFindingsSummary() (*Model, tea.Cmd) {
+	var sb strings.Builder
+	sb.WriteString("\n")
+	sb.WriteString(SectionHeaderStyle.Render("  FINDINGS SUMMARY") + "\n")
+	sb.WriteString(SectionRuleStyle.Render("  "+strings.Repeat("─", 60)) + "\n\n")
+
+	if len(m.findings) == 0 {
+		sb.WriteString(HintDescStyle.Render("  No findings detected yet.\n"))
+	} else {
+		sb.WriteString(fmt.Sprintf("  Total findings: %d\n\n", len(m.findings)))
+		for i, f := range m.findings {
+			sb.WriteString(fmt.Sprintf("  %d. %s\n", i+1, f))
+		}
+	}
+	sb.WriteString("\n")
+	m.appendLine(sb.String())
+	return m, nil
+}
+
 func uiCommands() []slashCommand {
 	return []slashCommand{
 		{
 			names:    []string{"/sidebar"},
 			category: catUI,
-			desc:     "Toggle the sidebar panel",
+			desc:     "Toggle the sidebar panel (Ctrl+B)",
 			run: func(m *Model, _ string) (*Model, tea.Cmd) {
 				if m.showSidebar || m.width >= sidebarMinWidth+20 {
 					m.showSidebar = !m.showSidebar
@@ -501,24 +570,74 @@ func uiCommands() []slashCommand {
 				if m.showSidebar {
 					state = "ON"
 				}
-				m.appendLine(InfoStyle.Render(fmt.Sprintf("  [-sidebar] Sidebar %s", state)))
+				m.appendLine(InfoStyle.Render(fmt.Sprintf("  [sidebar] %s", state)))
 				return m, nil
 			},
 		},
 		{
 			names:    []string{"/details"},
 			category: catUI,
-			desc:     "Toggle the tool detail panel",
+			desc:     "Toggle the tool detail panel (Ctrl+T)",
 			run: func(m *Model, _ string) (*Model, tea.Cmd) {
 				m.showToolDetail = !m.showToolDetail
 				state := "OFF"
 				if m.showToolDetail {
 					state = "ON"
 				}
-				m.appendLine(InfoStyle.Render(fmt.Sprintf("  [details] Tool details %s", state)))
+				m.appendLine(InfoStyle.Render(fmt.Sprintf("  [details] %s", state)))
 				return m, nil
 			},
 		},
+	}
+}
+
+func (m *Model) handleThemeCommand(args string) (*Model, tea.Cmd) {
+	name := strings.TrimSpace(strings.ToLower(args))
+	if name == "" {
+		current := m.cfg.GetTheme()
+		var sb strings.Builder
+		sb.WriteString(SectionHeaderStyle.Render("  AVAILABLE THEMES") + "\n")
+		sb.WriteString(SectionRuleStyle.Render("  " + strings.Repeat("─", 48)) + "\n\n")
+		for _, t := range ListThemes() {
+			marker := "  "
+			style := HintCmdStyle
+			if t == current {
+				marker = "▶ "
+				style = StatusOnStyle
+			}
+			sb.WriteString(fmt.Sprintf("%s%s  %s\n", marker, style.Render(t), HintDescStyle.Render(themeDescription(t))))
+		}
+		sb.WriteString("\n" + HintDescStyle.Render("  Usage: /theme <name>  — e.g. /theme dracula") + "\n")
+		m.appendLine(sb.String())
+		return m, nil
+	}
+	if _, ok := Themes[normalizeThemeName(name)]; !ok {
+		m.appendLine(ErrorStyle.Render(fmt.Sprintf("  [✗] Unknown theme: %s", name)))
+		m.appendLine(HintDescStyle.Render(fmt.Sprintf("  Available: %s", strings.Join(ListThemes(), ", "))))
+		return m, nil
+	}
+	theme := GetTheme(name)
+	m.theme = theme
+	ApplyTheme(theme)
+	m.cfg.SetTheme(normalizeThemeName(name))
+	m.appendLine(ToolDoneStyle.Render(fmt.Sprintf("  [✓] Theme: %s", normalizeThemeName(name))))
+	return m, nil
+}
+
+func themeDescription(name string) string {
+	switch normalizeThemeName(name) {
+	case "dark":
+		return "GitHub-inspired dark (default)"
+	case "light":
+		return "Light theme for daytime"
+	case "dracula":
+		return "Dracula purple/green"
+	case "nord":
+		return "Nord arctic blue"
+	case "gruvbox":
+		return "Gruvbox warm retro"
+	default:
+		return ""
 	}
 }
 

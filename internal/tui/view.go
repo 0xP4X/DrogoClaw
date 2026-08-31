@@ -315,6 +315,17 @@ func (m Model) renderInputLine() string {
 
 	var lines []string
 
+	// Show keyboard shortcuts when input is empty
+	if text == "" && len(m.hints) == 0 {
+		shortcuts := []string{
+			HintDescStyle.Render("  [?] help  "),
+			HintDescStyle.Render("[Ctrl+P] palette  "),
+			HintDescStyle.Render("[Ctrl+B] sidebar  "),
+			HintDescStyle.Render("[Ctrl+S] status"),
+		}
+		lines = append(lines, strings.Join(shortcuts, ""))
+	}
+
 	for i, h := range m.hints {
 		prefix := " "
 		cmdStr := HintCmdStyle.Render(h.cmd)
@@ -323,6 +334,7 @@ func (m Model) renderInputLine() string {
 			cmdStr = HintSelectedStyle.Render(h.cmd)
 		}
 		lines = append(lines, prefix+cmdStr+HintDescStyle.Render("  "+truncateVisible(h.desc, max(12, m.width-20))))
+	}
 	}
 
 	if len(m.promptQueue) > 0 {
@@ -1154,7 +1166,7 @@ func renderPhaseBadge(phase string) (string, lipgloss.Style) {
 	}
 }
 
-var xmlTagRegex = regexp.MustCompile(`(?s)<environment_details>.*?</environment_details>|<[^>]+>`)
+var xmlTagRegex = regexp.MustCompile(`(?s)<environment_details>.*?</environment_details>|<thinking>.*?</thinking>|<plan>.*?</plan>|<status>.*?</status>|<system_prompt>.*?</system_prompt>|<directive>.*?</directive>`)
 
 func stripXMLTags(s string) string {
 	return xmlTagRegex.ReplaceAllString(s, "")

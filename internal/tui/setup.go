@@ -17,6 +17,7 @@ const (
 	providerOpenAI     = "openai"
 	providerGemini     = "gemini"
 	providerOllama     = "ollama"
+	provider9Router    = "9router"
 )
 
 // Wizard-reported states used in the configuration summary and key pickers.
@@ -222,6 +223,8 @@ func providerLabel(id string) string {
 		return "Google Gemini"
 	case providerOllama:
 		return "Ollama (local)"
+	case provider9Router:
+		return "9Router.ai"
 	}
 	return id
 }
@@ -335,6 +338,13 @@ func providerModelOptions(provider string, r configReader) []huh.Option[string] 
 		}
 	case providerOllama:
 		return ollamaModelOptions(ollamaDefaultBaseURL(r))
+	case provider9Router:
+		return []huh.Option[string]{
+			huh.NewOption("Auto (intelligent routing)", "auto"),
+			huh.NewOption("Claude 3.5 Sonnet", "anthropic/claude-3.5-sonnet"),
+			huh.NewOption("GPT-4o", "openai/gpt-4o"),
+			huh.NewOption("Llama 3.1 70B", "meta-llama/llama-3.1-70b-instruct"),
+		}
 	}
 	return nil
 }
@@ -462,6 +472,7 @@ func runProviderSection(cfg *config.Manager) {
 			huh.NewOption("OpenAI — Direct API runtime", providerOpenAI),
 			huh.NewOption("Google Gemini — Enterprise reasoning core", providerGemini),
 			huh.NewOption("Ollama — Autonomous offline runtime", providerOllama),
+			huh.NewOption("9Router.ai — Intelligent auto-routing", provider9Router),
 		).
 		Value(&provider).
 		WithTheme(CustomHuhTheme()).
@@ -546,6 +557,8 @@ func providerAPIKeyConfig(provider string) string {
 		return "GOOGLE_API_KEY"
 	case providerOllama:
 		return "OLLAMA_BASE_URL"
+	case provider9Router:
+		return "NINEROUTER_API_KEY"
 	default:
 		return "OPENROUTER_API_KEY"
 	}
@@ -734,6 +747,7 @@ func runIdentitySection(cfg *config.Manager) {
 // managedConfigKeys is the full set of credentials the wizard can reset.
 var managedConfigKeys = []string{
 	"OPENROUTER_API_KEY", "NVIDIA_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY",
+	"NINEROUTER_API_KEY", "ROUTER_MODE",
 	"OLLAMA_BASE_URL", "TELEGRAM_TOKEN", "TELEGRAM_CHAT_ID",
 	"OPERATOR_NAME", "AGENT_NAME",
 	"GITHUB_TOKEN", "SHODAN_API_KEY", "VIRUSTOTAL_API_KEY",
