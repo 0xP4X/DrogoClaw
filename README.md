@@ -232,7 +232,7 @@ All commands are listed the same way `/help` renders them — one registry, zero
 | `/router [auto\|local\|9router\|off\|status]` | Configure intelligent routing |
 | `/providers` | Provider health & routing status dashboard |
 | `/theme [name]` | Switch color theme (dark/light/dracula/nord/gruvbox) |
-| `/set EXECUTION_MODE [manual\|autonomous]` | Runtime: `AUTOPILOT` alias — autonomous execution |
+| `/auto [on\|off]` | Toggle autopilot — auto-accept long-running tools (`Ctrl+A`) |
 | `/set EVASION [high\|medium\|low]` | Runtime: `OPSEC` alias — rate-limiting & evasion |
 | `/set ISOLATION [on\|off]` | Runtime: `SANDBOX` alias — Docker isolation |
 

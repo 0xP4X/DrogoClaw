@@ -21,13 +21,16 @@ const manifest = [];
 for (const file of files) {
   const src = readFileSync(join(skillsDir, file), 'utf-8');
   
-  // Extract tool name
-  const nameMatch = src.match(/name:\s*["']([^"']+)["']/);
+  // Extract tool name + description from the tool constructor call, not from
+  // arbitrary object literals elsewhere in the file (e.g. helper tables).
+  const ctorIdx = src.search(/new\s+\w+\(\{/);
+  const toolBlock = ctorIdx >= 0 ? src.slice(ctorIdx, ctorIdx + 2000) : src;
+  const nameMatch = toolBlock.match(/name:\s*["']([^"']+)["']/);
   if (!nameMatch) continue;
   const name = nameMatch[1];
 
   // Extract description (can be backtick or quote delimited)
-  const descMatch = src.match(/description:\s*[`"']([^`"']{10,})[`"']/);
+  const descMatch = toolBlock.match(/description:\s*[`"']([^`"']{10,})[`"']/);
   const description = descMatch ? descMatch[1].trim().replace(/\s+/g, ' ') : `Execute ${name}`;
 
   // Extract parameters from zod schema - parse key names
@@ -62,8 +65,11 @@ for (const file of files) {
     }
   }
 
-  // If no params extracted, add a generic command param
-  if (Object.keys(parameters).length === 0) {
+  // If the file declares no zod schema at all, fall back to a generic
+  // command param. A declared-but-empty schema (z.object({})) means the tool
+  // takes no arguments — do not invent a command param for it.
+  const hasSchema = /schema:\s*z\.object\(\{/.test(src);
+  if (Object.keys(parameters).length === 0 && !hasSchema) {
     parameters['command'] = {
       type: 'string',
       description: 'The shell command or arguments to execute',

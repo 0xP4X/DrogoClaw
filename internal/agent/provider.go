@@ -134,6 +134,9 @@ func (p *Provider) complete(ctx context.Context, model string, messages []openai
 		}
 	}
 
+	if lastErr != nil && strings.Contains(strings.ToLower(lastErr.Error()), "404") {
+		return nil, fmt.Errorf("LLM completion failed after retries: %w — check AI_PROVIDER/AI_MODEL via /setup or /config (current model: %s)", lastErr, p.model)
+	}
 	return nil, fmt.Errorf("LLM completion failed after retries: %w", lastErr)
 }
 

@@ -89,12 +89,32 @@ func (m *Model) renderStatusBarBar() string {
 
 func (m *Model) renderInputBar() string {
 	inner := m.renderInputArea()
+	if len(m.promptQueue) == 0 {
+		return lipgloss.NewStyle().
+			Background(m.theme.BackgroundSurface).
+			Foreground(m.theme.Text).
+			Width(m.width).
+			Padding(0, 1).
+			Render(inner)
+	}
+	qItems := make([]string, 0, len(m.promptQueue))
+	for i, q := range m.promptQueue {
+		if i >= 2 {
+			if len(m.promptQueue) > 3 {
+				qItems = append(qItems, fmt.Sprintf("+%d more", len(m.promptQueue)-3))
+			}
+			break
+		}
+		qItems = append(qItems, truncate(q, 25))
+	}
+	queueLine := QueueStyle.Render(fmt.Sprintf("⏳ %d queued: %s", len(m.promptQueue), strings.Join(qItems, " · ")))
+	combined := queueLine + "\n" + inner
 	return lipgloss.NewStyle().
 		Background(m.theme.BackgroundSurface).
 		Foreground(m.theme.Text).
 		Width(m.width).
 		Padding(0, 1).
-		Render(inner)
+		Render(combined)
 }
 
 func (m Model) renderHeaderLine() string {
@@ -522,20 +542,6 @@ func (m Model) renderSidebar(width, height int) string {
 		row("Est. cost", fmt.Sprintf("$%.4f", cost))
 	}
 
-	if len(m.promptQueue) > 0 {
-		section("QUEUE")
-		limit := len(m.promptQueue)
-		if limit > 3 {
-			limit = 3
-		}
-		for i := 0; i < limit; i++ {
-			row(fmt.Sprintf("%d.", i+1), truncate(m.promptQueue[i], max(1, innerWidth-16)))
-		}
-		if len(m.promptQueue) > 3 {
-			row("…", fmt.Sprintf("+%d more", len(m.promptQueue)-3))
-		}
-	}
-
 	// Tools section
 	if len(m.recentTools) > 0 {
 		section("TOOLS")
@@ -954,9 +960,11 @@ var allHints []cmdHint
 func init() { allHints = buildCommandHints() }
 
 func buildCommandHints() []cmdHint {
-	out := make([]cmdHint, 0, len(slashCommands))
+	out := make([]cmdHint, 0, len(slashCommands)*2)
 	for _, c := range slashCommands {
-		out = append(out, cmdHint{cmd: c.canonical(), desc: c.desc})
+		for _, n := range c.names {
+			out = append(out, cmdHint{cmd: n, desc: c.desc})
+		}
 	}
 	return out
 }
@@ -1021,13 +1029,58 @@ func matchHints(input string) []cmdHint {
 	if query == "" || !strings.HasPrefix(query, "/") {
 		return nil
 	}
+	lowerInput := strings.ToLower(input)
+	if strings.HasPrefix(lowerInput, "/set ") || strings.HasPrefix(lowerInput, "/config set ") {
+		return matchConfigHints(input)
+	}
 	var out []cmdHint
+	seen := make(map[string]bool)
 	for _, h := range allHints {
-		if strings.HasPrefix(h.cmd, query) {
-			out = append(out, h)
+		if strings.HasPrefix(strings.ToLower(h.cmd), query) {
+			if !seen[h.cmd] {
+				seen[h.cmd] = true
+				out = append(out, h)
+			}
 		}
 	}
-	// Return all matches up to maxVisible (now 6)
+	if len(out) > 6 {
+		out = out[:6]
+	}
+	return out
+}
+
+var configKeys = []cmdHint{
+	{cmd: "AUTOPILOT", desc: "Toggle auto-accept (on/off, alias: EXECUTION_MODE)"},
+	{cmd: "EXECUTION_MODE", desc: "Execution mode (manual/autonomous)"},
+	{cmd: "OPSEC", desc: "Evasion level (high/medium/low, alias: EVASION)"},
+	{cmd: "EVASION", desc: "Evasion level (high/medium/low, alias: OPSEC)"},
+	{cmd: "SANDBOX", desc: "Docker sandbox (on/off, alias: ISOLATION)"},
+	{cmd: "ISOLATION", desc: "Docker sandbox (on/off, alias: SANDBOX)"},
+	{cmd: "THEME", desc: "Color theme (dark/light/dracula/nord/gruvbox)"},
+	{cmd: "AI_PROVIDER", desc: "AI provider (openrouter/nvidia/openai/gemini/ollama)"},
+	{cmd: "AI_MODEL", desc: "Model name for current provider"},
+	{cmd: "ROUTER_MODE", desc: "Routing mode (auto/local/9router/off)"},
+	{cmd: "NINEROUTER_API_KEY", desc: "9Router API key"},
+}
+
+func matchConfigHints(input string) []cmdHint {
+	lower := strings.ToLower(strings.TrimSpace(input))
+	prefix := ""
+	after := ""
+	if strings.HasPrefix(lower, "/config set ") {
+		prefix = input[:len("/config set ")]
+		after = strings.TrimSpace(input[len("/config set "):])
+	} else if strings.HasPrefix(lower, "/set ") {
+		prefix = input[:len("/set ")]
+		after = strings.TrimSpace(input[len("/set "):])
+	}
+	q := strings.ToLower(after)
+	var out []cmdHint
+	for _, k := range configKeys {
+		if q == "" || strings.HasPrefix(strings.ToLower(k.cmd), q) {
+			out = append(out, cmdHint{cmd: prefix + k.cmd, desc: k.desc})
+		}
+	}
 	if len(out) > 6 {
 		out = out[:6]
 	}

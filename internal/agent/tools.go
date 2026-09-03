@@ -198,6 +198,12 @@ func extractFindings(name, out string) []string {
 	case strings.Contains(low, "exploit success"), strings.Contains(low, "successfully exploited"),
 		strings.Contains(low, "authentication bypass"), strings.Contains(low, "remote code execution"):
 		f = append(f, "exploit:confirmed")
+	case regexp.MustCompile(`found [1-9]\d* subdomain`).MatchString(low):
+		f = append(f, "recon:subdomain")
+	case strings.Contains(low, "certificate transparency") && regexp.MustCompile(`count:\s*[1-9]`).MatchString(low):
+		f = append(f, "recon:cert")
+	case strings.Contains(low, "a:") && strings.Contains(low, "mx:") && strings.Contains(low, "ns:"):
+		f = append(f, "recon:dns")
 	}
 	return f
 }
@@ -958,8 +964,18 @@ func (r *ToolRegistry) Execute(ctx context.Context, name string, argsJSON string
 }
 
 func (r *ToolRegistry) gateToolExecution(name string, args map[string]any) string {
-	if name == "shell_execute" && !isActiveShellCommand(args) {
-		return ""
+	if name == "shell_execute" {
+		cmd, _ := args["command"].(string)
+		lower := strings.ToLower(cmd)
+		if strings.Contains(lower, "subfinder") {
+			return "[Blocked] Use the dedicated wrapper 'run_subfinder' instead of shell_execute for subdomain enumeration — it has correct flags and timeout handling."
+		}
+		if strings.Contains(lower, "nmap") || strings.Contains(lower, "nuclei") || strings.Contains(lower, "gobuster") || strings.Contains(lower, "ffuf") || strings.Contains(lower, "sqlmap") || strings.Contains(lower, "httpx") {
+			return "[Blocked] Use the dedicated wrapper for this tool (run_nmap, run_nuclei, run_gobuster, run_ffuf, run_sqlmap, run_httpx) instead of shell_execute."
+		}
+		if !isActiveShellCommand(args) {
+			return ""
+		}
 	}
 
 	policy := classifyToolPolicy(name)
@@ -1193,6 +1209,10 @@ func (r *ToolRegistry) registerBuiltins() {
 		cmd, _ := args["command"].(string)
 		if cmd == "" {
 			return "[Error] No command provided"
+		}
+		lowerCmd := strings.ToLower(strings.TrimSpace(cmd))
+		if strings.HasPrefix(lowerCmd, "echo \"waiting") || strings.HasPrefix(lowerCmd, "echo 'waiting") || lowerCmd == "echo \"waiting for tool results...\"" || lowerCmd == "echo \"fetching results...\"" || lowerCmd == "echo \"waiting for results...\"" || strings.Contains(lowerCmd, "waiting for tool") {
+			return "[Hint] No need to echo waiting messages — the tool output is already returned. Proceed directly to the next reconnaissance or exploitation step."
 		}
 
 		if cached, ok := r.recentCommands[cmd]; ok && time.Since(cached.executed) < shellDedupWindow {

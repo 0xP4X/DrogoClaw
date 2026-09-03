@@ -88,13 +88,7 @@
   {
     "name": "advanced_web_exploiter",
     "description": "Advanced web attack engine handling SSTI (Server-Side Template Injection) via tplmap and JWT forging via PyJWT. Choose the attack mode and provide necessary parameters.",
-    "parameters": {
-      "command": {
-        "type": "string",
-        "description": "The shell command or arguments to execute",
-        "required": true
-      }
-    },
+    "parameters": {},
     "executes_via": "docker_shell"
   },
   {
@@ -441,15 +435,9 @@
     "executes_via": "docker_shell"
   },
   {
-    "name": "nmap",
+    "name": "health_status",
     "description": "Run a REAL system diagnostic. Checks which security tools are installed, verifies the AI provider connection, and reports actual system readiness. Use when the operator asks for health, status, or diagnostics.",
-    "parameters": {
-      "command": {
-        "type": "string",
-        "description": "The shell command or arguments to execute",
-        "required": true
-      }
-    },
+    "parameters": {},
     "executes_via": "docker_shell"
   },
   {
@@ -467,13 +455,7 @@
   {
     "name": "http_request",
     "description": "Make a full HTTP request with complete control over method, headers, body, and cookies.",
-    "parameters": {
-      "command": {
-        "type": "string",
-        "description": "The shell command or arguments to execute",
-        "required": true
-      }
-    },
+    "parameters": {},
     "executes_via": "docker_shell"
   },
   {
@@ -878,13 +860,7 @@
   {
     "name": "async_race_condition_engine",
     "description": "A high-performance Python asyncio engine to exploit TOCTOU (Time-Of-Check to Time-Of-Use) and race conditions. Blasts an endpoint with dozens of concurrent requests in the exact same millisecond.",
-    "parameters": {
-      "command": {
-        "type": "string",
-        "description": "The shell command or arguments to execute",
-        "required": true
-      }
-    },
+    "parameters": {},
     "executes_via": "docker_shell"
   },
   {

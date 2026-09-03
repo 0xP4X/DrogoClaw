@@ -310,6 +310,23 @@ func controlsCommands() []slashCommand {
 				return m.handleThemeCommand(args)
 			},
 		},
+		{
+			names:    []string{"/auto"},
+			category: catControls,
+			desc:     "Toggle autopilot (auto-accept long-running tools, Ctrl+A)",
+			args:     "[on|off]",
+			run: func(m *Model, args string) (*Model, tea.Cmd) {
+				if strings.TrimSpace(args) == "" {
+					state := "off"
+					if m.autopilot {
+						state = "on"
+					}
+					m.appendLine(InfoStyle.Render(fmt.Sprintf("  [i] Autopilot: %s — use /auto on/off", state)))
+					return m, nil
+				}
+				return m.handleConfigSet("AUTOPILOT", args)
+			},
+		},
 	}
 }
 
@@ -366,7 +383,7 @@ func (m *Model) handleConfigSet(key, val string) (*Model, tea.Cmd) {
 func sessionCommands() []slashCommand {
 	return []slashCommand{
 		{
-			names:    []string{"/help"},
+			names:    []string{"/help", "/commands"},
 			category: catSession,
 			desc:     "Show the complete command reference",
 			run: func(m *Model, _ string) (*Model, tea.Cmd) {
@@ -647,8 +664,100 @@ func (m *Model) handleSlashCommand(raw string) (*Model, tea.Cmd) {
 			return c.run(m, args)
 		}
 	}
-	m.appendLine(WarningStyle.Render(fmt.Sprintf("  [?] Unknown command: %s. Type /help for reference.", name)))
+	suggestions := suggestCommands(name)
+	if len(suggestions) > 0 {
+		m.appendLine(WarningStyle.Render(fmt.Sprintf("  [?] Unknown command: %s. Did you mean: %s ?", name, strings.Join(suggestions, ", "))))
+		m.appendLine(HintDescStyle.Render(fmt.Sprintf("      Type /help for full reference or press Ctrl+P for palette.")))
+	} else {
+		m.appendLine(WarningStyle.Render(fmt.Sprintf("  [?] Unknown command: %s. Type /help for reference.", name)))
+	}
 	return m, nil
+}
+
+func suggestCommands(input string) []string {
+	input = strings.ToLower(input)
+	var exactPrefix []string
+	for _, c := range slashCommands {
+		for _, n := range c.names {
+			if strings.HasPrefix(n, input) {
+				exactPrefix = append(exactPrefix, n)
+			}
+		}
+	}
+	if len(exactPrefix) > 0 {
+		if len(exactPrefix) > 3 {
+			exactPrefix = exactPrefix[:3]
+		}
+		return exactPrefix
+	}
+	var fuzzy []string
+	for _, c := range slashCommands {
+		for _, n := range c.names {
+			if strings.Contains(n, strings.TrimPrefix(input, "/")) {
+				fuzzy = append(fuzzy, n)
+				break
+			}
+		}
+	}
+	if len(fuzzy) > 0 {
+		if len(fuzzy) > 3 {
+			fuzzy = fuzzy[:3]
+		}
+		return fuzzy
+	}
+	deprecatedHints := map[string][]string{
+		"/rate":    {"/router", "/set OPSEC high/medium/low"},
+		"/stealth": {"/set OPSEC high/medium/low"},
+		"/sandbox": {"/set SANDBOX on/off"},
+		"/opsec":   {"/set OPSEC high/medium/low"},
+		"/auto":    {"/auto on/off"},
+		"/c":       {"/copy", "/clear", "/cost"},
+	}
+	if hints, ok := deprecatedHints[input]; ok {
+		return hints
+	}
+	best := ""
+	bestDist := 100
+	for _, c := range slashCommands {
+		for _, n := range c.names {
+			d := levenshtein(input, n)
+			if d < bestDist {
+				bestDist = d
+				best = n
+			}
+		}
+	}
+	if bestDist <= 3 && best != "" {
+		return []string{best}
+	}
+	return nil
+}
+
+func levenshtein(a, b string) int {
+	la, lb := len(a), len(b)
+	if la == 0 {
+		return lb
+	}
+	if lb == 0 {
+		return la
+	}
+	prev := make([]int, lb+1)
+	curr := make([]int, lb+1)
+	for j := 0; j <= lb; j++ {
+		prev[j] = j
+	}
+	for i := 1; i <= la; i++ {
+		curr[0] = i
+		for j := 1; j <= lb; j++ {
+			cost := 0
+			if a[i-1] != b[j-1] {
+				cost = 1
+			}
+			curr[j] = min(min(prev[j]+1, curr[j-1]+1), prev[j-1]+cost)
+		}
+		prev, curr = curr, prev
+	}
+	return prev[lb]
 }
 
 func (m *Model) handleModeCommand(args string) {

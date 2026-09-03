@@ -79,8 +79,8 @@ DrogonClaw can run tools in two modes:
 - **Native mode** (default): commands run directly on your host OS. This is the recommended mode for most use cases.
 - **Sandbox mode**: commands run inside an isolated Docker container. Use this if you want complete isolation from your host.
 
-You can switch modes with the `/sandbox` command inside the terminal, or launch
-with `./drogonclaw sandbox` / `./drogonclaw native`.
+You can switch modes with `/set SANDBOX on/off` (alias: `/set ISOLATION on/off`) inside the terminal, or launch
+with `./drogonclaw sandbox` / `./drogonclaw native`. Autopilot is available as `/auto [on|off]` (`Ctrl+A`), and evasion via `/set OPSEC high/medium/low`. All are discoverable via `/` palette with `Tab` completion — type `/auto` or `/set ` to see options.
 
 If Docker is not available, DrogonClaw will fall back to native mode automatically.
 

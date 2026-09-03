@@ -226,7 +226,7 @@ func isLongRunningTool(name string) (time.Duration, bool) {
 
 const (
 	maxRecentToolCalls  = 8
-	repetitionThreshold = 3
+	repetitionThreshold = 2
 )
 
 func (o *Orchestrator) isRepeatedCall(toolName, args string) bool {
@@ -234,7 +234,7 @@ func (o *Orchestrator) isRepeatedCall(toolName, args string) bool {
 }
 
 func (o *Orchestrator) countRecentCalls(toolName, args string) int {
-	normalized := normalizeArgs(args)
+	normalized := canonicalToolArgs(toolName, args)
 	count := 0
 	for _, rec := range o.recentToolCalls {
 		if rec.toolName == toolName && rec.args == normalized {
@@ -245,10 +245,78 @@ func (o *Orchestrator) countRecentCalls(toolName, args string) int {
 }
 
 func (o *Orchestrator) recordToolCall(toolName, args string) {
-	o.recentToolCalls = append(o.recentToolCalls, toolCallRecord{toolName: toolName, args: normalizeArgs(args)})
+	o.recentToolCalls = append(o.recentToolCalls, toolCallRecord{toolName: toolName, args: canonicalToolArgs(toolName, args)})
 	if len(o.recentToolCalls) > maxRecentToolCalls {
 		o.recentToolCalls = o.recentToolCalls[len(o.recentToolCalls)-maxRecentToolCalls:]
 	}
+}
+
+func canonicalToolArgs(toolName, raw string) string {
+	var m map[string]any
+	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+		return strings.TrimSpace(raw)
+	}
+	if toolName == "shell_execute" {
+		if cmd, ok := m["command"].(string); ok {
+			return "command=" + normalizeShellCommand(cmd)
+		}
+	}
+	return normalizeArgs(raw)
+}
+
+func normalizeShellCommand(cmd string) string {
+	s := strings.TrimSpace(cmd)
+	s = strings.ReplaceAll(s, "2>&1", "")
+	s = strings.ReplaceAll(s, "2>/dev/null", "")
+	s = strings.ReplaceAll(s, "2> /dev/null", "")
+	s = strings.ReplaceAll(s, "| cat", "")
+	return strings.Join(strings.Fields(s), " ")
+}
+
+func isSimpleFactualQuery(msg string) bool {
+	low := strings.ToLower(strings.TrimSpace(msg))
+	if low == "" || len(strings.Fields(low)) > 25 {
+		return false
+	}
+	if extractTargetFromMessage(msg) != "" {
+		return false
+	}
+	for _, kw := range []string{
+		"wifi", "wi-fi", "ssid", "essid", "what network", "which network",
+		"connected to", "hostname", "whoami", "current director", "working director",
+		"what is my ip", "my ip address", "what user", "which user",
+	} {
+		if strings.Contains(low, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+var essidRe = regexp.MustCompile(`ESSID:"([^"]+)"`)
+
+func extractKnownAnswer(recs []toolOutputEvidence) string {
+	for i := len(recs) - 1; i >= 0; i-- {
+		if m := essidRe.FindStringSubmatch(recs[i].output); m != nil {
+			return m[1]
+		}
+	}
+	for i := len(recs) - 1; i >= 0; i-- {
+		t := strings.TrimSpace(recs[i].output)
+		if strings.HasPrefix(t, "[Dedup]") || strings.HasPrefix(t, "[Blocked]") || strings.HasPrefix(t, "[Error]") {
+			continue
+		}
+		low := strings.ToLower(t)
+		if strings.Contains(low, "no wireless") || strings.Contains(low, "not found") || strings.Contains(low, "error") {
+			continue
+		}
+		if !strings.Contains(t, "\n") && len(t) > 0 && len(t) <= 32 {
+			if regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9 _.\-]{0,31}$`).MatchString(t) {
+				return t
+			}
+		}
+	}
+	return ""
 }
 
 func (o *Orchestrator) clearRecentCalls() {
@@ -434,6 +502,12 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 
 	o.fastPhaseNext = false
 	maxIter := o.maxIterations
+	simpleQuery := isSimpleFactualQuery(userMsg)
+	if simpleQuery && maxIter > 6 {
+		maxIter = 6
+	}
+	shellCalls := 0
+	answerNudged := false
 	for i := 0; i < maxIter; i++ {
 		var resp *CompletionResponse
 		var err error
@@ -542,10 +616,7 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 				}
 			}
 
-			// Auto-verify: re-check the final claims against the raw tool
-			// evidence actually gathered this run. Purely advisory — it warns
-			// loudly but never blocks or fabricates.
-			if o.tools != nil && o.tools.validator != nil && len(o.recentToolOutputs) > 0 {
+			if needsEvidenceReview(finalContent) && o.tools != nil && o.tools.validator != nil && len(o.recentToolOutputs) > 0 {
 				vctx, vcancel := context.WithTimeout(ctx, 25*time.Second)
 				ev := buildToolEvidence(o.recentToolOutputs)
 				verdict, vErr := o.tools.validator.Validate(vctx, "combined", ev, trimForVerification(finalContent))
@@ -564,7 +635,7 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 				}
 			}
 
-			if len(o.recentToolOutputs) > 0 {
+			if len(o.recentToolOutputs) > 0 && needsEvidenceReview(finalContent) {
 				finalContent += buildResultsAppendix(o.recentToolOutputs)
 			}
 
@@ -581,15 +652,14 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 		for _, tc := range resp.ToolCalls {
 			prettyArgs := formatArgs(tc.Function.Arguments)
 
-			// Check for repeated tool calls with same arguments (infinite loop detection)
 			if o.isRepeatedCall(tc.Function.Name, tc.Function.Arguments) {
 				loopMsg := fmt.Sprintf(
-					"[SYSTEM WARNING] You have called %s with identical arguments %d times in a row. This is an infinite loop. You MUST do something completely different now. Try a different tool, a different target, a different technique, or ask the operator for guidance. Do NOT call this tool with the same arguments again.",
+					"[SYSTEM WARNING] You have called %s with the same effective command %d times. The answer is already in your previous tool outputs above. STOP calling tools and answer the operator's original question NOW using the evidence you already have. Do NOT call this tool again.",
 					tc.Function.Name, o.countRecentCalls(tc.Function.Name, tc.Function.Arguments))
 				messages = append(messages, openai.UserMessage(loopMsg))
 				o.history = append(o.history, openai.UserMessage(loopMsg))
 				o.retainHistory()
-				events <- Event{Type: EvError, Content: fmt.Sprintf("Repetition detected: %s called %d times with same args. Breaking loop.", tc.Function.Name, o.countRecentCalls(tc.Function.Name, tc.Function.Arguments))}
+				events <- Event{Type: EvError, Content: fmt.Sprintf("Repetition detected: %s called %d times with same command. Breaking loop — answer with existing evidence.", tc.Function.Name, o.countRecentCalls(tc.Function.Name, tc.Function.Arguments))}
 				o.clearRecentCalls()
 				continue
 			}
@@ -646,14 +716,17 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 			if verified {
 				o.tools.RecordVerifiedFinding()
 			}
+			displayResult := result
+			llmResult := result
 			if estatus != "" {
-				evidenceFooter := fmt.Sprintf("\n[EVIDENCE: %s — %s]", estatus, reason)
-				result += evidenceFooter
+				llmResult += fmt.Sprintf("\n[EVIDENCE: %s — %s]", estatus, reason)
+			}
+			if strings.HasPrefix(result, "[Dedup]") {
+				llmResult += "\n[SYSTEM HINT] This command already ran — its output is reused above. You already have this data. Answer the operator now instead of re-running it."
 			}
 
-			events <- Event{Type: EvToolDone, Tool: tc.Function.Name, Result: result}
-			// Sanitize external tool outputs before injecting into LLM context
-			sanitizedResult := sanitizeToolOutput(result)
+			events <- Event{Type: EvToolDone, Tool: tc.Function.Name, Result: displayResult}
+			sanitizedResult := sanitizeToolOutput(llmResult)
 			messages = append(messages, openai.ToolMessage(tc.ID, sanitizedResult))
 			o.history = append(o.history, openai.ToolMessage(tc.ID, sanitizedResult))
 			o.retainHistory()
@@ -675,6 +748,23 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 				o.history = append(o.history, openai.UserMessage(fmt.Sprintf("Human-in-the-loop response: %s", ans)))
 				o.retainHistory()
 				events <- Event{Type: EvStatus, Content: "Approval received. Resuming execution..."}
+			}
+
+			if simpleQuery && (tc.Function.Name == "shell_execute" || tc.Function.Name == "nmap") {
+				shellCalls++
+				if known := extractKnownAnswer(o.recentToolOutputs); known != "" && !answerNudged {
+					nudge := fmt.Sprintf("[SYSTEM] You already have the answer: %q appears in the tool output above. The operator asked a one-fact question. Respond NOW with that value and NO further tool calls. Do not run iwconfig/iwgetid/ip/echo variants.", known)
+					messages = append(messages, openai.UserMessage(nudge))
+					o.history = append(o.history, openai.UserMessage(nudge))
+					o.retainHistory()
+					answerNudged = true
+				} else if shellCalls >= 3 && !answerNudged {
+					nudge := "[SYSTEM] You have run 3 tools for a one-fact question. Answer NOW with the best value from the outputs above and NO further tool calls."
+					messages = append(messages, openai.UserMessage(nudge))
+					o.history = append(o.history, openai.UserMessage(nudge))
+					o.retainHistory()
+					answerNudged = true
+				}
 			}
 		}
 		o.fastPhaseNext = fastRound
@@ -725,6 +815,22 @@ func trimForVerification(s string) string {
 		s = s[:4000]
 	}
 	return s
+}
+
+func needsEvidenceReview(final string) bool {
+	if strings.TrimSpace(final) == "" {
+		return false
+	}
+	if len(final) < 600 {
+		low := strings.ToLower(final)
+		for _, kw := range []string{"vuln", "cve-", "exploit", "penetrat", "flag{", "open port", "payload", "tactical assessment", "phase ", "[+]", "attack vector"} {
+			if strings.Contains(low, kw) {
+				return true
+			}
+		}
+		return false
+	}
+	return true
 }
 
 // formatArgs pretty-prints JSON tool arguments for display.

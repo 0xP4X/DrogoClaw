@@ -112,6 +112,7 @@ Commands are grouped the same way `/help` renders them — one registry, zero dr
 | `/router` | `[auto\|local\|9router\|off\|status]` | Configure intelligent routing |
 | `/providers` | - | Provider health & routing status dashboard |
 | `/theme` | `[name]` | Switch color theme (dark/light/dracula/nord/gruvbox) |
+| `/auto` | `[on\|off]` | Toggle autopilot — auto-accept long-running tools (`Ctrl+A`) |
 
 Runtime controls via `/set` / `/config set`:
 

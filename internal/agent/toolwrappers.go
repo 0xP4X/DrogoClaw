@@ -272,8 +272,18 @@ func (r *ToolRegistry) registerToolWrappers() {
 			}
 			return fmt.Sprintf("[subfinder Error] %v\nOutput: %s", err, out)
 		}
-		lines := strings.Split(strings.TrimSpace(out), "\n")
-		return fmt.Sprintf("[SUBFINDER — %s] Found %d subdomains:\n%s", domain, len(lines), out)
+		trimmed := strings.TrimSpace(out)
+		if trimmed == "" {
+			return fmt.Sprintf("[SUBFINDER — %s] Found 0 subdomains:\n(no results)", domain)
+		}
+		lines := strings.Split(trimmed, "\n")
+		count := 0
+		for _, l := range lines {
+			if strings.TrimSpace(l) != "" {
+				count++
+			}
+		}
+		return fmt.Sprintf("[SUBFINDER — %s] Found %d subdomains:\n%s", domain, count, trimmed)
 	}
 
 	// ── 7. HTTPX ──────────────────────────────────────────────────────────────

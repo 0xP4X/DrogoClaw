@@ -100,3 +100,60 @@ func TestBuildResultsAppendix(t *testing.T) {
 		t.Fatalf("appendix exceeds budget: %d", len(app))
 	}
 }
+
+func TestCanonicalToolArgsIgnoresShellRedirection(t *testing.T) {
+	a := `{"command":"iwconfig","timeout":10}`
+	b := `{"command":"iwconfig 2>&1","timeout":10}`
+	if canonicalToolArgs("shell_execute", a) != canonicalToolArgs("shell_execute", b) {
+		t.Fatal("iwconfig and iwconfig 2>&1 must canonicalize identically")
+	}
+	c := `{"command":"iwgetid -r","cleanupCommand":"echo done"}`
+	d := `{"command":"iwgetid -r","cleanupCommand":"echo other"}`
+	if canonicalToolArgs("shell_execute", c) != canonicalToolArgs("shell_execute", d) {
+		t.Fatal("same command with different cleanup metadata must canonicalize identically")
+	}
+	e := `{"command":"iwgetid"}`
+	if canonicalToolArgs("shell_execute", c) == canonicalToolArgs("shell_execute", e) {
+		t.Fatal("different commands must not canonicalize identically")
+	}
+}
+
+func TestIsSimpleFactualQuery(t *testing.T) {
+	for _, q := range []string{
+		"what wifi name are we connected to",
+		"hi i am jogon, please what wifi name are we connected to",
+		"what is the hostname",
+		"show me the current directory",
+	} {
+		if !isSimpleFactualQuery(q) {
+			t.Errorf("expected simple factual query: %q", q)
+		}
+	}
+	for _, q := range []string{
+		"scan 10.0.0.0/24 for open ports",
+		"find subdomains of example.com",
+		"exploit the target at 192.168.1.10",
+		"run a full pentest report with tactical assessment of the findings",
+	} {
+		if isSimpleFactualQuery(q) {
+			t.Errorf("expected NON-simple query: %q", q)
+		}
+	}
+}
+
+func TestExtractKnownAnswer(t *testing.T) {
+	recs := []toolOutputEvidence{
+		{tool: "shell_execute", output: "lo        no wireless extensions."},
+		{tool: "shell_execute", output: "wlan0     IEEE 802.11  ESSID:\"LIBRARY\"\n  Mode:Managed"},
+	}
+	if got := extractKnownAnswer(recs); got != "LIBRARY" {
+		t.Fatalf("expected LIBRARY, got %q", got)
+	}
+	bare := []toolOutputEvidence{{tool: "shell_execute", output: "LIBRARY"}}
+	if got := extractKnownAnswer(bare); got != "LIBRARY" {
+		t.Fatalf("expected bare LIBRARY, got %q", got)
+	}
+	if got := extractKnownAnswer(nil); got != "" {
+		t.Fatalf("expected empty answer without evidence, got %q", got)
+	}
+}

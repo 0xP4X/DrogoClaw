@@ -52,12 +52,22 @@ func TestSlashCommandRegistryConsistent(t *testing.T) {
 		t.Error("registry missing /config")
 	}
 
-	if len(allHints) != len(slashCommands) {
-		t.Errorf("palette hints (%d) drifted from registry (%d)", len(allHints), len(slashCommands))
+	totalNames := 0
+	for _, c := range slashCommands {
+		totalNames += len(c.names)
 	}
-	for i := range allHints {
-		if allHints[i].cmd != slashCommands[i].canonical() {
-			t.Errorf("hint command %s mismatched with registry %s", allHints[i].cmd, slashCommands[i].canonical())
+	if len(allHints) != totalNames {
+		t.Errorf("palette hints (%d) drifted from registry names (%d)", len(allHints), totalNames)
+	}
+	seenHint := make(map[string]bool)
+	for _, h := range allHints {
+		seenHint[h.cmd] = true
+	}
+	for _, c := range slashCommands {
+		for _, n := range c.names {
+			if !seenHint[n] {
+				t.Errorf("hint missing for registry name %s", n)
+			}
 		}
 	}
 }
