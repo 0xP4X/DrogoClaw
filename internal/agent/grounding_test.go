@@ -166,6 +166,19 @@ func TestGroundingIgnoresDeniedInterface(t *testing.T) {
 	}
 }
 
+func TestGroundingCatchesInventedMAC(t *testing.T) {
+	recs := []toolOutputEvidence{{tool: "shell_execute", output: "wlan0     IEEE 802.11  ESSID:\"LIBRARY\"\n  Access Point: 18:E8:29:C2:C6:62"}}
+	answer := "Connected to LIBRARY via access point 02:15:6D:F5:7F:7A on channel 6."
+	correction := groundingCorrections(answer, recs)
+	if !strings.Contains(correction, "02:15:6D:F5:7F:7A") {
+		t.Errorf("correction should flag the invented BSSID, got: %s", correction)
+	}
+	grounded := "Connected to LIBRARY via access point 18:E8:29:C2:C6:62."
+	if c := groundingCorrections(grounded, recs); strings.Contains(c, "18:E8:29:C2:C6:62") {
+		t.Errorf("quoted BSSID must not be flagged, got: %s", c)
+	}
+}
+
 func TestGroundingRequiresEvidence(t *testing.T) {
 	if c := groundingCorrections(hallucinatedWifiAnswer, nil); c != "" {
 		t.Errorf("expected no corrections without evidence, got: %s", c)

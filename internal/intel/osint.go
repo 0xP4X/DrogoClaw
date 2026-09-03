@@ -300,7 +300,7 @@ func WHOISLookup(domain string) (*OSINTResult, error) {
 
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("RDAP error %d", resp.StatusCode)
+		return nil, fmt.Errorf("RDAP unavailable (HTTP %d)", resp.StatusCode)
 	}
 
 	var data map[string]interface{}

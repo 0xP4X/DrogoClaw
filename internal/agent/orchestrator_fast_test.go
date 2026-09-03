@@ -141,6 +141,43 @@ func TestIsSimpleFactualQuery(t *testing.T) {
 	}
 }
 
+func TestResetRunStateScopesEachQuestion(t *testing.T) {
+	o := &Orchestrator{}
+	o.recordToolCall("shell_execute", `{"command":"iwgetid -r"}`)
+	o.appendToolEvidence("shell_execute", "LIBRARY")
+	if len(o.recentToolCalls) == 0 || len(o.recentToolOutputs) == 0 {
+		t.Fatal("setup failed: expected tracked calls and evidence")
+	}
+	o.resetRunState()
+	if len(o.recentToolCalls) != 0 {
+		t.Fatal("repeat-call tracking must reset for a new question")
+	}
+	if len(o.recentToolOutputs) != 0 {
+		t.Fatal("evidence window must reset so a new question verifies against its own tools")
+	}
+}
+
+func TestNeedsEvidenceReview(t *testing.T) {
+	memEvidence := []toolOutputEvidence{{tool: "update_neural_memory", output: "[Memory] Acknowledged Operator identity: jiggon."}}
+	capabilities := "I'm DrogonClaw with recon, exploitation, payload generation, and vulnerability scanning. What task can I help with?"
+	if needsEvidenceReview(capabilities, memEvidence) {
+		t.Fatal("capability listing with no findings evidence must skip review")
+	}
+	subEvidence := []toolOutputEvidence{{tool: "run_subfinder", output: "[SUBFINDER — knust.edu.gh] Found 469 subdomains:\na.knust.edu.gh"}}
+	if !needsEvidenceReview("Found 469 subdomains", subEvidence) {
+		t.Fatal("short result backed by findings evidence must be reviewed")
+	}
+	if needsEvidenceReview("", subEvidence) {
+		t.Fatal("empty answer must skip review")
+	}
+	if needsEvidenceReview("hello", nil) {
+		t.Fatal("answer without evidence must skip review")
+	}
+	if !needsEvidenceReview(strings.Repeat("report ", 200), memEvidence) {
+		t.Fatal("long mission report must always be reviewed")
+	}
+}
+
 func TestExtractKnownAnswer(t *testing.T) {
 	recs := []toolOutputEvidence{
 		{tool: "shell_execute", output: "lo        no wireless extensions."},

@@ -323,6 +323,11 @@ func (o *Orchestrator) clearRecentCalls() {
 	o.recentToolCalls = nil
 }
 
+func (o *Orchestrator) resetRunState() {
+	o.recentToolCalls = nil
+	o.recentToolOutputs = nil
+}
+
 func normalizeArgs(raw string) string {
 	var m map[string]any
 	if err := json.Unmarshal([]byte(raw), &m); err != nil {
@@ -434,6 +439,8 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 		o.actions.Begin(userMsg)
 	}
 
+	o.resetRunState()
+
 	// 1. Mission Planning Phase
 	events <- Event{Type: EvThinking, Content: "Analyzing objective and generating execution plan..."}
 	plan, err := o.missionPlanner.GeneratePlan(ctx, userMsg)
@@ -508,6 +515,11 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 	}
 	shellCalls := 0
 	answerNudged := false
+	runFindings := 0
+	nonFindingStreak := 0
+	finalizeNudged := false
+	blockedStreak := 0
+	blockedNudged := false
 	for i := 0; i < maxIter; i++ {
 		var resp *CompletionResponse
 		var err error
@@ -616,7 +628,7 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 				}
 			}
 
-			if needsEvidenceReview(finalContent) && o.tools != nil && o.tools.validator != nil && len(o.recentToolOutputs) > 0 {
+			if needsEvidenceReview(finalContent, o.recentToolOutputs) && o.tools != nil && o.tools.validator != nil && len(o.recentToolOutputs) > 0 {
 				vctx, vcancel := context.WithTimeout(ctx, 25*time.Second)
 				ev := buildToolEvidence(o.recentToolOutputs)
 				verdict, vErr := o.tools.validator.Validate(vctx, "combined", ev, trimForVerification(finalContent))
@@ -635,7 +647,7 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 				}
 			}
 
-			if len(o.recentToolOutputs) > 0 && needsEvidenceReview(finalContent) {
+			if len(o.recentToolOutputs) > 0 && needsEvidenceReview(finalContent, o.recentToolOutputs) {
 				finalContent += buildResultsAppendix(o.recentToolOutputs)
 			}
 
@@ -724,6 +736,18 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 			if strings.HasPrefix(result, "[Dedup]") {
 				llmResult += "\n[SYSTEM HINT] This command already ran — its output is reused above. You already have this data. Answer the operator now instead of re-running it."
 			}
+			if strings.HasPrefix(result, "[Blocked]") {
+				llmResult += "\n[SYSTEM HINT] Blocked by policy — do not retry this with tweaked arguments; use the suggested dedicated tool or answer with evidence already gathered."
+				blockedStreak++
+			} else {
+				blockedStreak = 0
+			}
+			if verified {
+				runFindings++
+				nonFindingStreak = 0
+			} else {
+				nonFindingStreak++
+			}
 
 			events <- Event{Type: EvToolDone, Tool: tc.Function.Name, Result: displayResult}
 			sanitizedResult := sanitizeToolOutput(llmResult)
@@ -765,6 +789,20 @@ func (o *Orchestrator) Execute(ctx context.Context, userMsg string, events chan<
 					o.retainHistory()
 					answerNudged = true
 				}
+			}
+			if blockedStreak >= 2 && !blockedNudged {
+				nudge := "[SYSTEM] Two calls were blocked by policy in a row. Stop retrying blocked approaches with different arguments. Use the dedicated tool already suggested, or answer with the evidence gathered so far."
+				messages = append(messages, openai.UserMessage(nudge))
+				o.history = append(o.history, openai.UserMessage(nudge))
+				o.retainHistory()
+				blockedNudged = true
+			}
+			if runFindings > 0 && nonFindingStreak >= 3 && !finalizeNudged {
+				nudge := fmt.Sprintf("[SYSTEM] %d tool call(s) since the last new finding; you already banked %d verified finding(s) this run. If that satisfies the operator's request, compose the final answer NOW with no further tool calls. Otherwise state what is still missing and continue.", nonFindingStreak, runFindings)
+				messages = append(messages, openai.UserMessage(nudge))
+				o.history = append(o.history, openai.UserMessage(nudge))
+				o.retainHistory()
+				finalizeNudged = true
 			}
 		}
 		o.fastPhaseNext = fastRound
@@ -817,20 +855,28 @@ func trimForVerification(s string) string {
 	return s
 }
 
-func needsEvidenceReview(final string) bool {
-	if strings.TrimSpace(final) == "" {
+func needsEvidenceReview(final string, recs []toolOutputEvidence) bool {
+	if strings.TrimSpace(final) == "" || len(recs) == 0 {
 		return false
 	}
-	if len(final) < 600 {
-		low := strings.ToLower(final)
-		for _, kw := range []string{"vuln", "cve-", "exploit", "penetrat", "flag{", "open port", "payload", "tactical assessment", "phase ", "[+]", "attack vector"} {
-			if strings.Contains(low, kw) {
-				return true
-			}
+	if len(final) >= 600 {
+		return true
+	}
+	for _, r := range recs {
+		if len(extractFindings(r.tool, r.output)) > 0 {
+			return true
 		}
-		return false
 	}
-	return true
+	low := strings.ToLower(final)
+	for _, kw := range []string{"tactical assessment", "exploitability score", "attack vector", "phase 1", "phase 2"} {
+		if strings.Contains(low, kw) {
+			return true
+		}
+	}
+	if ipv4Re.MatchString(final) || macRe.MatchString(final) {
+		return true
+	}
+	return false
 }
 
 // formatArgs pretty-prints JSON tool arguments for display.
